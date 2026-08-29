@@ -1,4 +1,5 @@
 from django.db.models import Sum
+from django.db.models.functions import TruncMonth
 from django.utils import timezone
 from rest_framework import generics, status
 from rest_framework.response import Response
@@ -55,3 +56,9 @@ class PaymentSummaryView(generics.GenericAPIView):
         expenses = GeneralExpense.objects.filter(property__owner=request.user, expense_date__year=year, expense_date__month=month).aggregate(total=Sum("amount"))["total"] or 0
         paid_tenant_count = sum(1 for agreement in agreements if (payments.filter(rental_agreement=agreement).aggregate(total=Sum("amount"))["total"] or 0) >= agreement.agreed_monthly_rent)
         return Response({"expected": expected, "collected": collected, "unpaid": max(expected - collected, 0), "expenses": expenses, "net": collected - expenses, "paid_tenants": paid_tenant_count, "total_tenants": agreements.count()})
+
+
+class MonthlyPaymentSummaryView(generics.GenericAPIView):
+    def get(self, request):
+        payments = Payment.objects.filter(rental_agreement__tenant__owner=request.user).annotate(month=TruncMonth("payment_date")).values("month").annotate(total=Sum("amount")).order_by("month")
+        return Response([{"month": item["month"].strftime("%Y-%m"), "total": item["total"]} for item in payments])
