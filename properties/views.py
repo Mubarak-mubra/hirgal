@@ -1,8 +1,8 @@
 from django.db.models import Count, Q, Sum
 from rest_framework import generics
 
-from .models import Property, Room, Unit
-from .serializers import PropertySerializer, RoomSerializer, UnitSerializer
+from .models import Property, PropertyAsset, Room, Unit
+from .serializers import PropertyAssetSerializer, PropertySerializer, RoomSerializer, UnitSerializer
 
 
 class PropertyListCreateView(generics.ListCreateAPIView):
@@ -68,3 +68,23 @@ class RoomDetailView(generics.RetrieveUpdateDestroyAPIView):
 
     def get_queryset(self):
         return Room.objects.filter(unit__property__owner=self.request.user)
+
+
+class PropertyAssetListCreateView(generics.ListCreateAPIView):
+    serializer_class = PropertyAssetSerializer
+
+    def get_queryset(self):
+        return PropertyAsset.objects.filter(property__owner=self.request.user)
+
+    def perform_create(self, serializer):
+        property_instance = Property.objects.get(
+            id=self.request.data.get("property_id"), owner=self.request.user
+        )
+        serializer.save(property=property_instance)
+
+
+class PropertyAssetDetailView(generics.RetrieveUpdateDestroyAPIView):
+    serializer_class = PropertyAssetSerializer
+
+    def get_queryset(self):
+        return PropertyAsset.objects.filter(property__owner=self.request.user)

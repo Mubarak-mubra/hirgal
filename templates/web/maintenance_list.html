@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% load i18n_tags %}
+{% block title %}{% t 'repairs' %} - Hirgal Kiro{% endblock %}
+{% block content %}
+<section class="mb-7 flex items-end justify-between">
+  <div>
+    <a class="text-sm font-semibold text-indigo-700" href="{% url 'home' %}">← {% t 'home' %}</a>
+    <h1 class="mt-4 text-3xl font-bold">{% t 'repairs' %}</h1>
+    <p class="mt-2 text-slate-500">All maintenance and repair records.</p>
+  </div>
+  <a class="rounded-lg bg-ink px-4 py-3 text-sm font-bold text-white" href="{% url 'web-maintenance-create' %}">+ {% t 'add_repair' %}</a>
+</section>
+
+{% if repairs %}
+<section class="rounded-xl border bg-white shadow-sm">
+  <div class="overflow-x-auto">
+    <table class="w-full text-left text-sm">
+      <thead class="border-b bg-slate-50 text-xs font-semibold uppercase text-slate-500">
+        <tr>
+          <th class="px-5 py-3">Title</th>
+          <th class="px-5 py-3">Property</th>
+          <th class="px-5 py-3">Category</th>
+          <th class="px-5 py-3">Status</th>
+          <th class="px-5 py-3">Payment</th>
+          <th class="px-5 py-3">Date</th>
+          <th class="px-5 py-3 text-right">Cost</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y">
+        {% for repair in repairs %}
+        <tr class="hover:bg-slate-50">
+          <td class="px-5 py-4 font-semibold text-ink">
+            <a href="{% url 'web-maintenance-detail' repair.pk %}" class="text-indigo-700 hover:underline">{{ repair.title }}</a>
+          </td>
+          <td class="px-5 py-4">
+            <a href="{% url 'web-property-detail' repair.property.pk %}" class="text-indigo-500 hover:underline">{{ repair.property.name }}</a>
+          </td>
+          <td class="px-5 py-4 text-slate-600">{{ repair.get_category_display }}</td>
+          <td class="px-5 py-4 text-slate-600">{{ repair.get_status_display }}</td>
+          <td class="px-5 py-4">
+            {% if repair.payment_status == 'paid' %}
+              <span class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-semibold text-green-800">La bixiyay</span>
+            {% else %}
+              <span class="inline-flex items-center rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-semibold text-orange-800">Aan la bixin</span>
+            {% endif %}
+          </td>
+          <td class="px-5 py-4 text-slate-600">{{ repair.reported_date }}</td>
+          <td class="px-5 py-4 text-right font-semibold text-rose-600">${{ repair.repair_cost }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% else %}
+<div class="rounded-xl border border-dashed bg-white p-10 text-center">
+  <p class="font-semibold text-slate-700">No repairs yet.</p>
+  <p class="mt-2 text-sm text-slate-500">Record a repair for your property.</p>
+</div>
+{% endif %}
+{% endblock %}

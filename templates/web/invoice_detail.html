@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}{{ invoice.invoice_number }} - Bilaha - Hirgal Kiro{% endblock %}
+{% block content %}
+<a class="text-sm font-semibold text-indigo-700" href="{% url 'web-invoice-list' %}">← Bilaha</a>
+
+<div class="mt-4 rounded-xl border bg-white shadow-sm p-6">
+  <div class="flex items-start justify-between">
+    <div>
+      <h1 class="text-2xl font-bold">{{ invoice.invoice_number }}</h1>
+      <p class="mt-2 text-slate-500">{{ invoice.notes|default:"Faahfaahin ma jiro" }}</p>
+    </div>
+    <div class="flex gap-2">
+      <a href="{% url 'web-invoice-edit' invoice.pk %}" class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold hover:bg-slate-50 transition">Wax ka beddel</a>
+      <a href="{% url 'web-invoice-delete' invoice.pk %}" class="rounded-lg bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-600 hover:bg-rose-100 transition">Tirtir</a>
+    </div>
+  </div>
+
+  <div class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div>
+      <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Kiraystaha</p>
+      <p class="mt-1 font-medium"><a href="{% url 'web-tenant-detail' invoice.tenant.pk %}" class="text-indigo-600 hover:underline">{{ invoice.tenant.full_name }}</a></p>
+    </div>
+    <div>
+      <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Taariikhda</p>
+      <p class="mt-1 font-medium">{{ invoice.date }}</p>
+    </div>
+    <div>
+      <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Kama Dambaysta</p>
+      <p class="mt-1 font-medium">{{ invoice.due_date }}</p>
+    </div>
+    <div>
+      <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Xaaladda</p>
+      <p class="mt-1"><span class="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-700">{{ invoice.get_status_display }}</span></p>
+    </div>
+  </div>
+</div>
+
+<div class="mt-6 rounded-xl border bg-white shadow-sm overflow-hidden">
+  <div class="border-b px-4 py-3">
+    <h2 class="text-lg font-bold">Qaybaha Biilka</h2>
+  </div>
+  {% if lines %}
+  <div class="overflow-x-auto">
+    <table class="w-full text-left text-sm">
+      <thead class="border-b bg-slate-50 text-slate-600">
+        <tr>
+          <th class="px-4 py-3 font-semibold">Xisaabta</th>
+          <th class="px-4 py-3 font-semibold">Faahfaahin</th>
+          <th class="px-4 py-3 font-semibold text-right">Qiimaha</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y">
+        {% for line in lines %}
+        <tr class="hover:bg-slate-50">
+          <td class="px-4 py-3 font-medium"><a href="{% url 'web-account-ledger' line.account.pk %}" class="text-indigo-600 hover:underline">{{ line.account.name }}</a></td>
+          <td class="px-4 py-3 text-slate-500">{{ line.description|default:"—" }}</td>
+          <td class="px-4 py-3 text-right font-mono text-xs">{{ line.amount }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot class="border-t bg-slate-50 font-semibold">
+        <tr>
+          <td class="px-4 py-3" colspan="2">Wadarta</td>
+          <td class="px-4 py-3 text-right font-mono text-xs">{{ total }}</td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+  {% else %}
+  <div class="p-10 text-center">
+    <p class="text-slate-500">Ma jiraan qaybo.</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

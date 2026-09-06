@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% load i18n_tags %}
+
+{% block title %}{% t 'accounting' %} - {% block report_title %}{% endblock %}{% endblock %}
+
+{% block content %}
+<div class="no-print mb-6">
+    <a class="text-sm font-semibold text-indigo-700" href="{% url 'web-accounting-dashboard' %}">← Back to Reports</a>
+    <h1 class="mt-2 text-2xl font-bold text-ink">{% block heading %}{% endblock %}</h1>
+</div>
+
+<div class="no-print mb-4 flex flex-wrap gap-3 items-center">
+    <button onclick="window.print()" class="inline-flex items-center gap-2 rounded-lg bg-green-600 px-5 py-2 text-sm font-bold text-white hover:bg-green-700 transition">
+        🖨️ {% t 'print' %}
+    </button>
+    <a href="?{% block csv_params %}{% endblock %}export=csv"
+       class="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-5 py-2 text-sm font-bold text-white hover:bg-emerald-700 transition">
+        📊 Download CSV
+    </a>
+    {% block extra_actions %}{% endblock %}
+</div>
+
+<div class="rounded-xl border bg-white p-6 shadow-sm">
+    <div class="print-header mb-4 hidden print:block">
+        <h1 class="text-xl font-bold">Hirgal Kiro - {% block print_title %}{% endblock %}</h1>
+        <p class="text-sm text-slate-600">{% t 'date' %}: {% now "d/m/Y" %} | User: {{ request.user.full_name|default:request.user.username }}</p>
+        <hr class="my-2 border-slate-300">
+    </div>
+    {% block report_content %}{% endblock %}
+</div>
+{% endblock %}

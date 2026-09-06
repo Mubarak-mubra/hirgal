@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+{% load i18n_tags %}
+{% block title %}{% t 'accounting' %} - Hirgal Kiro{% endblock %}
+{% block content %}
+<a class="text-sm font-semibold text-indigo-700" href="{% url 'home' %}">← {% t 'home' %}</a>
+<h1 class="mt-4 text-3xl font-bold text-ink">{% t 'accounting' %}</h1>
+<p class="mt-2 text-slate-500">Guji warbixin si aad u aragto xogtaada maaliyadeed.</p>
+
+<!-- Management Links -->
+<section class="mt-6 mb-8">
+    <h2 class="mb-3 text-lg font-bold text-ink">Maamulka (Management)</h2>
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <a href="{% url 'web-account-list' %}" class="group rounded-2xl border bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:border-indigo-300 hover:shadow-md">
+            <span class="mb-4 grid h-11 w-11 place-items-center rounded-xl bg-purple-50 text-xl text-purple-600">≡</span>
+            <strong class="block text-lg text-ink">{% t 'accounts' %}</strong>
+            <small class="mt-1 block text-slate-500">{% t 'chart_of_accounts' %}</small>
+        </a>
+        <a href="{% url 'web-journal-list' %}" class="group rounded-2xl border bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:border-indigo-300 hover:shadow-md">
+            <span class="mb-4 grid h-11 w-11 place-items-center rounded-xl bg-blue-50 text-xl text-blue-600">✎</span>
+            <strong class="block text-lg text-ink">{% t 'journal' %}</strong>
+            <small class="mt-1 block text-slate-500">{% t 'general_journal' %}</small>
+        </a>
+        <a href="{% url 'web-invoice-list' %}" class="group rounded-2xl border bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:border-indigo-300 hover:shadow-md">
+            <span class="mb-4 grid h-11 w-11 place-items-center rounded-xl bg-green-50 text-xl text-green-600">📄</span>
+            <strong class="block text-lg text-ink">{% t 'invoices' %}</strong>
+            <small class="mt-1 block text-slate-500">{% t 'tenant_invoices' %}</small>
+        </a>
+        <a href="{% url 'web-chart-of-accounts' %}" class="group rounded-2xl border bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:border-indigo-300 hover:shadow-md">
+            <span class="mb-4 grid h-11 w-11 place-items-center rounded-xl bg-indigo-50 text-xl text-indigo-600">📊</span>
+            <strong class="block text-lg text-ink">{% t 'chart_of_accounts_report' %}</strong>
+            <small class="mt-1 block text-slate-500">{% t 'financial_reports' %}</small>
+        </a>
+    </div>
+</section>
+
+<!-- Financial Reports -->
+<section class="mb-8">
+    <h2 class="mb-3 text-lg font-bold text-ink">Warbixinnada Maaliyadda (Financial Reports)</h2>
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+
+        <!-- Income Statement -->
+        <a href="{% url 'web-income-statement' %}" class="group rounded-2xl border bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:border-green-300 hover:shadow-md">
+            <div class="flex items-center gap-3 mb-3">
+                <span class="grid h-11 w-11 place-items-center rounded-xl bg-green-50 text-xl text-green-600">📈</span>
+                <div>
+                    <strong class="block text-lg text-ink">{% t 'income_statement' %}</strong>
+                    <small class="text-slate-500">Dakhli - Kharash = Faa'iido</small>
+                </div>
+            </div>
+            <p class="text-sm text-slate-600">Arag inta lacag ah oo kaatayd ama kaa baxday intii lagu jiray muddo cayiman. Wuxuu muujinayaa dakhliga guud ee kirada oo laga jaray kharashyada dhan.</p>
+            <p class="mt-2 text-xs text-green-600 font-semibold">Eeg warbixinta →</p>
+        </a>
+
+        <!-- Profit & Loss -->
+        <a href="{% url 'web-profit-loss' %}" class="group rounded-2xl border bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:border-green-300 hover:shadow-md">
+            <div class="flex items-center gap-3 mb-3">
+                <span class="grid h-11 w-11 place-items-center rounded-xl bg-green-50 text-xl text-green-600">💰</span>
+                <div>
+                    <strong class="block text-lg text-ink">{% t 'profit_loss' %}</strong>
+                    <small class="text-slate-500">La mid ah Income Statement</small>
+                </div>
+            </div>
+            <p class="text-sm text-slate-600">Faa'iidada ama khasaraha guud. Haddii dakhligu ka badan yahay kharashka waa faa'iido, haddii kharashku badan yahayna waa khasaro.</p>
+            <p class="mt-2 text-xs text-green-600 font-semibold">Eeg warbixinta →</p>
+        </a>
+
+        <!-- Balance Sheet -->
+        <a href="{% url 'web-balance-sheet' %}" class="group rounded-2xl border bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:border-blue-300 hover:shadow-md">
+            <div class="flex items-center gap-3 mb-3">
+                <span class="grid h-11 w-11 place-items-center rounded-xl bg-blue-50 text-xl text-blue-600">⚖️</span>
+                <div>
+                    <strong class="block text-lg text-ink">{% t 'balance_sheet' %}</strong>
+                    <small class="text-slate-500">Hantida aad leedahay vs Deymaha lagu leeyahay</small>
+                </div>
+            </div>
+            <p class="text-sm text-slate-600">Wuxuu muujinayaa xaaladdaada maaliyadeed ee xilligan. Hantida (Assets) = Deymaha (Liabilities) + Raasamaalka (Equity).</p>
+            <p class="mt-2 text-xs text-blue-600 font-semibold">Eeg warbixinta →</p>
+        </a>
+
+        <!-- Cash Flow -->
+        <a href="{% url 'web-cash-flow' %}" class="group rounded-2xl border bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:border-emerald-300 hover:shadow-md">
+            <div class="flex items-center gap-3 mb-3">
+                <span class="grid h-11 w-11 place-items-center rounded-xl bg-emerald-50 text-xl text-emerald-600">💵</span>
+                <div>
+                    <strong class="block text-lg text-ink">{% t 'cash_flow' %}</strong>
+                    <small class="text-slate-500">Lacagta soo gashay vs Lacagta baxday</small>
+                </div>
+            </div>
+            <p class="text-sm text-slate-600">Wuxuu dabagalaa socodka lacagta cagdada ah. Inta lacag ah oo ka timid kirada iyo inta kharashyada ku baxday.</p>
+            <p class="mt-2 text-xs text-emerald-600 font-semibold">Eeg warbixinta →</p>
+        </a>
+
+        <!-- Trial Balance -->
+        <a href="{% url 'web-trial-balance' %}" class="group rounded-2xl border bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:border-purple-300 hover:shadow-md">
+            <div class="flex items-center gap-3 mb-3">
+                <span class="grid h-11 w-11 place-items-center rounded-xl bg-purple-50 text-xl text-purple-600">✅</span>
+                <div>
+                    <strong class="block text-lg text-ink">{% t 'trial_balance' %}</strong>
+                    <small class="text-slate-500">Hubinta isku-dhafka debit iyo credit</small>
+                </div>
+            </div>
+            <p class="text-sm text-slate-600">Wuxuu liisgaraynayaa xisaabaha oo dhan iyadoo la muujinayo Debit iyo Credit. Dhanka Debit-ka iyo Credit-ku waa inay is leeyihiin.</p>
+            <p class="mt-2 text-xs text-purple-600 font-semibold">Eeg warbixinta →</p>
+        </a>
+
+        <!-- General Ledger -->
+        <a href="{% url 'web-general-ledger' %}" class="group rounded-2xl border bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:border-slate-300 hover:shadow-md">
+            <div class="flex items-center gap-3 mb-3">
+                <span class="grid h-11 w-11 place-items-center rounded-xl bg-slate-50 text-xl text-slate-600">📒</span>
+                <div>
+                    <strong class="block text-lg text-ink">{% t 'general_ledger' %}</strong>
+                    <small class="text-slate-500">Diiwaanka guud ee sarrifka iyo lacagaha</small>
+                </div>
+            </div>
+            <p class="text-sm text-slate-600">Taariikhda buuxda ee dhammaan sarrifyada xisaab kasta. Waxaad ku arkeysaa debit iyo credit kasta oo leh taariikh iyo faahfaahin.</p>
+            <p class="mt-2 text-xs text-slate-600 font-semibold">Eeg warbixinta →</p>
+        </a>
+
+        <!-- Accounts Receivable -->
+        <a href="{% url 'web-ar' %}" class="group rounded-2xl border bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:border-orange-300 hover:shadow-md">
+            <div class="flex items-center gap-3 mb-3">
+                <span class="grid h-11 w-11 place-items-center rounded-xl bg-orange-50 text-xl text-orange-600">📋</span>
+                <div>
+                    <strong class="block text-lg text-ink">{% t 'accounts_receivable' %}</strong>
+                    <small class="text-slate-500">Lacagaha deynta ah ee kiraystayaasha lagu leeyahay</small>
+                </div>
+            </div>
+            <p class="text-sm text-slate-600">Wuxuu muujinayaa inta lacag oo deyn ah oo lagu leeyahay kiraystayaasha. Haddii ay badantahay waa inaad lacagaha soo uruurisaa.</p>
+            <p class="mt-2 text-xs text-orange-600 font-semibold">Eeg warbixinta →</p>
+        </a>
+
+        <!-- Accounts Payable -->
+        <a href="{% url 'web-ap' %}" class="group rounded-2xl border bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:border-red-300 hover:shadow-md">
+            <div class="flex items-center gap-3 mb-3">
+                <span class="grid h-11 w-11 place-items-center rounded-xl bg-red-50 text-xl text-red-600">📝</span>
+                <div>
+                    <strong class="block text-lg text-ink">{% t 'accounts_payable' %}</strong>
+                    <small class="text-slate-500">Lacagaha deynta ah ee lagu leeyahay shirkada</small>
+                </div>
+            </div>
+            <p class="text-sm text-slate-600">Wuxuu muujinayaa lacagaha aad ku leeyihiin ganacsatada, qandraasleeyda, ama korontada. Bixi si aad u ilaaliso akoonadaada.</p>
+            <p class="mt-2 text-xs text-red-600 font-semibold">Eeg warbixinta →</p>
+        </a>
+
+        <!-- Sales Report -->
+        <a href="{% url 'web-sales-report' %}" class="group rounded-2xl border bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:border-teal-300 hover:shadow-md">
+            <div class="flex items-center gap-3 mb-3">
+                <span class="grid h-11 w-11 place-items-center rounded-xl bg-teal-50 text-xl text-teal-600">🏠</span>
+                <div>
+                    <strong class="block text-lg text-ink">{% t 'sales_report' %}</strong>
+                    <small class="text-slate-500">Dakhliga guri kasta soo saaray</small>
+                </div>
+            </div>
+            <p class="text-sm text-slate-600">Wuxuu muujinayaa inta dakhli ah ee guri kasta uu soo saaray. Isbarbardhig guryaha si aad u ogaato kan ugu dakhliga badan.</p>
+            <p class="mt-2 text-xs text-teal-600 font-semibold">Eeg warbixinta →</p>
+        </a>
+
+        <!-- Expense Report -->
+        <a href="{% url 'web-expense-report' %}" class="group rounded-2xl border bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:border-rose-300 hover:shadow-md">
+            <div class="flex items-center gap-3 mb-3">
+                <span class="grid h-11 w-11 place-items-center rounded-xl bg-rose-50 text-xl text-rose-600">💸</span>
+                <div>
+                    <strong class="block text-lg text-ink">{% t 'expense_report' %}</strong>
+                    <small class="text-slate-500">Kharashyada loo kala qeybiyay noocyo</small>
+                </div>
+            </div>
+            <p class="text-sm text-slate-600">Wuxuu u kala jabineyaa kharashyada noocyo (dayactir, maamul, koronto). Si aad u ogaato halka lacagtu ku baxayso.</p>
+            <p class="mt-2 text-xs text-rose-600 font-semibold">Eeg warbixinta →</p>
+        </a>
+
+        <!-- Inventory -->
+        <a href="{% url 'web-inventory-report' %}" class="group rounded-2xl border bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:border-amber-300 hover:shadow-md">
+            <div class="flex items-center gap-3 mb-3">
+                <span class="grid h-11 w-11 place-items-center rounded-xl bg-amber-50 text-xl text-amber-600">📦</span>
+                <div>
+                    <strong class="block text-lg text-ink">{% t 'inventory_report' %}</strong>
+                    <small class="text-slate-500">Alaabaha iyo hantida guryaha yaalla</small>
+                </div>
+            </div>
+            <p class="text-sm text-slate-600">Liiska kuraasta, qalabka guriga, iyo agabka yaalla guryahaaga. Dabagal alaabta aad leedahay iyo xaaladdooda.</p>
+            <p class="mt-2 text-xs text-amber-600 font-semibold">Eeg warbixinta →</p>
+        </a>
+
+    </div>
+</section>
+{% endblock %}

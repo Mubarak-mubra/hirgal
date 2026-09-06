@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Lacag-bixinta - Hirgal Kiro{% endblock %}
+{% block content %}
+<a class="text-sm font-semibold text-indigo-700" href="{% url 'web-payments' %}">← Lacag-bixinta</a>
+<h1 class="mt-4 text-3xl font-bold text-ink">Faahfaahinta Lacag-bixinta</h1>
+
+<section class="mt-6 rounded-xl border bg-white p-6 shadow-sm">
+  <div class="grid gap-4 sm:grid-cols-2">
+    <div>
+      <p class="text-sm font-semibold text-slate-500">Kiraystaha</p>
+      <p class="mt-1 font-semibold text-ink"><a href="{% url 'web-tenant-detail' payment.rental_agreement.tenant.pk %}" class="text-indigo-600 hover:underline">{{ payment.rental_agreement.tenant.full_name }}</a></p>
+    </div>
+    <div>
+      <p class="text-sm font-semibold text-slate-500">Hantida</p>
+      <p class="mt-1 font-semibold text-ink"><a href="{% url 'web-property-detail' payment.rental_agreement.property.pk %}" class="text-indigo-600 hover:underline">{{ payment.rental_agreement.property.name }}</a></p>
+    </div>
+    <div>
+      <p class="text-sm font-semibold text-slate-500">Qiimaha</p>
+      <p class="mt-1 text-2xl font-bold text-ink">${{ payment.amount }}</p>
+    </div>
+    <div>
+      <p class="text-sm font-semibold text-slate-500">Taariikhda</p>
+      <p class="mt-1 font-semibold text-ink">{{ payment.payment_date }}</p>
+    </div>
+    <div>
+      <p class="text-sm font-semibold text-slate-500">Habka lacagta</p>
+      <p class="mt-1 font-semibold text-ink">{{ payment.get_payment_method_display }}</p>
+    </div>
+    <div>
+      <p class="text-sm font-semibold text-slate-500">Account-ka</p>
+      {% if payment.journal_entry %}<p class="mt-1 font-semibold text-ink"><a href="{% url 'web-journal-detail' payment.journal_entry.pk %}" class="text-indigo-600 hover:underline">{{ payment.destination_account|default:"-" }}</a></p>{% else %}<p class="mt-1 font-semibold text-ink">{{ payment.destination_account|default:"-" }}</p>{% endif %}
+    </div>
+    <div>
+      <p class="text-sm font-semibold text-slate-500">Lambarka xuquuqda</p>
+      <p class="mt-1 font-semibold text-ink">{{ payment.reference_number|default:"-" }}</p>
+    </div>
+    <div>
+      <p class="text-sm font-semibold text-slate-500">Taariikhda abuurista</p>
+      <p class="mt-1 font-semibold text-ink">{{ payment.created_at }}</p>
+    </div>
+  </div>
+
+  {% if payment.notes %}
+  <div class="mt-5 border-t pt-4">
+    <p class="text-sm font-semibold text-slate-500">Qoraallo</p>
+    <p class="mt-1 text-ink">{{ payment.notes }}</p>
+  </div>
+  {% endif %}
+
+  <div class="mt-6 flex gap-3">
+    <a class="rounded-lg bg-ink px-4 py-2 text-sm font-bold text-white" href="{% url 'web-payment-edit' payment.pk %}">Wax ka beddel</a>
+    <form method="post" action="{% url 'web-payment-delete' payment.pk %}" class="inline">
+      {% csrf_token %}
+      <button type="submit" class="rounded-lg border border-red-300 bg-red-50 px-4 py-2 text-sm font-bold text-red-700 hover:bg-red-100">Tirtir</button>
+    </form>
+  </div>
+</section>
+{% endblock %}

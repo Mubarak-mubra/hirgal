@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}{% if editing %}Wax ka beddel dayactirka{% else %}Ku dar dayactirka cusub{% endif %} - Hirgal Kiro{% endblock %}
+{% block content %}
+<a class="text-sm font-semibold text-indigo-700" href="{% url 'web-maintenance-list' %}">← Dayactirro</a>
+<h1 class="mt-4 text-3xl font-bold text-ink">{% if editing %}Wax ka beddel dayactirka{% else %}Ku dar dayactirka cusub{% endif %}</h1>
+
+<form method="post" class="mt-6 rounded-xl border bg-white p-6 shadow-sm">
+  {% csrf_token %}
+
+  <div class="mb-4">
+    <label class="block text-sm font-medium text-slate-700">{{ form.property.label }}</label>
+    {{ form.property }}
+    {% if form.property.errors %}<p class="text-red-500 text-sm">{{ form.property.errors.0 }}</p>{% endif %}
+  </div>
+
+  <div class="mb-4">
+    <label class="block text-sm font-medium text-slate-700">{{ form.unit.label }}</label>
+    {{ form.unit }}
+    {% if form.unit.errors %}<p class="text-red-500 text-sm">{{ form.unit.errors.0 }}</p>{% endif %}
+  </div>
+
+  <div class="mb-4">
+    <label class="block text-sm font-medium text-slate-700">{{ form.title.label }}</label>
+    {{ form.title }}
+    {% if form.title.errors %}<p class="text-red-500 text-sm">{{ form.title.errors.0 }}</p>{% endif %}
+  </div>
+
+  <div class="mb-4">
+    <label class="block text-sm font-medium text-slate-700">{{ form.description.label }}</label>
+    {{ form.description }}
+    {% if form.description.errors %}<p class="text-red-500 text-sm">{{ form.description.errors.0 }}</p>{% endif %}
+  </div>
+
+  <div class="grid gap-4 sm:grid-cols-2">
+    <div class="mb-4">
+      <label class="block text-sm font-medium text-slate-700">{{ form.category.label }}</label>
+      {{ form.category }}
+      {% if form.category.errors %}<p class="text-red-500 text-sm">{{ form.category.errors.0 }}</p>{% endif %}
+    </div>
+    <div class="mb-4">
+      <label class="block text-sm font-medium text-slate-700">{{ form.status.label }}</label>
+      {{ form.status }}
+      {% if form.status.errors %}<p class="text-red-500 text-sm">{{ form.status.errors.0 }}</p>{% endif %}
+    </div>
+  </div>
+
+  <div class="grid gap-4 sm:grid-cols-2">
+    <div class="mb-4">
+      <label class="block text-sm font-medium text-slate-700">{{ form.repair_cost.label }}</label>
+      {{ form.repair_cost }}
+      {% if form.repair_cost.errors %}<p class="text-red-500 text-sm">{{ form.repair_cost.errors.0 }}</p>{% endif %}
+    </div>
+    <div class="mb-4">
+      <label class="block text-sm font-medium text-slate-700">{{ form.payment_status.label }}</label>
+      {{ form.payment_status }}
+      {% if form.payment_status.errors %}<p class="text-red-500 text-sm">{{ form.payment_status.errors.0 }}</p>{% endif %}
+    </div>
+  </div>
+
+  <div class="grid gap-4 sm:grid-cols-2">
+    <div class="mb-4">
+      <label class="block text-sm font-medium text-slate-700">{{ form.reported_date.label }}</label>
+      {{ form.reported_date }}
+      {% if form.reported_date.errors %}<p class="text-red-500 text-sm">{{ form.reported_date.errors.0 }}</p>{% endif %}
+    </div>
+    <div class="mb-4">
+      <label class="block text-sm font-medium text-slate-700">{{ form.fixed_date.label }}</label>
+      {{ form.fixed_date }}
+      {% if form.fixed_date.errors %}<p class="text-red-500 text-sm">{{ form.fixed_date.errors.0 }}</p>{% endif %}
+    </div>
+  </div>
+
+  <div class="mb-4">
+    <label class="block text-sm font-medium text-slate-700">{{ form.notes.label }}</label>
+    {{ form.notes }}
+    {% if form.notes.errors %}<p class="text-red-500 text-sm">{{ form.notes.errors.0 }}</p>{% endif %}
+  </div>
+
+  <button class="mt-4 rounded-lg bg-ink px-5 py-3 font-bold text-white">Kaydi</button>
+</form>
+
+<script>
+document.getElementById('id_property').addEventListener('change', function() {
+    const propertyId = this.value;
+    const unitSelect = document.getElementById('id_unit');
+    unitSelect.innerHTML = '<option value="">--- Dooro qaybta ---</option>';
+    if (propertyId) {
+        fetch(`/api/units-by-property/?property_id=${propertyId}`)
+            .then(r => r.json())
+            .then(data => {
+                data.units.forEach(u => {
+                    const opt = document.createElement('option');
+                    opt.value = u.id;
+                    opt.textContent = u.unit_number;
+                    unitSelect.appendChild(opt);
+                });
+            });
+    }
+});
+</script>
+{% endblock %}

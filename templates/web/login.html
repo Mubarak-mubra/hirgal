@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Soo gal - Hirgal Kiro{% endblock %}
+{% block content %}
+<section class="mx-auto mt-12 max-w-md rounded-2xl border bg-white p-7 shadow-lg">
+    <img src="{% static 'logoHirgal.png' %}" alt="Hirgal Kiro" class="h-12 w-12 rounded-xl object-cover">
+    <h1 class="mt-5 text-2xl font-bold">Ku soo gal Hirgal Kiro</h1>
+    <p class="mt-2 text-slate-500">Geli username-ka ama telefoonkaaga iyo furaha sirta ah.</p>
+    {% if error_message %}<p class="mt-4 rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{{ error_message }}</p>{% endif %}
+    <form method="post" class="mt-5">
+        {% csrf_token %}
+        <label class="mb-2 block text-sm font-semibold">Username ama telefoon</label>
+        <input class="w-full rounded-lg border border-slate-300 px-3 py-3 outline-none focus:border-indigo-500" name="username_or_phone" required autocomplete="username">
+        <label class="mb-2 mt-5 block text-sm font-semibold">Furaha sirta ah</label>
+        <input class="w-full rounded-lg border border-slate-300 px-3 py-3 outline-none focus:border-indigo-500" name="password" type="password" required autocomplete="current-password">
+        <button class="mt-6 w-full rounded-lg bg-ink px-4 py-3 font-bold text-white hover:bg-indigo-900" type="submit">Soo gal</button>
+    </form>
+</section>
+{% endblock %}

@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}{% if editing %}Wax ka beddel kharashka{% else %}Ku dar kharashka cusub{% endif %} - Hirgal Kiro{% endblock %}
+{% block content %}
+<a class="text-sm font-semibold text-indigo-700" href="{% url 'web-expense-list' %}">← Kharashyo</a>
+<h1 class="mt-4 text-3xl font-bold text-ink">{% if editing %}Wax ka beddel kharashka{% else %}Ku dar kharashka cusub{% endif %}</h1>
+
+<form method="post" class="mt-6 rounded-xl border bg-white p-6 shadow-sm">
+  {% csrf_token %}
+  {{ form.as_p }}
+  <button class="mt-4 rounded-lg bg-ink px-5 py-3 font-bold text-white">Kaydi</button>
+</form>
+{% endblock %}

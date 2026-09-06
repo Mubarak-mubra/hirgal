@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Bilaha - Hirgal Kiro{% endblock %}
+{% block content %}
+<section class="mb-7 flex items-end justify-between">
+  <div>
+    <a class="text-sm font-semibold text-indigo-700" href="{% url 'home' %}">← Bogga hore</a>
+    <h1 class="mt-4 text-3xl font-bold">Bilaha</h1>
+    <p class="mt-2 text-slate-500">Dhammaan biilaha kirada.</p>
+  </div>
+  <a class="rounded-lg bg-ink px-4 py-3 text-sm font-bold text-white" href="{% url 'web-invoice-create' %}">+ Ku cusub</a>
+</section>
+
+<section class="rounded-xl border bg-white shadow-sm overflow-hidden">
+  {% if invoices %}
+  <div class="overflow-x-auto">
+    <table class="w-full text-left text-sm">
+      <thead class="border-b bg-slate-50 text-slate-600">
+        <tr>
+          <th class="px-4 py-3 font-semibold">Nambarka</th>
+          <th class="px-4 py-3 font-semibold">Kiraystaha</th>
+          <th class="px-4 py-3 font-semibold">Taariikhda</th>
+          <th class="px-4 py-3 font-semibold">Kama Dambaysta</th>
+          <th class="px-4 py-3 font-semibold text-right">Qiimaha</th>
+          <th class="px-4 py-3 font-semibold">Xaaladda</th>
+          <th class="px-4 py-3 font-semibold text-right">Ficillo</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y">
+        {% for invoice in invoices %}
+        <tr class="hover:bg-slate-50">
+          <td class="px-4 py-3 font-mono text-xs font-semibold text-indigo-700">
+            <a href="{% url 'web-invoice-detail' invoice.pk %}" class="hover:underline">{{ invoice.invoice_number }}</a>
+          </td>
+          <td class="px-4 py-3"><a href="{% url 'web-tenant-detail' invoice.tenant.pk %}" class="text-indigo-600 hover:underline">{{ invoice.tenant.full_name }}</a></td>
+          <td class="px-4 py-3">{{ invoice.date }}</td>
+          <td class="px-4 py-3">{{ invoice.due_date }}</td>
+          <td class="px-4 py-3 text-right font-mono text-xs">{{ invoice.get_total_amount }}</td>
+          <td class="px-4 py-3">
+            <span class="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-700">{{ invoice.get_status_display }}</span>
+          </td>
+          <td class="px-4 py-3 text-right">
+            <a href="{% url 'web-invoice-detail' invoice.pk %}" class="font-semibold text-indigo-600 hover:underline">Faahfaahin</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="p-10 text-center">
+    <p class="font-semibold text-slate-700">Ma jiraan bilaha.</p>
+    <p class="mt-2 text-sm text-slate-500">Ku cusub biil cusub si aad bilowdo.</p>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

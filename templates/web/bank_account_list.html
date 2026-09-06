@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% load i18n_tags %}
+{% block title %}{% t 'bank_accounts_title' %} - Hirgal Kiro{% endblock %}
+{% block content %}
+<section class="mb-7 flex items-end justify-between">
+  <div>
+    <a class="text-sm font-semibold text-indigo-700" href="{% url 'home' %}">← {% t 'home' %}</a>
+    <h1 class="mt-4 text-3xl font-bold">{% t 'bank_accounts_title' %}</h1>
+    <p class="mt-2 text-slate-500">{% t 'bank_accounts_desc' %}</p>
+  </div>
+  <a class="rounded-lg bg-ink px-4 py-3 text-sm font-bold text-white" href="{% url 'web-bank-account-create' %}">{% t 'add_bank_account' %}</a>
+</section>
+
+<section class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+{% for bank in bank_accounts %}
+<a href="{% url 'web-bank-account-detail' bank.pk %}" class="rounded-2xl border bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:border-indigo-300 hover:shadow-md">
+  <div class="flex items-center gap-3 mb-3">
+    <span class="grid h-10 w-10 place-items-center rounded-xl bg-blue-50 text-lg text-blue-600">🏦</span>
+    <div>
+      <h2 class="font-bold text-ink">{{ bank.bank_name }}</h2>
+      <p class="text-xs text-slate-500">{{ bank.account_name }}</p>
+    </div>
+  </div>
+  <p class="text-xs text-slate-400">{% t 'account_number' %}: {{ bank.account_number }}</p>
+</a>
+{% empty %}
+<div class="rounded-2xl border border-dashed bg-white p-10 text-center md:col-span-3">
+  <p class="font-semibold text-slate-700">{% t 'no_bank_accounts' %}</p>
+  <p class="mt-2 text-sm text-slate-500">{% t 'no_bank_accounts_hint' %}</p>
+</div>
+{% endfor %}
+</section>
+{% endblock %}

@@ -1,0 +1,63 @@
+{% load static i18n_tags %}
+<!doctype html>
+<html lang="{{ current_language }}">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Hirgal Kiro{% endblock %}</title>
+    <link rel="icon" type="image/png" href="{% static 'logoHirgal.png' %}">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>tailwind.config = { theme: { extend: { colors: { ink: '#10194f' } } } }</script>
+    <style>
+        @media print {
+            body { background: white !important; }
+            header, nav, .no-print, footer, a[href*="delete"], button { display: none !important; }
+            main { margin: 0 !important; padding: 0 !important; }
+            .print-break { page-break-before: always; }
+            table { border-collapse: collapse !important; }
+            th, td { border: 1px solid #333 !important; padding: 6px 10px !important; }
+            .rounded-2xl, .rounded-xl, .rounded-lg { border-radius: 0 !important; }
+            .shadow-sm, .shadow-md { box-shadow: none !important; }
+            .bg-slate-50, .bg-slate-100 { background: white !important; }
+            .bg-ink { background: #10194f !important; color: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .text-white { color: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            @page { margin: 1cm; size: A4; }
+        }
+    </style>
+</head>
+<body>
+    <main class="min-h-screen bg-slate-50 text-slate-900">
+
+        <header class="no-print flex h-16 items-center justify-between border-b bg-white px-5 shadow-sm md:px-10">
+
+
+            <a 
+            href="{% url 'home' %}" class="flex items-center gap-2 text-lg font-bold text-ink">
+
+                <img src="{% static 'logoHirgal.png' %}" alt="Hirgal Kiro" class="h-9 w-9 rounded-xl object-cover">
+                Hirgal Kiro
+            
+            </a>
+
+
+            {% if request.user.is_authenticated %}
+                <div class="flex items-center gap-3">
+                    <span class="hidden text-sm text-slate-500 sm:block">{{ request.user.full_name|default:request.user.username }}</span>
+                    <a href="{% url 'web-chatbot' %}" class="rounded-lg bg-indigo-50 p-2 text-indigo-600 hover:bg-indigo-100" title="AI Assistant">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-5 w-5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+                        </svg>
+                    </a>
+                    <a href="?lang={% other_lang %}" class="rounded-lg bg-indigo-50 px-3 py-2 text-sm font-semibold text-indigo-600 hover:bg-indigo-100">{% other_lang_name %}</a>
+                    <a href="{% url 'web-logout' %}" class="rounded-lg bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-600 hover:bg-rose-100">{% t 'logout' %}</a>
+                </div>
+            {% endif %}
+        </header>
+
+
+        <div class="mx-auto max-w-7xl px-4 py-6 md:px-10">
+            {% block content %}{% endblock %}
+        </div>
+    </main>
+</body>
+</html>

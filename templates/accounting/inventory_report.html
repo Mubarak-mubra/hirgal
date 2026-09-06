@@ -1,0 +1,32 @@
+{% extends "accounting/base_accounting.html" %}
+
+{% block report_title %}Alaabaha{% endblock %}
+{% block print_title %}Warbixinta Alaabaha (Inventory Report){% endblock %}
+{% block heading %}Warbixinta Alaabaha (Inventory Report){% endblock %}
+
+{% block report_content %}
+<div class="bg-white rounded-xl border border-slate-200 overflow-hidden mb-6">
+    <table class="w-full text-sm">
+        <thead class="bg-slate-50 border-b border-slate-200">
+            <tr>
+                <th class="text-left px-4 py-3 font-semibold text-slate-700">Hantida</th>
+                <th class="text-left px-4 py-3 font-semibold text-slate-700">Magaca Alaabta</th>
+                <th class="text-right px-4 py-3 font-semibold text-slate-700">Tirada</th>
+                <th class="text-left px-4 py-3 font-semibold text-slate-700">Xaaladda</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+            {% for asset in assets %}
+            <tr class="hover:bg-slate-50">
+                <td class="px-4 py-3 text-slate-800"><a href="{% url 'web-property-detail' asset.property.pk %}" class="text-indigo-600 hover:underline">{{ asset.property.name }}</a></td>
+                <td class="px-4 py-3 text-slate-800">{{ asset.name }}</td>
+                <td class="px-4 py-3 text-right text-slate-600">{{ asset.quantity }}</td>
+                <td class="px-4 py-3 text-slate-600">{{ asset.get_condition_display }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="4" class="px-4 py-8 text-center text-slate-400">Ma jiraan alaab.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

@@ -1,0 +1,5 @@
+{% extends "base.html" %}
+{% block title %}Ku dar apartment - Hirgal Kiro{% endblock %}
+{% block content %}
+<section class="mx-auto max-w-3xl"><a class="text-sm font-semibold text-indigo-700" href="{% url 'web-property-detail' property.pk %}">← {{ property.name }}</a><div class="mb-6 mt-5"><p class="text-xs font-bold tracking-widest text-indigo-700">QAYBTA GURIGA</p><h1 class="mt-2 text-3xl font-bold text-ink">Ku dar apartment ama qayb</h1><p class="mt-2 text-slate-500">Qiimaha waxaa lagu go’aaminayaa heshiiska kiraystaha, halkan ha gelin.</p></div><form method="post" class="rounded-2xl border bg-white p-6 shadow-xl shadow-slate-200/60 md:p-8">{% csrf_token %}<div class="grid gap-5 md:grid-cols-2">{% for field in form %}<label class="text-sm font-semibold text-slate-700">{{ field.label }}{{ field }}</label>{% endfor %}</div><div class="mt-6 flex justify-end border-t pt-5"><button class="rounded-xl bg-ink px-6 py-3 font-bold text-white shadow-lg shadow-indigo-900/20 hover:bg-indigo-900">Kaydi qaybta</button></div></form></section>
+{% endblock %}

@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}{% if editing %}Wax ka beddel xisaabta{% else %}Ku dar xisaab cusub{% endif %} - Hirgal Kiro{% endblock %}
+{% block content %}
+<div class="max-w-2xl mx-auto p-6">
+  <div class="bg-white rounded-xl border shadow-sm p-6">
+    <h1 class="text-2xl font-bold mb-2">
+      {% if editing %}
+        Wax ka beddel xisaabta
+      {% else %}
+        Ku dar xisaab cusub
+      {% endif %}
+    </h1>
+
+    <div class="mb-6 rounded-lg bg-amber-50 p-4 text-sm text-amber-800">
+      <strong>Xisaabtu waa maxay?</strong>
+      <p class="mt-1">Xisaabta waa meel aad ku qorto lacagaha. Tusaale:</p>
+      <ul class="mt-2 space-y-1">
+        <li><strong>Bangiga</strong> - Lacagta aad ku shubato bankiga</li>
+        <li><strong>Kirada</strong> - Lacagta ka timid kiraystayaasha</li>
+        <li><strong>Biilka</strong> - Kharashka aad bixisay (koronto, biyo, iwm)</li>
+      </ul>
+    </div>
+
+    <form method="POST" action="">
+      {% csrf_token %}
+
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-slate-700">{{ form.name.label }}</label>
+        {{ form.name }}
+        {% if form.name.errors %}<p class="text-red-500 text-sm">{{ form.name.errors.0 }}</p>{% endif %}
+        <p class="mt-1 text-xs text-slate-500">Magaca xisaabta si fudud u qor. Tusaale: "Bangiga", "Kirada Bishan"</p>
+      </div>
+
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-slate-700">{{ form.category.label }}</label>
+        {{ form.category }}
+        {% if form.category.errors %}<p class="text-red-500 text-sm">{{ form.category.errors.0 }}</p>{% endif %}
+        <div class="mt-2 grid grid-cols-2 gap-2 text-xs">
+          <div class="rounded bg-green-50 p-2 text-green-700"><strong>Hanti</strong> = Wixii aad leedahay</div>
+          <div class="rounded bg-red-50 p-2 text-red-700"><strong>Deyn</strong> = Wixii aad iska leedahay</div>
+          <div class="rounded bg-purple-50 p-2 text-purple-700"><strong>Raasamaal</strong> = Net-worth-kaaga</div>
+          <div class="rounded bg-blue-50 p-2 text-blue-700"><strong>Dakhli</strong> = Wixii aad ku heshay</div>
+          <div class="rounded bg-orange-50 p-2 text-orange-700"><strong>Kharash</strong> = Wixii aad ku bixisay</div>
+        </div>
+      </div>
+
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-slate-700">{{ form.bank_account.label }}</label>
+        {{ form.bank_account }}
+        {% if form.bank_account.errors %}<p class="text-red-500 text-sm">{{ form.bank_account.errors.0 }}</p>{% endif %}
+        <p class="mt-1 text-xs text-slate-500">Haddii xisaabtani ay la xiriirto bangi, dooro bangiga halkan. Tusaale: "Bangiga" → Teletsom</p>
+      </div>
+
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-slate-700">{{ form.description.label }}</label>
+        {{ form.description }}
+        {% if form.description.errors %}<p class="text-red-500 text-sm">{{ form.description.errors.0 }}</p>{% endif %}
+      </div>
+
+      <div class="mb-4">
+        <label class="flex items-center gap-2">
+          {{ form.is_active }}
+          <span class="text-sm text-slate-700">{{ form.is_active.label }}</span>
+        </label>
+      </div>
+
+      <div class="flex gap-3 mt-6">
+        <button type="submit" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition">Kaydi</button>
+        <a href="{% url 'web-account-list' %}" class="border px-6 py-2 rounded-lg hover:bg-gray-50 transition">Jooji</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

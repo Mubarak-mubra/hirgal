@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}{% if editing %}Wax ka beddel{% else %}Ku dar{% endif %} - Xisaabta Bangiga - Hirgal Kiro{% endblock %}
+{% block content %}
+<div class="max-w-2xl mx-auto p-6">
+  <div class="bg-white rounded-xl border shadow-sm p-6">
+    <h1 class="text-2xl font-bold mb-2">
+      {% if editing %}
+        Wax ka beddel xisaabta bangiga
+      {% else %}
+        Ku dar xisaab bangi cusub
+      {% endif %}
+    </h1>
+
+    <div class="mb-6 rounded-lg bg-blue-50 p-4 text-sm text-blue-800">
+      <strong>Xisaabta Bangiga waa maxay?</strong>
+      <p class="mt-1">Waa bangiga ama xisaabta aad isticmaaliso. Tusaale:</p>
+      <ul class="mt-2 space-y-1">
+        <li><strong>Teletsom</strong> - Lambarka 061... + Magaca account-ka</li>
+        <li><strong>VCash</strong> - Lambarka + Magaca</li>
+        <li><strong>Dahabshiil Bank</strong> - Lambarka xisaabta + Magaca</li>
+      </ul>
+    </div>
+
+    <form method="POST" action="">
+      {% csrf_token %}
+
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-slate-700">{{ form.bank_name.label }}</label>
+        {{ form.bank_name }}
+        {% if form.bank_name.errors %}<p class="text-red-500 text-sm">{{ form.bank_name.errors.0 }}</p>{% endif %}
+        <p class="mt-1 text-xs text-slate-500">Magaca bangiga. Tusaale: Teletsom, VCash, Dahabshiil</p>
+      </div>
+
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-slate-700">{{ form.account_number.label }}</label>
+        {{ form.account_number }}
+        {% if form.account_number.errors %}<p class="text-red-500 text-sm">{{ form.account_number.errors.0 }}</p>{% endif %}
+        <p class="mt-1 text-xs text-slate-500">Lambarka xisaabtaada bangiga</p>
+      </div>
+
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-slate-700">{{ form.account_name.label }}</label>
+        {{ form.account_name }}
+        {% if form.account_name.errors %}<p class="text-red-500 text-sm">{{ form.account_name.errors.0 }}</p>{% endif %}
+        <p class="mt-1 text-xs text-slate-500">Magaca ku qoran xisaabta (tusaale: "Farhan Mohamed")</p>
+      </div>
+
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-slate-700">{{ form.notes.label }}</label>
+        {{ form.notes }}
+        {% if form.notes.errors %}<p class="text-red-500 text-sm">{{ form.notes.errors.0 }}</p>{% endif %}
+      </div>
+
+      <div class="mb-4">
+        <label class="flex items-center gap-2">
+          {{ form.is_active }}
+          <span class="text-sm text-slate-700">{{ form.is_active.label }}</span>
+        </label>
+      </div>
+
+      <div class="flex gap-3 mt-6">
+        <button type="submit" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition">Kaydi</button>
+        <a href="{% url 'web-bank-accounts' %}" class="border px-6 py-2 rounded-lg hover:bg-gray-50 transition">Jooji</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

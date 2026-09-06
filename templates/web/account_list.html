@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% load i18n_tags %}
+{% block title %}{% t 'accounts_title' %} - Hirgal Kiro{% endblock %}
+{% block content %}
+<section class="mb-7 flex items-end justify-between">
+  <div>
+    <a class="text-sm font-semibold text-indigo-700" href="{% url 'home' %}">← {% t 'home' %}</a>
+    <h1 class="mt-4 text-3xl font-bold">{% t 'accounts_title' %}</h1>
+    <p class="mt-2 text-slate-500">{% t 'track_money' %}</p>
+  </div>
+  <a class="rounded-lg bg-ink px-4 py-3 text-sm font-bold text-white" href="{% url 'web-account-create' %}">{% t 'add_account' %}</a>
+</section>
+
+<section class="mb-6 rounded-xl border bg-white p-4 shadow-sm">
+  <p class="text-sm text-slate-600"><strong>{% t 'what_are_accounts' %}</strong> {% t 'accounts_explain' %}</p>
+</section>
+
+<section class="rounded-xl border bg-white shadow-sm overflow-hidden">
+  {% if accounts %}
+  <div class="overflow-x-auto">
+    <table class="w-full text-left text-sm">
+      <thead class="border-b bg-slate-50 text-slate-600">
+        <tr>
+          <th class="px-4 py-3 font-semibold">{% t 'name' %}</th>
+          <th class="px-4 py-3 font-semibold">{% t 'type' %}</th>
+          <th class="px-4 py-3 font-semibold">{% t 'description' %}</th>
+          <th class="px-4 py-3 font-semibold text-right">{% t 'actions' %}</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y">
+        {% for account in accounts %}
+        <tr class="hover:bg-slate-50">
+          <td class="px-4 py-3">
+            <div class="font-medium">{{ account.name }}</div>
+            <div class="text-xs text-slate-400">{% t 'code' %}: {{ account.code }}</div>
+          </td>
+          <td class="px-4 py-3">
+            <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold
+              {% if account.category == 'asset' %}bg-green-100 text-green-700
+              {% elif account.category == 'liability' %}bg-red-100 text-red-700
+              {% elif account.category == 'equity' %}bg-purple-100 text-purple-700
+              {% elif account.category == 'revenue' %}bg-blue-100 text-blue-700
+              {% else %}bg-orange-100 text-orange-700{% endif %}">
+              {{ account.get_category_display }}
+            </span>
+          </td>
+          <td class="px-4 py-3 text-slate-500">{{ account.description|default:"-" }}</td>
+          <td class="px-4 py-3 text-right">
+            <a href="{% url 'web-account-edit' account.pk %}" class="font-semibold text-indigo-600 hover:underline">{% t 'edit' %}</a>
+            <span class="mx-1 text-slate-300">|</span>
+            <a href="{% url 'web-account-delete' account.pk %}" class="font-semibold text-rose-600 hover:underline">{% t 'delete' %}</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="p-10 text-center">
+    <p class="font-semibold text-slate-700">{% t 'no_accounts' %}</p>
+    <p class="mt-2 text-sm text-slate-500">{% t 'no_accounts_hint' %}</p>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

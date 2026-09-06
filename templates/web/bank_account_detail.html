@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}{{ bank_account.bank_name }} - Hirgal Kiro{% endblock %}
+{% block content %}
+<a class="text-sm font-semibold text-indigo-700" href="{% url 'web-bank-accounts' %}">← Xisaabaha Bangiga</a>
+
+<div class="mt-4 flex flex-wrap items-end justify-between gap-4">
+  <div>
+    <h1 class="text-3xl font-bold text-ink">{{ bank_account.bank_name }}</h1>
+    <p class="mt-2 text-slate-500">{{ bank_account.account_name }} · Lambarka: {{ bank_account.account_number }}</p>
+  </div>
+  <div class="flex gap-3">
+    <a class="rounded-xl bg-slate-200 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-300" href="{% url 'web-bank-account-edit' bank_account.pk %}">Wax ka beddel</a>
+    <a class="rounded-xl bg-red-100 px-4 py-2 text-sm font-bold text-red-700 hover:bg-red-200" href="{% url 'web-bank-account-delete' bank_account.pk %}">Tirtir</a>
+  </div>
+</div>
+
+{% if payments %}
+<section class="mt-6 rounded-2xl border bg-white p-5 shadow-sm">
+  <h2 class="text-lg font-bold">Lacagihii Ugu Dambeeyay</h2>
+  <div class="mt-4 divide-y">
+    {% for p in payments %}
+    <div class="flex justify-between py-3">
+      <div>
+        <p class="font-semibold"><a href="{% url 'web-tenant-detail' p.rental_agreement.tenant.pk %}" class="text-indigo-600 hover:underline">{{ p.rental_agreement.tenant.full_name }}</a></p>
+        <p class="text-sm text-slate-500"><a href="{% url 'web-property-detail' p.rental_agreement.property.pk %}" class="text-indigo-500 hover:underline">{{ p.rental_agreement.property.name }}</a> · {{ p.payment_date }}</p>
+      </div>
+      <strong class="text-green-600">${{ p.amount }}</strong>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{% if expenses %}
+<section class="mt-6 rounded-2xl border bg-white p-5 shadow-sm">
+  <h2 class="text-lg font-bold">Kharashyadii Ugu Dambeeyay</h2>
+  <div class="mt-4 divide-y">
+    {% for e in expenses %}
+    <div class="flex justify-between py-3">
+      <div>
+        <p class="font-semibold"><a href="{% url 'web-expense-detail' e.pk %}" class="text-indigo-600 hover:underline">{{ e.title }}</a></p>
+        <p class="text-sm text-slate-500"><a href="{% url 'web-property-detail' e.property.pk %}" class="text-indigo-500 hover:underline">{{ e.property.name }}</a> · {{ e.expense_date }}</p>
+      </div>
+      <strong class="text-red-600">${{ e.amount }}</strong>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+{% endblock %}

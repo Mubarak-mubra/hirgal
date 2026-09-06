@@ -12,14 +12,16 @@ class TenantListCreateView(generics.ListCreateAPIView):
         return TenantRegistrationSerializer if self.request.method == "POST" else TenantSerializer
 
     def get_queryset(self):
-        return Tenant.objects.filter(owner=self.request.user).prefetch_related("rental_agreements__payments")
+        owner = self.request.user.get_data_owner()
+        return Tenant.objects.filter(owner=owner).prefetch_related("rental_agreements__payments")
 
 
 class TenantDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = TenantSerializer
 
     def get_queryset(self):
-        return Tenant.objects.filter(owner=self.request.user).prefetch_related("rental_agreements")
+        owner = self.request.user.get_data_owner()
+        return Tenant.objects.filter(owner=owner).prefetch_related("rental_agreements")
 
     def destroy(self, request, *args, **kwargs):
         tenant = self.get_object()
@@ -31,7 +33,8 @@ class TenantDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 class EndTenantRentalView(generics.GenericAPIView):
     def get_queryset(self):
-        return Tenant.objects.filter(owner=self.request.user)
+        owner = self.request.user.get_data_owner()
+        return Tenant.objects.filter(owner=owner)
 
     def post(self, request, pk):
         tenant = self.get_object()
@@ -45,7 +48,8 @@ class EndTenantRentalView(generics.GenericAPIView):
 
 class TenantPaymentView(generics.GenericAPIView):
     def get_queryset(self):
-        return Tenant.objects.filter(owner=self.request.user)
+        owner = self.request.user.get_data_owner()
+        return Tenant.objects.filter(owner=owner)
 
     def post(self, request, pk):
         tenant = self.get_object()

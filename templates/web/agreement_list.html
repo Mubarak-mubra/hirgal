@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% load i18n_tags %}
+{% block title %}Agreements - Hirgal Kiro{% endblock %}
+{% block content %}
+<section class="mb-7 flex items-end justify-between">
+    <div>
+        <a class="text-sm font-semibold text-indigo-700" href="{% url 'home' %}">← {% t 'home' %}</a>
+        <h1 class="mt-4 text-3xl font-bold">Rental Agreements</h1>
+        <p class="mt-2 text-slate-500">All active and past rental agreements.</p>
+    </div>
+    <a class="rounded-lg bg-ink px-4 py-3 text-sm font-bold text-white" href="{% url 'web-agreement-create' %}">+ {% t 'add_agreement' %}</a>
+</section>
+
+<section class="rounded-xl border bg-white shadow-sm">
+  <div class="overflow-x-auto">
+    <table class="w-full text-left text-sm">
+      <thead class="border-b bg-slate-50 text-xs font-semibold uppercase text-slate-500">
+        <tr>
+          <th class="px-5 py-3">Tenant</th>
+          <th class="px-5 py-3">Property</th>
+          <th class="px-5 py-3">Unit</th>
+          <th class="px-5 py-3">Rent</th>
+          <th class="px-5 py-3">Start</th>
+          <th class="px-5 py-3">End</th>
+          <th class="px-5 py-3">Status</th>
+          <th class="px-5 py-3">Actions</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y">
+        {% for agreement in agreements %}
+        <tr class="hover:bg-slate-50">
+          <td class="px-5 py-4">
+            <a href="{% url 'web-tenant-detail' agreement.tenant.pk %}" class="font-semibold text-indigo-600 hover:underline">{{ agreement.tenant.full_name }}</a>
+          </td>
+          <td class="px-5 py-4">
+            <a href="{% url 'web-property-detail' agreement.property.pk %}" class="text-indigo-500 hover:underline">{{ agreement.property.name }}</a>
+          </td>
+          <td class="px-5 py-4 text-slate-600">{{ agreement.unit|default:"-" }}</td>
+          <td class="px-5 py-4 font-semibold text-ink">${{ agreement.monthly_rent }}/mo</td>
+          <td class="px-5 py-4 text-slate-600">{{ agreement.start_date }}</td>
+          <td class="px-5 py-4 text-slate-600">{{ agreement.end_date|default:"-" }}</td>
+          <td class="px-5 py-4">
+            {% if agreement.status == 'active' %}
+            <span class="rounded-full bg-green-100 px-2 py-1 text-xs font-semibold text-green-700">Active</span>
+            {% else %}
+            <span class="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">{{ agreement.get_status_display }}</span>
+            {% endif %}
+          </td>
+          <td class="px-5 py-4 flex gap-2">
+            <a class="text-xs font-semibold text-indigo-700" href="{% url 'web-agreement-edit' agreement.pk %}">{% t 'edit' %}</a>
+            <a class="text-xs font-semibold text-red-600" href="{% url 'web-agreement-delete' agreement.pk %}">{% t 'delete' %}</a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="8" class="px-5 py-10 text-center text-slate-500">No agreements found.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

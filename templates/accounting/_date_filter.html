@@ -1,0 +1,47 @@
+{% load i18n_tags %}
+
+<form method="get" class="mb-6 bg-white rounded-xl border border-slate-200 p-4 no-print" id="date-filter-form">
+    <div class="flex flex-wrap items-end gap-4">
+        <div class="flex-1 min-w-[200px]">
+            <label class="block text-sm font-medium text-slate-600 mb-1">{% t 'date_from' %}</label>
+            <input type="date" name="start_date" id="filter_start_date" value="{{ start_date|default:'' }}"
+                class="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-slate-900 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100">
+        </div>
+        <div class="flex-1 min-w-[200px]">
+            <label class="block text-sm font-medium text-slate-600 mb-1">{% t 'date_to' %}</label>
+            <input type="date" name="end_date" id="filter_end_date" value="{{ end_date|default:'' }}"
+                class="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-slate-900 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100">
+        </div>
+        <div class="flex gap-2">
+            <button type="submit"
+                class="rounded-xl bg-indigo-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 transition">
+                {% t 'filter' %}
+            </button>
+            <a href="{{ request.path }}"
+                class="rounded-xl border border-slate-300 px-6 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition">
+                {% t 'clear' %}
+            </a>
+        </div>
+    </div>
+</form>
+
+{# Update the CSV download link href dynamically to include date range #}
+<script>
+(function () {
+    var csvLink = document.querySelector('a[href*="export=csv"]');
+    if (!csvLink) return;
+    function updateCsvLink() {
+        var s = document.getElementById('filter_start_date') ? document.getElementById('filter_start_date').value : '';
+        var e = document.getElementById('filter_end_date') ? document.getElementById('filter_end_date').value : '';
+        var base = window.location.pathname;
+        var params = new URLSearchParams();
+        if (s) params.set('start_date', s);
+        if (e) params.set('end_date', e);
+        params.set('export', 'csv');
+        csvLink.href = base + '?' + params.toString();
+    }
+    updateCsvLink();
+    document.getElementById('filter_start_date') && document.getElementById('filter_start_date').addEventListener('change', updateCsvLink);
+    document.getElementById('filter_end_date') && document.getElementById('filter_end_date').addEventListener('change', updateCsvLink);
+})();
+</script>

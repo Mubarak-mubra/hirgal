@@ -23,7 +23,7 @@ class PropertyApiTests(APITestCase):
     def test_user_can_add_unit_to_owned_property(self):
         property_response = self.client.post(reverse("property-list"), {"name": "Sunrise", "location": "Hodan"})
         property_id = property_response.data["id"]
-        response = self.client.post(reverse("unit-list", kwargs={"property_id": property_id}), {"unit_number": "102", "unit_type": "apartment", "default_monthly_rent": "500.00"})
+        response = self.client.post(reverse("unit-list", kwargs={"property_id": property_id}), {"unit_number": "102", "unit_type": "apartment", "monthly_rent": "500.00"})
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data["property_name"], "Sunrise")
 

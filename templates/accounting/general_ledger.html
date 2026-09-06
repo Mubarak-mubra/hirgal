@@ -1,0 +1,57 @@
+{% extends "accounting/base_accounting.html" %}
+
+{% block report_title %}General Ledger{% endblock %}
+{% block print_title %}General Ledger{% endblock %}
+{% block heading %}General Ledger{% endblock %}
+
+{% block report_content %}
+{% include "accounting/_date_filter.html" %}
+
+{% for account in ledger %}
+<div class="bg-white rounded-xl border border-slate-200 overflow-hidden mb-6">
+    <div class="bg-slate-50 border-b border-slate-200 px-4 py-3">
+        <a href="{% url 'web-account-ledger' account.account_id %}" class="font-mono font-semibold text-indigo-600 hover:underline mr-2">{{ account.account_code }}</a>
+        <a href="{% url 'web-account-ledger' account.account_id %}" class="font-semibold text-slate-800 hover:underline">{{ account.account_name }}</a>
+    </div>
+    <table class="w-full text-sm">
+        <thead class="bg-slate-50 border-b border-slate-200">
+            <tr>
+                <th class="text-left px-4 py-2 font-semibold text-slate-700">Date</th>
+                <th class="text-left px-4 py-2 font-semibold text-slate-700">Description</th>
+                <th class="text-left px-4 py-2 font-semibold text-slate-700">Source</th>
+                <th class="text-right px-4 py-2 font-semibold text-slate-700">Debit ($)</th>
+                <th class="text-right px-4 py-2 font-semibold text-slate-700">Credit ($)</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+            {% for line in account.transactions %}
+            <tr class="hover:bg-slate-50">
+                <td class="px-4 py-2 text-slate-600">{{ line.date }}</td>
+                <td class="px-4 py-2 text-slate-800">{{ line.description }}</td>
+                <td class="px-4 py-2">
+                    {% if line.source_url %}
+                    <a href="{{ line.source_url }}" class="text-indigo-600 hover:underline text-xs">{{ line.source_type }}</a>
+                    {% else %}
+                    <span class="text-slate-400 text-xs">{{ line.source_type }}</span>
+                    {% endif %}
+                </td>
+                <td class="px-4 py-2 text-right text-green-600">{% if line.debit %}${{ line.debit|floatformat:2 }}{% endif %}</td>
+                <td class="px-4 py-2 text-right text-red-600">{% if line.credit %}${{ line.credit|floatformat:2 }}{% endif %}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        <tfoot class="border-t border-slate-200 bg-slate-50 font-semibold">
+            <tr>
+                <td colspan="3" class="px-4 py-2 text-slate-700">Total</td>
+                <td class="px-4 py-2 text-right text-green-600">${{ account.total_debit|floatformat:2 }}</td>
+                <td class="px-4 py-2 text-right text-red-600">${{ account.total_credit|floatformat:2 }}</td>
+            </tr>
+        </tfoot>
+    </table>
+</div>
+{% empty %}
+<div class="bg-white rounded-xl border border-slate-200 p-8 text-center text-slate-400">
+    No ledger entries found.
+</div>
+{% endfor %}
+{% endblock %}

@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Diiwaanka Guud - Hirgal Kiro{% endblock %}
+{% block content %}
+<section class="mb-7 flex items-end justify-between">
+  <div>
+    <a class="text-sm font-semibold text-indigo-700" href="{% url 'home' %}">← Bogga hore</a>
+    <h1 class="mt-4 text-3xl font-bold">Diiwaanka Guud</h1>
+    <p class="mt-2 text-slate-500">Dhammaan diiwaannada lacagaha.</p>
+  </div>
+  <a class="rounded-lg bg-ink px-4 py-3 text-sm font-bold text-white" href="{% url 'web-journal-create' %}">+ Ku cusub</a>
+</section>
+
+<section class="rounded-xl border bg-white shadow-sm overflow-hidden">
+  {% if entries %}
+  <div class="overflow-x-auto">
+    <table class="w-full text-left text-sm">
+      <thead class="border-b bg-slate-50 text-slate-600">
+        <tr>
+          <th class="px-4 py-3 font-semibold">Nambarka</th>
+          <th class="px-4 py-3 font-semibold">Taariikhda</th>
+          <th class="px-4 py-3 font-semibold">Faahfaahin</th>
+          <th class="px-4 py-3 font-semibold">Xaaladda</th>
+          <th class="px-4 py-3 font-semibold">Kiraystaha</th>
+          <th class="px-4 py-3 font-semibold text-right">Ficillo</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y">
+        {% for entry in entries %}
+        <tr class="hover:bg-slate-50">
+          <td class="px-4 py-3 font-mono text-xs font-semibold text-indigo-700">
+            <a href="{% url 'web-journal-detail' entry.pk %}" class="hover:underline">JE-{{ entry.id }}</a>
+          </td>
+          <td class="px-4 py-3">{{ entry.date }}</td>
+          <td class="px-4 py-3 text-slate-500">{{ entry.description|truncatechars:60 }}</td>
+          <td class="px-4 py-3">
+            <span class="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-700">{{ entry.get_status_display }}</span>
+          </td>
+          <td class="px-4 py-3">{% if entry.tenant %}<a href="{% url 'web-tenant-detail' entry.tenant.pk %}" class="text-indigo-600 hover:underline">{{ entry.tenant }}</a>{% else %}—{% endif %}</td>
+          <td class="px-4 py-3 text-right">
+            <a href="{% url 'web-journal-detail' entry.pk %}" class="font-semibold text-indigo-600 hover:underline">Faahfaahin</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="p-10 text-center">
+    <p class="font-semibold text-slate-700">Ma jiraan diiwaanno.</p>
+    <p class="mt-2 text-sm text-slate-500">Ku cusub diiwaan cusub si aad bilowdo.</p>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

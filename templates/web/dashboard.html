@@ -1,0 +1,309 @@
+{% extends "base.html" %}
+{% load i18n_tags %}
+{% block title %}Dashboard - Hirgal Kiro{% endblock %}
+{% block content %}
+
+{# ── Overdue Rent Alert Banner ─────────────────────────────────────────────── #}
+{% if rent_not_paid %}
+<div class="mb-6 rounded-2xl border-2 border-rose-300 bg-rose-50 px-5 py-4 flex items-start gap-3">
+    <span class="text-2xl mt-0.5">🚨</span>
+    <div>
+        <p class="font-bold text-rose-700">{{ rent_not_paid|length }} tenant{{ rent_not_paid|length|pluralize }} haven't paid rent this month!</p>
+        <p class="text-sm text-rose-600 mt-0.5">
+            {% for item in rent_not_paid %}
+            <a href="{% url 'web-tenant-detail' item.agreement.tenant.pk %}" class="underline font-semibold">{{ item.agreement.tenant.full_name }}</a> (${{ item.monthly_rent|floatformat:0 }}){% if not forloop.last %}, {% endif %}
+            {% endfor %}
+        </p>
+    </div>
+</div>
+{% endif %}
+
+<section class="mb-8">
+    <p class="text-xs font-bold tracking-widest text-indigo-700">DASHBOARD</p>
+    <h1 class="mt-3 text-3xl font-bold text-ink">Welcome back, {{ request.user.full_name|default:request.user.username }}!</h1>
+    <p class="mt-2 text-slate-500">Here's a live overview of your property business.</p>
+</section>
+
+{# ── Top Financial Stats ───────────────────────────────────────────────────── #}
+<section class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-8">
+    <div class="rounded-2xl bg-ink p-5 text-white">
+        <p class="text-indigo-200 text-sm">Total Revenue</p>
+        <strong class="mt-2 block text-3xl">${{ total_revenue|floatformat:0 }}</strong>
+        <p class="mt-1 text-xs text-indigo-300">From {{ payment_count }} payment{{ payment_count|pluralize }}</p>
+    </div>
+    <div class="rounded-2xl border bg-white p-5">
+        <p class="text-slate-500 text-sm">Total Expenses</p>
+        <strong class="mt-2 block text-3xl text-rose-600">${{ expense_total|floatformat:0 }}</strong>
+        <p class="mt-1 text-xs text-slate-400">Repairs: ${{ repair_total|floatformat:0 }}</p>
+    </div>
+    <div class="rounded-2xl border bg-white p-5">
+        <p class="text-slate-500 text-sm">Net Income</p>
+        {% if net_income >= 0 %}
+        <strong class="mt-2 block text-3xl text-green-600">${{ net_income|floatformat:0 }}</strong>
+        {% else %}
+        <strong class="mt-2 block text-3xl text-rose-600">-${{ net_income|floatformat:0 }}</strong>
+        {% endif %}
+        <p class="mt-1 text-xs text-slate-400">Profit after all expenses</p>
+    </div>
+    <div class="rounded-2xl border bg-white p-5">
+        <p class="text-slate-500 text-sm">Cash Balance</p>
+        <strong class="mt-2 block text-3xl text-ink">${{ bank_balance|floatformat:0 }}</strong>
+        <p class="mt-1 text-xs text-slate-400">Across all bank accounts</p>
+    </div>
+</section>
+
+{# ── Property & Occupancy Stats ───────────────────────────────────────────── #}
+<section class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-8">
+    <a href="{% url 'web-properties' %}" class="rounded-2xl border bg-white p-5 shadow-sm hover:border-indigo-300 hover:shadow-md transition">
+        <p class="text-slate-500 text-sm">🏠 Properties</p>
+        <strong class="mt-2 block text-3xl text-ink">{{ property_count }}</strong>
+        <p class="mt-1 text-xs text-slate-400">Total owned</p>
+    </a>
+    <a href="{% url 'web-tenants' %}" class="rounded-2xl border bg-white p-5 shadow-sm hover:border-indigo-300 hover:shadow-md transition">
+        <p class="text-slate-500 text-sm">👥 Tenants</p>
+        <strong class="mt-2 block text-3xl text-ink">{{ tenant_count }}</strong>
+        <p class="mt-1 text-xs text-slate-400">{{ agreement_count }} active agreement{{ agreement_count|pluralize }}</p>
+    </a>
+    <div class="rounded-2xl border bg-white p-5">
+        <p class="text-slate-500 text-sm">📊 Occupancy Rate</p>
+        <strong class="mt-2 block text-3xl {% if occupancy_rate >= 80 %}text-green-600{% elif occupancy_rate >= 50 %}text-amber-600{% else %}text-rose-600{% endif %}">{{ occupancy_rate }}%</strong>
+        <div class="mt-2 w-full bg-slate-200 rounded-full h-2">
+            <div class="h-2 rounded-full {% if occupancy_rate >= 80 %}bg-green-500{% elif occupancy_rate >= 50 %}bg-amber-500{% else %}bg-rose-500{% endif %}" style="width: {{ occupancy_rate }}%"></div>
+        </div>
+        <p class="mt-1 text-xs text-slate-400">{{ rented_units }} of {{ total_units }} units rented</p>
+    </div>
+    <a href="{% url 'web-invoice-list' %}" class="rounded-2xl border bg-white p-5 shadow-sm hover:border-indigo-300 hover:shadow-md transition">
+        <p class="text-slate-500 text-sm">📄 Outstanding Invoices</p>
+        <strong class="mt-2 block text-3xl {% if invoice_count > 0 %}text-amber-600{% else %}text-green-600{% endif %}">{{ invoice_count }}</strong>
+        <p class="mt-1 text-xs text-slate-400">Receivable: ${{ ar_balance|floatformat:0 }}</p>
+    </a>
+</section>
+
+{# ── Quick Actions ────────────────────────────────────────────────────────── #}
+<section class="mb-8">
+    <h2 class="mb-3 text-lg font-bold text-ink">⚡ Quick Actions</h2>
+    <div class="flex flex-wrap gap-3">
+        <a href="{% url 'web-payment-create' %}" class="rounded-xl bg-green-600 px-4 py-2 text-sm font-bold text-white hover:bg-green-700 transition">💰 Record Payment</a>
+        <a href="{% url 'web-tenant-create' %}" class="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700 transition">👤 Add Tenant</a>
+        <a href="{% url 'web-property-create' %}" class="rounded-xl bg-sky-600 px-4 py-2 text-sm font-bold text-white hover:bg-sky-700 transition">🏠 Add Property</a>
+        <a href="{% url 'web-expense-create' %}" class="rounded-xl bg-rose-600 px-4 py-2 text-sm font-bold text-white hover:bg-rose-700 transition">📋 Add Expense</a>
+        <a href="{% url 'web-maintenance-create' %}" class="rounded-xl bg-amber-600 px-4 py-2 text-sm font-bold text-white hover:bg-amber-700 transition">🔧 Report Repair</a>
+        <a href="{% url 'web-invoice-create' %}" class="rounded-xl bg-purple-600 px-4 py-2 text-sm font-bold text-white hover:bg-purple-700 transition">🧾 Create Invoice</a>
+        <a href="{% url 'web-profit-loss' %}" class="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700 transition">📊 Profit & Loss</a>
+    </div>
+</section>
+
+{# ── Rent Status This Month ───────────────────────────────────────────────── #}
+<section class="mb-8">
+    <div class="flex items-center justify-between mb-4">
+        <h2 class="text-lg font-bold text-ink">🗓️ Rent Status — This Month</h2>
+        <div class="flex gap-4 text-sm">
+            <span class="text-green-600 font-semibold">${{ rent_total_collected|floatformat:0 }} collected</span>
+            <span class="text-slate-400">of</span>
+            <span class="text-slate-700 font-semibold">${{ rent_total_expected|floatformat:0 }} expected</span>
+        </div>
+    </div>
+
+    {# Summary Badges #}
+    <div class="grid gap-4 sm:grid-cols-3 mb-4">
+        <div class="rounded-2xl border-2 border-green-200 bg-green-50 p-4">
+            <div class="flex items-center gap-2 mb-2">
+                <span class="w-3 h-3 rounded-full bg-green-500"></span>
+                <span class="text-sm font-semibold text-green-700">Paid Full</span>
+            </div>
+            <strong class="text-2xl text-green-700">{{ rent_paid_full|length }}</strong>
+            <span class="text-sm text-green-600"> tenants</span>
+        </div>
+        <div class="rounded-2xl border-2 border-amber-200 bg-amber-50 p-4">
+            <div class="flex items-center gap-2 mb-2">
+                <span class="w-3 h-3 rounded-full bg-amber-500"></span>
+                <span class="text-sm font-semibold text-amber-700">Partial Payment</span>
+            </div>
+            <strong class="text-2xl text-amber-700">{{ rent_paid_partial|length }}</strong>
+            <span class="text-sm text-amber-600"> tenants</span>
+        </div>
+        <div class="rounded-2xl border-2 border-rose-200 bg-rose-50 p-4">
+            <div class="flex items-center gap-2 mb-2">
+                <span class="w-3 h-3 rounded-full bg-rose-500"></span>
+                <span class="text-sm font-semibold text-rose-700">Not Paid</span>
+            </div>
+            <strong class="text-2xl text-rose-700">{{ rent_not_paid|length }}</strong>
+            <span class="text-sm text-rose-600"> tenants</span>
+        </div>
+    </div>
+
+    {# Detailed Lists #}
+    <div class="grid gap-6 lg:grid-cols-3">
+        <section class="rounded-2xl border bg-white p-4 shadow-sm">
+            <h3 class="text-sm font-bold text-green-700 mb-3 flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-green-500"></span> Paid Full ({{ rent_paid_full|length }})
+            </h3>
+            <div class="divide-y max-h-64 overflow-y-auto">
+                {% for item in rent_paid_full %}
+                <div class="py-2">
+                    <a href="{% url 'web-tenant-detail' item.agreement.tenant.pk %}" class="text-sm font-semibold text-indigo-600 hover:underline">{{ item.agreement.tenant.full_name }}</a>
+                    <p class="text-xs text-slate-400">{{ item.agreement.property.name }}</p>
+                    <p class="text-xs text-green-600 font-semibold">${{ item.total_paid|floatformat:0 }} / ${{ item.monthly_rent|floatformat:0 }}</p>
+                </div>
+                {% empty %}
+                <p class="py-4 text-slate-400 text-xs text-center">No tenants paid in full yet.</p>
+                {% endfor %}
+            </div>
+        </section>
+
+        <section class="rounded-2xl border bg-white p-4 shadow-sm">
+            <h3 class="text-sm font-bold text-amber-700 mb-3 flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-amber-500"></span> Partial ({{ rent_paid_partial|length }})
+            </h3>
+            <div class="divide-y max-h-64 overflow-y-auto">
+                {% for item in rent_paid_partial %}
+                <div class="py-2">
+                    <a href="{% url 'web-tenant-detail' item.agreement.tenant.pk %}" class="text-sm font-semibold text-indigo-600 hover:underline">{{ item.agreement.tenant.full_name }}</a>
+                    <p class="text-xs text-slate-400">{{ item.agreement.property.name }}</p>
+                    <div class="mt-1">
+                        <div class="w-full bg-slate-200 rounded-full h-1.5">
+                            <div class="h-1.5 rounded-full bg-amber-500" style="width: {% widthratio item.total_paid item.monthly_rent 100 %}%"></div>
+                        </div>
+                        <p class="text-xs text-amber-600 font-semibold mt-1">${{ item.total_paid|floatformat:0 }} / ${{ item.monthly_rent|floatformat:0 }} — ${{ item.remaining|floatformat:0 }} remaining</p>
+                    </div>
+                </div>
+                {% empty %}
+                <p class="py-4 text-slate-400 text-xs text-center">No partial payments.</p>
+                {% endfor %}
+            </div>
+        </section>
+
+        <section class="rounded-2xl border bg-white p-4 shadow-sm">
+            <h3 class="text-sm font-bold text-rose-700 mb-3 flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-rose-500"></span> Not Paid ({{ rent_not_paid|length }})
+            </h3>
+            <div class="divide-y max-h-64 overflow-y-auto">
+                {% for item in rent_not_paid %}
+                <div class="py-2 flex justify-between items-start">
+                    <div>
+                        <a href="{% url 'web-tenant-detail' item.agreement.tenant.pk %}" class="text-sm font-semibold text-indigo-600 hover:underline">{{ item.agreement.tenant.full_name }}</a>
+                        <p class="text-xs text-slate-400">{{ item.agreement.property.name }}</p>
+                        <p class="text-xs text-rose-600 font-semibold">${{ item.monthly_rent|floatformat:0 }} due</p>
+                    </div>
+                    <a href="{% url 'web-payment-create' %}" class="text-xs bg-green-100 text-green-700 font-bold px-2 py-1 rounded-lg hover:bg-green-200 transition whitespace-nowrap">+ Pay</a>
+                </div>
+                {% empty %}
+                <p class="py-4 text-green-600 text-xs text-center font-semibold">✅ All tenants have paid!</p>
+                {% endfor %}
+            </div>
+        </section>
+    </div>
+</section>
+
+{# ── Recent Activity + Reports ────────────────────────────────────────────── #}
+<div class="grid gap-6 lg:grid-cols-2 mb-8">
+
+    {# Recent Payments #}
+    <section class="rounded-2xl border bg-white p-5 shadow-sm">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-bold">💰 Recent Payments</h2>
+            <a href="{% url 'web-payments' %}" class="text-sm text-indigo-600 hover:underline">View All →</a>
+        </div>
+        <div class="divide-y">
+            {% for payment in recent_payments %}
+            <div class="flex justify-between py-3">
+                <div>
+                    <a href="{% url 'web-payment-detail' payment.pk %}" class="font-semibold text-indigo-600 hover:underline text-sm">{{ payment.rental_agreement.tenant.full_name }}</a>
+                    <p class="text-xs text-slate-400">{{ payment.rental_agreement.property.name }} · {{ payment.payment_date }}</p>
+                </div>
+                <strong class="text-green-600">${{ payment.amount }}</strong>
+            </div>
+            {% empty %}
+            <p class="py-4 text-slate-400 text-sm">No payments yet.</p>
+            {% endfor %}
+        </div>
+    </section>
+
+    {# Recent Expenses #}
+    <section class="rounded-2xl border bg-white p-5 shadow-sm">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-bold">📋 Recent Expenses</h2>
+            <a href="{% url 'web-expense-list' %}" class="text-sm text-indigo-600 hover:underline">View All →</a>
+        </div>
+        <div class="divide-y">
+            {% for expense in recent_expenses %}
+            <div class="flex justify-between py-3">
+                <div>
+                    <a href="{% url 'web-expense-detail' expense.pk %}" class="font-semibold text-indigo-600 hover:underline text-sm">{{ expense.title }}</a>
+                    <p class="text-xs text-slate-400">{{ expense.property.name }} · {{ expense.expense_date }}</p>
+                </div>
+                <strong class="text-rose-600">${{ expense.amount }}</strong>
+            </div>
+            {% empty %}
+            <p class="py-4 text-slate-400 text-sm">No expenses yet.</p>
+            {% endfor %}
+        </div>
+    </section>
+
+    {# Recent Repairs #}
+    <section class="rounded-2xl border bg-white p-5 shadow-sm">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-bold">🔧 Recent Repairs</h2>
+            <a href="{% url 'web-maintenance-list' %}" class="text-sm text-indigo-600 hover:underline">View All →</a>
+        </div>
+        <div class="divide-y">
+            {% for repair in recent_repairs %}
+            <div class="flex justify-between py-3">
+                <div>
+                    <a href="{% url 'web-maintenance-detail' repair.pk %}" class="font-semibold text-indigo-600 hover:underline text-sm">{{ repair.title }}</a>
+                    <p class="text-xs text-slate-400">{{ repair.property.name }} · {{ repair.reported_date }}</p>
+                    {% if repair.status == 'reported' %}
+                    <span class="inline-block mt-1 text-xs bg-rose-100 text-rose-700 font-bold px-2 py-0.5 rounded-full">⚠️ Open</span>
+                    {% else %}
+                    <span class="inline-block mt-1 text-xs bg-green-100 text-green-700 font-bold px-2 py-0.5 rounded-full">✅ Fixed</span>
+                    {% endif %}
+                </div>
+                <strong class="text-rose-600">${{ repair.repair_cost }}</strong>
+            </div>
+            {% empty %}
+            <p class="py-4 text-slate-400 text-sm">No repairs yet.</p>
+            {% endfor %}
+        </div>
+    </section>
+
+    {# Accounting Quick Links #}
+    <section class="rounded-2xl border bg-white p-5 shadow-sm">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-bold">📑 Accounting Reports</h2>
+            <a href="{% url 'web-accounting-dashboard' %}" class="text-sm text-indigo-600 hover:underline">All Reports →</a>
+        </div>
+        <div class="space-y-2">
+            <a href="{% url 'web-profit-loss' %}" class="flex items-center justify-between p-3 rounded-lg bg-emerald-50 hover:bg-emerald-100 transition border border-emerald-200">
+                <span class="text-sm font-semibold text-emerald-800">📊 Profit & Loss</span>
+                <span class="text-emerald-500 font-bold">→</span>
+            </a>
+            <a href="{% url 'web-income-statement' %}" class="flex items-center justify-between p-3 rounded-lg bg-slate-50 hover:bg-indigo-50 transition">
+                <span class="text-sm font-semibold text-slate-700">📈 Income Statement</span>
+                <span class="text-slate-400">→</span>
+            </a>
+            <a href="{% url 'web-balance-sheet' %}" class="flex items-center justify-between p-3 rounded-lg bg-slate-50 hover:bg-indigo-50 transition">
+                <span class="text-sm font-semibold text-slate-700">⚖️ Balance Sheet</span>
+                <span class="text-slate-400">→</span>
+            </a>
+            <a href="{% url 'web-trial-balance' %}" class="flex items-center justify-between p-3 rounded-lg bg-slate-50 hover:bg-indigo-50 transition">
+                <span class="text-sm font-semibold text-slate-700">🧮 Trial Balance</span>
+                <span class="text-slate-400">→</span>
+            </a>
+            <a href="{% url 'web-general-ledger' %}" class="flex items-center justify-between p-3 rounded-lg bg-slate-50 hover:bg-indigo-50 transition">
+                <span class="text-sm font-semibold text-slate-700">📒 General Ledger</span>
+                <span class="text-slate-400">→</span>
+            </a>
+            <a href="{% url 'web-cash-flow' %}" class="flex items-center justify-between p-3 rounded-lg bg-slate-50 hover:bg-indigo-50 transition">
+                <span class="text-sm font-semibold text-slate-700">💵 Cash Flow</span>
+                <span class="text-slate-400">→</span>
+            </a>
+            <a href="{% url 'web-sales-report' %}" class="flex items-center justify-between p-3 rounded-lg bg-slate-50 hover:bg-indigo-50 transition">
+                <span class="text-sm font-semibold text-slate-700">🏆 Sales Report</span>
+                <span class="text-slate-400">→</span>
+            </a>
+        </div>
+    </section>
+</div>
+
+{% endblock %}
+

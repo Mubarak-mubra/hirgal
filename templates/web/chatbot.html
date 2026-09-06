@@ -1,0 +1,532 @@
+{% extends "base.html" %}
+{% block title %}AI Assistant - Hirgal Kiro{% endblock %}
+
+{% block content %}
+<style>
+  * { box-sizing: border-box; }
+
+  .chat-layout {
+    display: flex;
+    height: calc(100vh - 120px);
+    max-height: calc(100vh - 120px);
+    background: white;
+    border-radius: 16px;
+    border: 1px solid #e2e8f0;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+
+  /* ── Sidebar ── */
+  .chat-sidebar {
+    width: 260px;
+    background: #f8fafc;
+    border-right: 1px solid #e2e8f0;
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+  }
+  .sidebar-header {
+    padding: 16px;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  .new-chat-btn {
+    width: 100%;
+    padding: 10px 16px;
+    background: #6366f1;
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: background 0.2s;
+  }
+  .new-chat-btn:hover { background: #4f46e5; }
+  .new-chat-btn svg { width: 16px; height: 16px; }
+
+  .sidebar-chats {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px;
+  }
+  .sidebar-chats::-webkit-scrollbar { width: 4px; }
+  .sidebar-chats::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 2px; }
+
+  .chat-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.15s;
+    margin-bottom: 2px;
+  }
+  .chat-item:hover { background: #e2e8f0; }
+  .chat-item.active { background: #e0e7ff; }
+  .chat-item-text {
+    font-size: 13px;
+    color: #334155;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 1;
+  }
+  .chat-item-delete {
+    opacity: 0;
+    background: none;
+    border: none;
+    color: #94a3b8;
+    cursor: pointer;
+    padding: 2px;
+    border-radius: 4px;
+    flex-shrink: 0;
+    transition: opacity 0.15s, color 0.15s;
+  }
+  .chat-item:hover .chat-item-delete { opacity: 1; }
+  .chat-item-delete:hover { color: #ef4444; }
+  .chat-item-delete svg { width: 14px; height: 14px; }
+
+  /* ── Main Chat Area ── */
+  .chat-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px 16px;
+    scroll-behavior: smooth;
+  }
+  .chat-messages::-webkit-scrollbar { width: 6px; }
+  .chat-messages::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+
+  .msg-row {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 24px;
+    max-width: 760px;
+    margin-left: auto;
+    margin-right: auto;
+    animation: fadeIn 0.3s ease;
+  }
+  .msg-row.user { flex-direction: row-reverse; }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .msg-avatar {
+    width: 34px;
+    height: 34px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+  .msg-avatar.ai {
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: white;
+  }
+  .msg-avatar.user {
+    background: linear-gradient(135deg, #10194f, #1e3a8a);
+    color: white;
+  }
+
+  .msg-bubble {
+    padding: 12px 16px;
+    border-radius: 16px;
+    font-size: 14px;
+    line-height: 1.65;
+    max-width: calc(100% - 46px);
+    word-wrap: break-word;
+  }
+  .msg-row.user .msg-bubble {
+    background: #10194f;
+    color: white;
+    border-bottom-right-radius: 4px;
+  }
+  .msg-row.ai .msg-bubble {
+    background: #f1f5f9;
+    color: #1e293b;
+    border-bottom-left-radius: 4px;
+  }
+
+  .typing-indicator { display: flex; gap: 4px; padding: 4px 0; }
+  .typing-indicator span {
+    width: 7px; height: 7px;
+    background: #94a3b8;
+    border-radius: 50%;
+    animation: bounce 1.4s infinite ease-in-out;
+  }
+  .typing-indicator span:nth-child(1) { animation-delay: 0s; }
+  .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+  .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes bounce {
+    0%, 60%, 100% { transform: translateY(0); }
+    30% { transform: translateY(-6px); }
+  }
+
+  /* ── Input ── */
+  .chat-input-area {
+    padding: 16px;
+    background: white;
+    border-top: 1px solid #e2e8f0;
+  }
+  .chat-input-wrapper {
+    max-width: 760px;
+    margin: 0 auto;
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+  }
+  .chat-input-box {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    background: #f8fafc;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 4px 4px 4px 16px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .chat-input-box:focus-within {
+    border-color: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+  }
+  .chat-input-box input {
+    flex: 1;
+    border: none;
+    background: transparent;
+    outline: none;
+    font-size: 14px;
+    padding: 10px 0;
+    color: #1e293b;
+  }
+  .chat-input-box input::placeholder { color: #94a3b8; }
+  .send-btn {
+    width: 40px; height: 40px;
+    border-radius: 10px;
+    border: none;
+    background: #6366f1;
+    color: white;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s, transform 0.1s;
+    flex-shrink: 0;
+  }
+  .send-btn:hover { background: #4f46e5; }
+  .send-btn:active { transform: scale(0.95); }
+  .send-btn:disabled { background: #cbd5e1; cursor: not-allowed; }
+  .send-btn svg { width: 18px; height: 18px; }
+
+  /* ── Welcome ── */
+  .welcome-screen {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    text-align: center;
+    padding: 40px 20px;
+  }
+  .welcome-icon {
+    width: 60px; height: 60px;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 20px;
+    box-shadow: 0 8px 24px rgba(99, 102, 241, 0.3);
+  }
+  .welcome-icon svg { width: 30px; height: 30px; color: white; }
+  .welcome-title { font-size: 20px; font-weight: 700; color: #1e293b; margin-bottom: 6px; }
+  .welcome-sub { font-size: 13px; color: #64748b; margin-bottom: 28px; max-width: 380px; }
+
+  .suggestion-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    max-width: 480px;
+    width: 100%;
+  }
+  .suggestion-btn {
+    background: white;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 12px 14px;
+    text-align: left;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 12px;
+    color: #64748b;
+  }
+  .suggestion-btn:hover {
+    border-color: #6366f1;
+    background: #f5f3ff;
+    color: #4f46e5;
+  }
+  .suggestion-btn strong {
+    display: block;
+    font-size: 12px;
+    color: #1e293b;
+    margin-bottom: 2px;
+  }
+
+  /* ── Mobile ── */
+  .sidebar-toggle {
+    display: none;
+    background: none;
+    border: none;
+    color: #475569;
+    cursor: pointer;
+    padding: 6px;
+    border-radius: 6px;
+  }
+  .sidebar-toggle:hover { background: #f1f5f9; }
+  .sidebar-toggle svg { width: 20px; height: 20px; }
+
+  @media (max-width: 768px) {
+    .chat-layout { border-radius: 0; height: calc(100vh - 100px); }
+    .chat-sidebar {
+      position: fixed;
+      top: 0; left: 0; bottom: 0;
+      width: 280px;
+      z-index: 50;
+      transform: translateX(-100%);
+      transition: transform 0.3s ease;
+      box-shadow: 4px 0 24px rgba(0,0,0,0.1);
+    }
+    .chat-sidebar.open { transform: translateX(0); }
+    .sidebar-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.3);
+      z-index: 40;
+    }
+    .sidebar-overlay.open { display: block; }
+    .sidebar-toggle { display: flex; }
+    .suggestion-grid { grid-template-columns: 1fr; }
+  }
+</style>
+
+<!-- Mobile overlay -->
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+
+<div class="chat-layout">
+  <!-- Sidebar -->
+  <div class="chat-sidebar" id="chatSidebar">
+    <div class="sidebar-header">
+      <a href="{% url 'web-chatbot' %}" class="new-chat-btn">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+        </svg>
+        New Chat
+      </a>
+    </div>
+    <div class="sidebar-chats">
+      {% for s in sessions %}
+      <div class="chat-item {% if active_session and s.id == active_session.id %}active{% endif %}">
+        <a href="?session={{ s.id }}" class="chat-item-text">{{ s.title }}</a>
+        <form method="post" action="{% url 'web-chat-session-delete' s.id %}" onsubmit="return confirm('Delete this chat?')">
+          {% csrf_token %}
+          <button type="submit" class="chat-item-delete" title="Delete">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+            </svg>
+          </button>
+        </form>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Main Chat -->
+  <div class="chat-main">
+    <div class="chat-messages" id="chatbox">
+      <button class="sidebar-toggle" onclick="toggleSidebar()">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+        </svg>
+      </button>
+
+      {% if messages %}
+        {% for msg in messages %}
+        <div class="msg-row {{ msg.role }}">
+          <div class="msg-avatar {{ msg.role }}">{% if msg.role == 'ai' %}AI{% else %}U{% endif %}</div>
+          <div class="msg-bubble">{{ msg.content|linebreaksbr }}</div>
+        </div>
+        {% endfor %}
+      {% else %}
+        <div class="welcome-screen" id="welcome">
+          <div class="welcome-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+            </svg>
+          </div>
+          <div class="welcome-title">Hirgal Kiro AI</div>
+          <div class="welcome-sub">Your rent management assistant. Ask me anything about your properties, tenants, payments, or finances.</div>
+          <div class="suggestion-grid">
+            <button class="suggestion-btn" onclick="askSuggestion(this)"><strong>How many properties do I have?</strong></button>
+            <button class="suggestion-btn" onclick="askSuggestion(this)"><strong>Who hasn't paid rent?</strong></button>
+            <button class="suggestion-btn" onclick="askSuggestion(this)"><strong>What's my net income?</strong></button>
+            <button class="suggestion-btn" onclick="askSuggestion(this)"><strong>Show my expenses</strong></button>
+          </div>
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="chat-input-area">
+      <div class="chat-input-wrapper">
+        <div class="chat-input-box">
+          <input type="text" id="question-input" placeholder="Ask about your properties, tenants, payments..." autocomplete="off">
+          <button class="send-btn" id="send-btn" onclick="sendMessage()">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const chatbox = document.getElementById('chatbox');
+const input = document.getElementById('question-input');
+const sendBtn = document.getElementById('send-btn');
+const welcome = document.getElementById('welcome');
+let isWaiting = false;
+let sessionId = {{ active_session.id|default:"null" }};
+
+function toggleSidebar() {
+  document.getElementById('chatSidebar').classList.toggle('open');
+  document.getElementById('sidebarOverlay').classList.toggle('open');
+}
+
+function hideWelcome() {
+  if (welcome) welcome.style.display = 'none';
+}
+
+function scrollToBottom() {
+  chatbox.scrollTop = chatbox.scrollHeight;
+}
+
+function addUserMessage(text) {
+  hideWelcome();
+  const row = document.createElement('div');
+  row.className = 'msg-row user';
+  row.innerHTML = '<div class="msg-avatar user">U</div><div class="msg-bubble">' + escapeHtml(text) + '</div>';
+  chatbox.appendChild(row);
+  scrollToBottom();
+}
+
+function addAIMessage(text) {
+  const row = document.createElement('div');
+  row.className = 'msg-row ai';
+  row.innerHTML = '<div class="msg-avatar ai">AI</div><div class="msg-bubble">' + formatText(text) + '</div>';
+  chatbox.appendChild(row);
+  scrollToBottom();
+}
+
+function addLoading() {
+  hideWelcome();
+  const row = document.createElement('div');
+  row.className = 'msg-row ai';
+  row.id = 'loading-msg';
+  row.innerHTML = '<div class="msg-avatar ai">AI</div><div class="msg-bubble"><div class="typing-indicator"><span></span><span></span><span></span></div></div>';
+  chatbox.appendChild(row);
+  scrollToBottom();
+}
+
+function removeLoading() {
+  const el = document.getElementById('loading-msg');
+  if (el) el.remove();
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML.replace(/\n/g, '<br>');
+}
+
+function formatText(text) {
+  return text
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.*?)\*/g, '<em>$1</em>')
+    .replace(/`([^`]+)`/g, '<code style="background:#e2e8f0;padding:2px 6px;border-radius:4px;font-size:12px;">$1</code>')
+    .replace(/\n/g, '<br>');
+}
+
+function sendMessage() {
+  const question = input.value.trim();
+  if (!question || isWaiting) return;
+
+  isWaiting = true;
+  sendBtn.disabled = true;
+  addUserMessage(question);
+  input.value = '';
+  addLoading();
+
+  const body = 'question=' + encodeURIComponent(question) + (sessionId ? '&session_id=' + sessionId : '');
+
+  fetch('', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'X-CSRFToken': '{{ csrf_token }}'
+    },
+    body: body
+  })
+  .then(r => r.json())
+  .then(data => {
+    removeLoading();
+    addAIMessage(data.answer || data.error);
+    if (data.session_id && !sessionId) {
+      sessionId = data.session_id;
+      window.history.replaceState({}, '', '?session=' + sessionId);
+      location.reload();
+    }
+  })
+  .catch(() => {
+    removeLoading();
+    addAIMessage('Sorry, something went wrong. Please try again.');
+  })
+  .finally(() => {
+    isWaiting = false;
+    sendBtn.disabled = false;
+    input.focus();
+  });
+}
+
+function askSuggestion(btn) {
+  input.value = btn.querySelector('strong').textContent;
+  sendMessage();
+}
+
+input.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+});
+
+input.focus();
+scrollToBottom();
+</script>
+{% endblock %}

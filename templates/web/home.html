@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% load i18n_tags %}
+{% block title %}{% t 'home' %} - Hirgal Kiro{% endblock %}
+{% block content %}
+<section class="mb-8">
+    <p class="text-xs font-bold tracking-widest text-indigo-700">HIRGAL KIRO</p>
+    <h1 class="mt-3 text-3xl font-bold text-ink md:text-4xl">{% t 'welcome' %}</h1>
+    <p class="mt-2 text-slate-500">{% t 'choose_section' %}</p>
+</section>
+
+<section class="mb-8">
+    <h2 class="mb-3 text-lg font-bold text-ink">{% t 'general_management' %}</h2>
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <a class="group rounded-2xl border bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:border-indigo-300 hover:shadow-md" href="{% url 'dashboard' %}"><span class="mb-5 grid h-11 w-11 place-items-center rounded-xl bg-indigo-50 text-xl text-ink">◈</span><strong class="block text-lg">Dashboard</strong><small class="mt-1 block text-slate-500">{% t 'overview' %}</small></a>
+        
+        <a class="group rounded-2xl border bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:border-indigo-300 hover:shadow-md" href="{% url 'web-properties' %}"><span class="mb-5 grid h-11 w-11 place-items-center rounded-xl bg-indigo-50 text-xl text-ink">⌂</span><strong class="block text-lg">{% t 'properties' %}</strong><small class="mt-1 block text-slate-500">{% t 'houses_assets' %}</small></a>
+
+        <a class="group rounded-2xl border bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:border-indigo-300 hover:shadow-md" href="{% url 'web-tenants' %}"><span class="mb-5 grid h-11 w-11 place-items-center rounded-xl bg-indigo-50 text-xl text-ink">♙</span><strong class="block text-lg">{% t 'kireyste' %}</strong><small class="mt-1 block text-slate-500">{% t 'rental_agreements' %}</small></a>
+
+        <a class="group rounded-2xl border bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:border-indigo-300 hover:shadow-md" href="{% url 'web-agreements' %}"><span class="mb-5 grid h-11 w-11 place-items-center rounded-xl bg-indigo-50 text-xl text-ink">☰</span><strong class="block text-lg">{% t 'agreements' %}</strong><small class="mt-1 block text-slate-500">{% t 'rental_contracts' %}</small></a>
+    </div>
+</section>
+
+<section class="mb-8">
+    <h2 class="mb-3 text-lg font-bold text-ink">{% t 'finance' %}</h2>
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <a class="group rounded-2xl border bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:border-indigo-300 hover:shadow-md" href="{% url 'web-bank-accounts' %}"><span class="mb-5 grid h-11 w-11 place-items-center rounded-xl bg-blue-50 text-xl text-blue-600">🏦</span><strong class="block text-lg">{% t 'bank_accounts' %}</strong><small class="mt-1 block text-slate-500">{% t 'banks_accounts' %}</small></a>
+        <a class="group rounded-2xl border bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:border-indigo-300 hover:shadow-md" href="{% url 'web-payments' %}"><span class="mb-5 grid h-11 w-11 place-items-center rounded-xl bg-green-50 text-xl text-green-600">▣</span><strong class="block text-lg">{% t 'payments' %}</strong><small class="mt-1 block text-slate-500">{% t 'collected_rent' %}</small></a>
+        <a class="group rounded-2xl border bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:border-indigo-300 hover:shadow-md" href="{% url 'web-maintenance-list' %}"><span class="mb-5 grid h-11 w-11 place-items-center rounded-xl bg-orange-50 text-xl text-orange-600">🔧</span><strong class="block text-lg">{% t 'maintenance' %}</strong><small class="mt-1 block text-slate-500">{% t 'repairs_fixes' %}</small></a>
+        <a class="group rounded-2xl border bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:border-indigo-300 hover:shadow-md" href="{% url 'web-expense-list' %}"><span class="mb-5 grid h-11 w-11 place-items-center rounded-xl bg-red-50 text-xl text-red-600">$</span><strong class="block text-lg">{% t 'expenses' %}</strong><small class="mt-1 block text-slate-500">{% t 'general_expenses' %}</small></a>
+    </div>
+</section>
+
+<section class="mb-8">
+    <h2 class="mb-3 text-lg font-bold text-ink">{% t 'accounting' %}</h2>
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <a class="group rounded-2xl border bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:border-indigo-300 hover:shadow-md" href="{% url 'web-account-list' %}"><span class="mb-5 grid h-11 w-11 place-items-center rounded-xl bg-purple-50 text-xl text-purple-600">≡</span><strong class="block text-lg">{% t 'accounts' %}</strong><small class="mt-1 block text-slate-500">{% t 'chart_of_accounts' %}</small></a>
+        <a class="group rounded-2xl border bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:border-indigo-300 hover:shadow-md" href="{% url 'web-journal-list' %}"><span class="mb-5 grid h-11 w-11 place-items-center rounded-xl bg-purple-50 text-xl text-purple-600">✎</span><strong class="block text-lg">{% t 'journal' %}</strong><small class="mt-1 block text-slate-500">{% t 'general_journal' %}</small></a>
+        <a class="group rounded-2xl border bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:border-indigo-300 hover:shadow-md" href="{% url 'web-invoice-list' %}"><span class="mb-5 grid h-11 w-11 place-items-center rounded-xl bg-purple-50 text-xl text-purple-600">📄</span><strong class="block text-lg">{% t 'invoices' %}</strong><small class="mt-1 block text-slate-500">{% t 'tenant_invoices' %}</small></a>
+        <a class="group rounded-2xl border bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:border-indigo-300 hover:shadow-md" href="{% url 'web-accounting-dashboard' %}"><span class="mb-5 grid h-11 w-11 place-items-center rounded-xl bg-purple-50 text-xl text-purple-600">📊</span><strong class="block text-lg">{% t 'reports' %}</strong><small class="mt-1 block text-slate-500">{% t 'financial_reports' %}</small></a>
+    </div>
+</section>
+{% endblock %}

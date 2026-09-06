@@ -49,4 +49,9 @@ class RentalAgreement(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.tenant.full_name} - {self.unit}"
+        parts = [self.tenant.full_name]
+        if self.unit:
+            parts.append(str(self.unit))
+        elif self.property:
+            parts.append(str(self.property.name))
+        return " - ".join(parts)

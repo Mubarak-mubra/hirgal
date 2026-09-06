@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% load i18n_tags %}
+{% block title %}{% if editing %}Edit Payment{% else %}Add Payment{% endif %} - Hirgal Kiro{% endblock %}
+{% block content %}
+<a class="text-sm font-semibold text-indigo-700" href="{% url 'web-payments' %}">← {% t 'payments' %}</a>
+<h1 class="mt-4 text-3xl font-bold text-ink">{% if editing %}Edit Payment{% else %}Add Payment{% endif %}</h1>
+
+<form method="post" class="mt-6 rounded-xl border bg-white p-6 shadow-sm">
+  {% csrf_token %}
+
+  <div class="grid gap-4 md:grid-cols-2">
+    <div>
+      <label class="block text-sm font-medium text-slate-700 mb-1">1. {% t 'tenant' %}</label>
+      {{ form.tenant }}
+      <p class="text-xs text-slate-400 mt-1">Choose tenant first, then select their agreement</p>
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-slate-700 mb-1">2. Agreement</label>
+      {{ form.rental_agreement }}
+      <p class="text-xs text-slate-400 mt-1" id="agreement_hint">Select a tenant first</p>
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-slate-700 mb-1">{% t 'amount' %}</label>
+      {{ form.amount }}
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-slate-700 mb-1">{% t 'date' %}</label>
+      {{ form.payment_date }}
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-slate-700 mb-1">{% t 'method' %}</label>
+      {{ form.payment_method }}
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-slate-700 mb-1">{% t 'bank_accounts' %}</label>
+      {{ form.bank_account }}
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-slate-700 mb-1">{% t 'reference' %}</label>
+      {{ form.reference_number }}
+    </div>
+  </div>
+
+  <div class="mt-4">
+    <label class="block text-sm font-medium text-slate-700 mb-1">Notes</label>
+    {{ form.notes }}
+  </div>
+
+  {% if form.errors %}
+  <div class="mt-4 rounded-lg bg-red-50 border border-red-200 p-4 text-red-700">
+    {{ form.errors }}
+  </div>
+  {% endif %}
+
+  <button class="mt-4 rounded-lg bg-ink px-5 py-3 font-bold text-white">{% t 'save' %}</button>
+</form>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const tenantSelect = document.getElementById('id_tenant_select');
+    const agreementSelect = document.getElementById('id_rental_agreement');
+    const hint = document.getElementById('agreement_hint');
+
+    if (!tenantSelect || !agreementSelect) return;
+
+    // Store all agreements
+    const allOptions = Array.from(agreementSelect.options).map(opt => ({
+        id: opt.value,
+        text: opt.text,
+        tenantId: opt.dataset.tenantId || ''
+    }));
+
+    function filterAgreements() {
+        const selectedTenant = tenantSelect.value;
+
+        // Clear agreement dropdown
+        agreementSelect.innerHTML = '';
+
+        if (!selectedTenant) {
+            hint.textContent = 'Select a tenant first';
+            return;
+        }
+
+        // Filter agreements by selected tenant
+        const filtered = allOptions.filter(opt => opt.tenantId === selectedTenant);
+
+        if (filtered.length === 0) {
+            hint.textContent = 'No active agreements for this tenant';
+            return;
+        }
+
+        hint.textContent = '';
+
+        // Add filtered options
+        filtered.forEach(opt => {
+            const option = document.createElement('option');
+            option.value = opt.id;
+            option.textContent = opt.text;
+            agreementSelect.appendChild(option);
+        });
+    }
+
+    // Load tenant's agreements from API
+    function loadAgreements(tenantId) {
+        if (!tenantId) {
+            agreementSelect.innerHTML = '';
+            hint.textContent = 'Select a tenant first';
+            return;
+        }
+
+        hint.textContent = 'Loading...';
+
+        fetch(`/api/agreements-by-tenant/?tenant_id=${tenantId}`)
+            .then(r => r.json())
+            .then(data => {
+                agreementSelect.innerHTML = '';
+
+                if (data.agreements.length === 0) {
+                    hint.textContent = 'No active agreements for this tenant';
+                    return;
+                }
+
+                hint.textContent = '';
+                data.agreements.forEach(a => {
+                    const opt = document.createElement('option');
+                    opt.value = a.id;
+                    opt.textContent = a.label;
+                    agreementSelect.appendChild(opt);
+                });
+            })
+            .catch(() => {
+                hint.textContent = 'Error loading agreements';
+            });
+    }
+
+    tenantSelect.addEventListener('change', function() {
+        loadAgreements(this.value);
+    });
+
+    // Load on page load if tenant is already selected
+    if (tenantSelect.value) {
+        loadAgreements(tenantSelect.value);
+    }
+});
+</script>
+{% endblock %}

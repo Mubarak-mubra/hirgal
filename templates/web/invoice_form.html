@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+{% block title %}{% if editing %}Wax ka beddel biilka{% else %}Biil cusub{% endif %} - Hirgal Kiro{% endblock %}
+{% block content %}
+<div class="max-w-4xl mx-auto p-6">
+  <div class="bg-white rounded-xl border shadow-sm p-6">
+    <h1 class="text-2xl font-bold mb-6">
+      {% if editing %}
+        Wax ka beddel biilka
+      {% else %}
+        Biil cusub
+      {% endif %}
+    </h1>
+
+    <form method="POST" action="">
+      {% csrf_token %}
+
+      <div class="grid gap-4 sm:grid-cols-2">
+        <div class="mb-4">
+          <label class="block text-sm font-medium text-slate-700">{{ form.tenant.label }}</label>
+          {{ form.tenant }}
+          {% if form.tenant.errors %}<p class="text-red-500 text-sm">{{ form.tenant.errors.0 }}</p>{% endif %}
+        </div>
+        <div class="mb-4">
+          <label class="block text-sm font-medium text-slate-700">{{ form.rental_agreement.label }}</label>
+          {{ form.rental_agreement }}
+          {% if form.rental_agreement.errors %}<p class="text-red-500 text-sm">{{ form.rental_agreement.errors.0 }}</p>{% endif %}
+        </div>
+      </div>
+
+      <div class="grid gap-4 sm:grid-cols-2">
+        <div class="mb-4">
+          <label class="block text-sm font-medium text-slate-700">{{ form.property.label }}</label>
+          {{ form.property }}
+          {% if form.property.errors %}<p class="text-red-500 text-sm">{{ form.property.errors.0 }}</p>{% endif %}
+        </div>
+        <div class="mb-4">
+          <label class="block text-sm font-medium text-slate-700">{{ form.invoice_number.label }}</label>
+          {{ form.invoice_number }}
+          {% if form.invoice_number.errors %}<p class="text-red-500 text-sm">{{ form.invoice_number.errors.0 }}</p>{% endif %}
+        </div>
+      </div>
+
+      <div class="grid gap-4 sm:grid-cols-3">
+        <div class="mb-4">
+          <label class="block text-sm font-medium text-slate-700">{{ form.date.label }}</label>
+          {{ form.date }}
+          {% if form.date.errors %}<p class="text-red-500 text-sm">{{ form.date.errors.0 }}</p>{% endif %}
+        </div>
+        <div class="mb-4">
+          <label class="block text-sm font-medium text-slate-700">{{ form.due_date.label }}</label>
+          {{ form.due_date }}
+          {% if form.due_date.errors %}<p class="text-red-500 text-sm">{{ form.due_date.errors.0 }}</p>{% endif %}
+        </div>
+        <div class="mb-4">
+          <label class="block text-sm font-medium text-slate-700">{{ form.status.label }}</label>
+          {{ form.status }}
+          {% if form.status.errors %}<p class="text-red-500 text-sm">{{ form.status.errors.0 }}</p>{% endif %}
+        </div>
+      </div>
+
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-slate-700">{{ form.notes.label }}</label>
+        {{ form.notes }}
+        {% if form.notes.errors %}<p class="text-red-500 text-sm">{{ form.notes.errors.0 }}</p>{% endif %}
+      </div>
+
+      <div class="border-t pt-6">
+        <h3 class="text-lg font-bold mb-4">Qaybaha Biilka (Lines)</h3>
+        {{ formset.management_form }}
+
+        <div class="overflow-x-auto rounded-lg border">
+          <table class="w-full text-left text-sm">
+            <thead class="bg-slate-50 text-slate-600">
+              <tr>
+                <th class="px-4 py-3 font-semibold">Xisaabta</th>
+                <th class="px-4 py-3 font-semibold">Faahfaahin</th>
+                <th class="px-4 py-3 font-semibold">Qiimaha</th>
+                <th class="px-4 py-3 font-semibold">Tirtir</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y">
+              {% for line_form in formset %}
+              <tr>
+                <td class="px-4 py-3">{{ line_form.account }}</td>
+                <td class="px-4 py-3">{{ line_form.description }}</td>
+                <td class="px-4 py-3">{{ line_form.amount }}</td>
+                <td class="px-4 py-3">
+                  {% if line_form.DELETE %}
+                    {{ line_form.DELETE }}
+                  {% endif %}
+                  {% for hidden in line_form.hidden_fields %}{{ hidden }}{% endfor %}
+                </td>
+              </tr>
+              {% if line_form.errors %}
+              <tr>
+                <td colspan="4" class="px-4 py-2">
+                  <div class="rounded bg-red-50 p-2 text-xs text-red-600">{{ line_form.errors }}</div>
+                </td>
+              </tr>
+              {% endif %}
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="flex gap-3 mt-6">
+        <button type="submit" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition">
+          Kaydi
+        </button>
+        <a href="{% url 'web-invoice-list' %}" class="border px-6 py-2 rounded-lg hover:bg-gray-50 transition">Jooji</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+document.getElementById('id_tenant').addEventListener('change', function() {
+    const tenantId = this.value;
+    const agreementSelect = document.getElementById('id_rental_agreement');
+    const propertySelect = document.getElementById('id_property');
+
+    // Reset agreement and property
+    agreementSelect.innerHTML = '<option value="">--- Dooro heshiiska ---</option>';
+    propertySelect.innerHTML = '<option value="">--- Dooro hantida ---</option>';
+
+    if (tenantId) {
+        // Fetch agreements for this tenant
+        fetch('/api/agreements-by-tenant/?tenant_id=' + tenantId)
+            .then(r => r.json())
+            .then(data => {
+                data.agreements.forEach(function(a) {
+                    const opt = document.createElement('option');
+                    opt.value = a.id;
+                    opt.textContent = a.label;
+                    agreementSelect.appendChild(opt);
+                });
+
+                // If only one agreement, auto-select it and its property
+                if (data.agreements.length === 1) {
+                    agreementSelect.value = data.agreements[0].id;
+                    agreementSelect.dispatchEvent(new Event('change'));
+                }
+            });
+    }
+});
+
+document.getElementById('id_rental_agreement').addEventListener('change', function() {
+    const agreementId = this.value;
+    const propertySelect = document.getElementById('id_property');
+
+    if (agreementId) {
+        // Fetch the agreement details to get the property
+        const tenantId = document.getElementById('id_tenant').value;
+        fetch('/api/agreements-by-tenant/?tenant_id=' + tenantId)
+            .then(r => r.json())
+            .then(data => {
+                const agreement = data.agreements.find(a => a.id == agreementId);
+                if (agreement) {
+                    // Find and select the matching property
+                    for (let i = 0; i < propertySelect.options.length; i++) {
+                        if (propertySelect.options[i].text === agreement.property__name) {
+                            propertySelect.selectedIndex = i;
+                            break;
+                        }
+                    }
+                }
+            });
+    }
+});
+</script>
+{% endblock %}

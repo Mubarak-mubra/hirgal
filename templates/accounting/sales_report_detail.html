@@ -1,0 +1,53 @@
+{% extends "accounting/base_accounting.html" %}
+{% load i18n_tags %}
+
+{% block report_title %}{{ property.name }} - Revenue{% endblock %}
+{% block print_title %}{{ property.name }} - Revenue Detail{% endblock %}
+{% block heading %}{{ property.name }} - Revenue Detail{% endblock %}
+
+{% block report_content %}
+<a class="text-sm font-semibold text-indigo-700" href="{% url 'web-sales-report' %}?start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}">← Sales Report</a>
+
+<div class="bg-white rounded-xl border border-slate-200 p-6 mb-6">
+    <p class="text-sm text-slate-500 mb-2">{{ start_date }} to {{ end_date }}</p>
+    <div class="flex justify-between border-b pb-2">
+        <span class="font-semibold">Total Revenue</span>
+        <span class="text-green-600 font-bold">${{ total|floatformat:2 }}</span>
+    </div>
+</div>
+
+{% if items %}
+<div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+    <table class="w-full text-left text-sm">
+        <thead class="border-b bg-slate-50 text-xs font-semibold uppercase text-slate-500">
+            <tr>
+                <th class="px-5 py-3">Taariikhda</th>
+                <th class="px-5 py-3">Reference</th>
+                <th class="px-5 py-3">Faahfaahin</th>
+                <th class="px-5 py-3 text-right">Credit</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y">
+            {% for item in items %}
+            <tr class="hover:bg-slate-50">
+                <td class="px-5 py-4 text-slate-600">{{ item.date }}</td>
+                <td class="px-5 py-4 font-semibold text-ink">
+                    {% if item.source_url %}
+                        <a href="{{ item.source_url }}" class="text-indigo-700 hover:underline">{{ item.reference }}</a>
+                    {% else %}
+                        {{ item.reference }}
+                    {% endif %}
+                </td>
+                <td class="px-5 py-4 text-slate-600">{{ item.description }}</td>
+                <td class="px-5 py-4 text-right font-semibold text-green-600">${{ item.credit|floatformat:2 }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="rounded-xl border border-dashed bg-white p-10 text-center">
+    <p class="font-semibold text-slate-700">Ma jiraan dakhli.</p>
+</div>
+{% endif %}
+{% endblock %}

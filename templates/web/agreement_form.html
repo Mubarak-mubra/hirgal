@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+{% load i18n_tags %}
+
+{% block title %}{% if editing %}Edit Agreement{% else %}New Agreement{% endif %} - Hirgal Kiro{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto p-6">
+  <div class="bg-white rounded-xl border shadow-sm p-6">
+    <h1 class="text-2xl font-bold mb-6">
+      {% if editing %}Edit Agreement{% else %}New Agreement{% endif %}
+    </h1>
+
+    <form method="POST" id="agreement-form">
+      {% csrf_token %}
+
+      <!-- Tenant (auto-filled or selectable) -->
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-gray-700 mb-1">1. Tenant</label>
+        {{ form.tenant }}
+        {% if tenant_id %}
+          <p class="text-xs text-green-600 mt-1">✓ Tenant auto-selected from profile</p>
+        {% else %}
+          <p class="text-xs text-slate-400 mt-1">Select the tenant for this agreement</p>
+        {% endif %}
+        {% if form.tenant.errors %}
+        <p class="text-red-500 text-sm mt-1">{{ form.tenant.errors.0 }}</p>
+        {% endif %}
+      </div>
+
+      <!-- Property -->
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-gray-700 mb-1">2. Property</label>
+        {{ form.property }}
+        <p class="text-xs text-slate-400 mt-1">Select the property to rent out</p>
+        {% if form.property.errors %}
+        <p class="text-red-500 text-sm mt-1">{{ form.property.errors.0 }}</p>
+        {% endif %}
+      </div>
+
+      <!-- Unit (filtered by property) -->
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-gray-700 mb-1">3. Unit (optional)</label>
+        {{ form.unit }}
+        <p class="text-xs text-slate-400 mt-1" id="unit-hint">Select a property first to see available units</p>
+        {% if form.unit.errors %}
+        <p class="text-red-500 text-sm mt-1">{{ form.unit.errors.0 }}</p>
+        {% endif %}
+      </div>
+
+      <!-- Monthly Rent -->
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-gray-700 mb-1">4. Monthly Rent ($)</label>
+        {{ form.monthly_rent }}
+        <p class="text-xs text-slate-400 mt-1">How much rent per month</p>
+        {% if form.monthly_rent.errors %}
+        <p class="text-red-500 text-sm mt-1">{{ form.monthly_rent.errors.0 }}</p>
+        {% endif %}
+      </div>
+
+      <!-- Dates -->
+      <div class="grid grid-cols-2 gap-4 mb-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">5. Start Date</label>
+          {{ form.start_date }}
+          {% if form.start_date.errors %}
+          <p class="text-red-500 text-sm mt-1">{{ form.start_date.errors.0 }}</p>
+          {% endif %}
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">End Date (optional)</label>
+          {{ form.end_date }}
+          <p class="text-xs text-slate-400 mt-1">Leave blank for ongoing</p>
+        </div>
+      </div>
+
+      <!-- Status -->
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-gray-700 mb-1">6. Status</label>
+        {{ form.status }}
+      </div>
+
+      <!-- Notes -->
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-gray-700 mb-1">Notes (optional)</label>
+        {{ form.notes }}
+      </div>
+
+      {% if form.errors %}
+      <div class="mb-4 rounded-lg bg-red-50 border border-red-200 p-4 text-red-700">
+        {{ form.errors }}
+      </div>
+      {% endif %}
+
+      <div class="flex gap-3 mt-6">
+        <button type="submit" class="bg-ink text-white px-6 py-2 rounded-lg font-bold hover:bg-indigo-800 transition">
+          {% if editing %}Save Changes{% else %}Create Agreement{% endif %}
+        </button>
+        {% if tenant_id %}
+        <a href="{% url 'web-tenant-detail' tenant_id %}" class="border px-6 py-2 rounded-lg hover:bg-gray-50 transition">Cancel</a>
+        {% else %}
+        <a href="{% url 'web-agreements' %}" class="border px-6 py-2 rounded-lg hover:bg-gray-50 transition">Cancel</a>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const propertySelect = document.getElementById('id_property');
+    const unitSelect = document.getElementById('id_unit');
+    const unitHint = document.getElementById('unit-hint');
+
+    if (!propertySelect || !unitSelect) return;
+
+    propertySelect.addEventListener('change', function() {
+        const propertyId = this.value;
+
+        if (!propertyId) {
+            unitSelect.innerHTML = '<option value="">---------</option>';
+            unitHint.textContent = 'Select a property first to see available units';
+            return;
+        }
+
+        unitHint.textContent = 'Loading units...';
+
+        fetch(`/api/units-by-property/?property_id=${propertyId}`)
+            .then(r => r.json())
+            .then(data => {
+                unitSelect.innerHTML = '<option value="">---------</option>';
+
+                if (data.units.length === 0) {
+                    unitHint.textContent = 'No units for this property (whole property rental)';
+                    return;
+                }
+
+                unitHint.textContent = `${data.units.length} unit(s) available - select one`;
+                data.units.forEach(u => {
+                    const opt = document.createElement('option');
+                    opt.value = u.id;
+                    opt.textContent = u.unit_number;
+                    unitSelect.appendChild(opt);
+                });
+            })
+            .catch(() => {
+                unitHint.textContent = 'Error loading units';
+            });
+    });
+
+    // Trigger on load if property already selected
+    if (propertySelect.value) {
+        propertySelect.dispatchEvent(new Event('change'));
+    }
+});
+</script>
+{% endblock %}

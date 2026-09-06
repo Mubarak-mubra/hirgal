@@ -1,18 +1,5 @@
 """
 URL configuration for config project.
-
-The `urlpatterns` list routes URLs to views. For more information please see:
-    https://docs.djangoproject.com/en/6.1/topics/http/urls/
-Examples:
-Function views
-    1. Add an import:  from my_app import views
-    2. Add a URL to urlpatterns:  path('', views.home, name='home')
-Class-based views
-    1. Add an import:  from other_app.views import Home
-    2. Add a URL to urlpatterns:  path('', Home.as_view(), name='home')
-Including another URLconf
-    1. Import the include() function: from django.urls import include, path
-    2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 
 from django.contrib import admin
@@ -25,11 +12,13 @@ admin.site.site_title = "Hirgal Kiro"
 admin.site.index_title = "Maamulka xogta"
 
 urlpatterns = [
+    path("", include("web.urls")),
+    path("api/v1/properties/", include("properties.urls")),
+    path("api/v1/rentals/", include("rentals.urls")),
+    path("api/v1/finance/", include("finance.urls")),
+    path("api/v1/accounts/", include("accounts.urls")),
+    path("api/v1/accounting/", include("accounting.urls")),
     path("admin/", admin.site.urls),
-    path("api/accounts/", include("accounts.urls")),
-    path("api/properties/", include("properties.urls")),
-    path("api/tenants/", include("rentals.urls")),
-    path("api/payments/", include("finance.urls")),
 ]
 
 if settings.DEBUG:

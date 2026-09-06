@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}{% if editing %}Wax ka beddel diiwaanka{% else %}Diiwaan cusub{% endif %} - Hirgal Kiro{% endblock %}
+{% block content %}
+<div class="max-w-4xl mx-auto p-6">
+  <div class="bg-white rounded-xl border shadow-sm p-6">
+    <h1 class="text-2xl font-bold mb-6">
+      {% if editing %}
+        Wax ka beddel diiwaanka
+      {% else %}
+        Diiwaan cusub
+      {% endif %}
+    </h1>
+
+    <form method="POST" action="">
+      {% csrf_token %}
+
+      <div class="mb-6">
+        {{ form.as_p }}
+      </div>
+
+      <div class="border-t pt-6">
+        <h3 class="text-lg font-bold mb-4">Qaybaha (Lines)</h3>
+        {{ formset.management_form }}
+
+        <div class="overflow-x-auto rounded-lg border">
+          <table class="w-full text-left text-sm">
+            <thead class="bg-slate-50 text-slate-600">
+              <tr>
+                <th class="px-4 py-3 font-semibold">Xisaabta</th>
+                <th class="px-4 py-3 font-semibold">Faahfaahin</th>
+                <th class="px-4 py-3 font-semibold">Debit</th>
+                <th class="px-4 py-3 font-semibold">Credit</th>
+                <th class="px-4 py-3 font-semibold">Hantida</th>
+                <th class="px-4 py-3 font-semibold">Tirtir</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y">
+              {% for line_form in formset %}
+              <tr>
+                <td class="px-4 py-3">{{ line_form.account }}</td>
+                <td class="px-4 py-3">{{ line_form.description }}</td>
+                <td class="px-4 py-3">{{ line_form.debit }}</td>
+                <td class="px-4 py-3">{{ line_form.credit }}</td>
+                <td class="px-4 py-3">{{ line_form.property }}</td>
+                <td class="px-4 py-3">
+                  {% if line_form.DELETE %}
+                    {{ line_form.DELETE }}
+                  {% endif %}
+                  {% for hidden in line_form.hidden_fields %}{{ hidden }}{% endfor %}
+                </td>
+              </tr>
+              {% if line_form.errors %}
+              <tr>
+                <td colspan="6" class="px-4 py-2">
+                  <div class="rounded bg-red-50 p-2 text-xs text-red-600">{{ line_form.errors }}</div>
+                </td>
+              </tr>
+              {% endif %}
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="flex gap-3 mt-6">
+        <button type="submit" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition">
+          Kaydi
+        </button>
+        <a href="{% url 'web-journal-list' %}" class="border px-6 py-2 rounded-lg hover:bg-gray-50 transition">Jooji</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

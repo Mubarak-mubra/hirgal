@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Profile - Hirgal Kiro{% endblock %}
+{% block content %}
+<section class="mx-auto mt-12 max-w-md rounded-2xl border bg-white p-7 shadow-lg">
+    <img src="{% static 'logoHirgal.png' %}" alt="Hirgal Kiro" class="h-12 w-12 rounded-xl object-cover">
+    <h1 class="mt-5 text-2xl font-bold">Profile</h1>
+    <p class="mt-2 text-slate-500">Macluumaadkaaga shaqsiyeed.</p>
+    <form method="post" class="mt-5">
+        {% csrf_token %}
+        <label class="mb-2 block text-sm font-semibold">Magaca isticmaalaha</label>
+        <input type="text" value="{{ user.username }}" class="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-3 outline-none" readonly>
+        <label class="mb-2 mt-5 block text-sm font-semibold">Magaca oo dhan</label>
+        {{ form.full_name }}
+        {% if form.full_name.errors %}<p class="text-red-500 text-sm">{{ form.full_name.errors.0 }}</p>{% endif %}
+        <label class="mb-2 mt-5 block text-sm font-semibold">Lambarka taleefanka</label>
+        {{ form.phone_number }}
+        {% if form.phone_number.errors %}<p class="text-red-500 text-sm">{{ form.phone_number.errors.0 }}</p>{% endif %}
+        <label class="mb-2 mt-5 block text-sm font-semibold">Taariikhda diwaangelinta</label>
+        <input type="text" value="{{ user.date_joined|date:'d M Y' }}" class="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-3 outline-none" readonly>
+        <button class="mt-6 w-full rounded-lg bg-ink px-4 py-3 font-bold text-white hover:bg-indigo-900" type="submit">Cusbooneysii</button>
+    </form>
+</section>
+{% endblock %}

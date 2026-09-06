@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% load i18n_tags %}
+{% block title %}{% t 'expenses' %} - Hirgal Kiro{% endblock %}
+{% block content %}
+<section class="mb-7 flex items-end justify-between">
+  <div>
+    <a class="text-sm font-semibold text-indigo-700" href="{% url 'home' %}">← {% t 'home' %}</a>
+    <h1 class="mt-4 text-3xl font-bold">{% t 'expenses' %}</h1>
+    <p class="mt-2 text-slate-500">All property expenses.</p>
+  </div>
+  <a class="rounded-lg bg-ink px-4 py-3 text-sm font-bold text-white" href="{% url 'web-expense-create' %}">+ {% t 'add_expense' %}</a>
+</section>
+
+{% if expenses %}
+<section class="rounded-xl border bg-white shadow-sm">
+  <div class="overflow-x-auto">
+    <table class="w-full text-left text-sm">
+      <thead class="border-b bg-slate-50 text-xs font-semibold uppercase text-slate-500">
+        <tr>
+          <th class="px-5 py-3">Title</th>
+          <th class="px-5 py-3">Property</th>
+          <th class="px-5 py-3">Category</th>
+          <th class="px-5 py-3">Payment</th>
+          <th class="px-5 py-3 text-right">Amount</th>
+          <th class="px-5 py-3">Date</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y">
+        {% for expense in expenses %}
+        <tr class="hover:bg-slate-50">
+          <td class="px-5 py-4 font-semibold text-ink">
+            <a href="{% url 'web-expense-detail' expense.pk %}" class="text-indigo-700 hover:underline">{{ expense.title }}</a>
+          </td>
+          <td class="px-5 py-4">
+            <a href="{% url 'web-property-detail' expense.property.pk %}" class="text-indigo-500 hover:underline">{{ expense.property.name }}</a>
+          </td>
+          <td class="px-5 py-4 text-slate-600">{{ expense.category }}</td>
+          <td class="px-5 py-4">
+            {% if expense.payment_status == 'paid' %}
+              <span class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-semibold text-green-800">La bixiyay</span>
+            {% else %}
+              <span class="inline-flex items-center rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-semibold text-orange-800">Aan la bixin</span>
+            {% endif %}
+          </td>
+          <td class="px-5 py-4 text-right font-semibold text-rose-600">${{ expense.amount }}</td>
+          <td class="px-5 py-4 text-slate-600">{{ expense.expense_date }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% else %}
+<div class="rounded-xl border border-dashed bg-white p-10 text-center">
+  <p class="font-semibold text-slate-700">No expenses yet.</p>
+  <p class="mt-2 text-sm text-slate-500">Record an expense for your property.</p>
+</div>
+{% endif %}
+{% endblock %}
