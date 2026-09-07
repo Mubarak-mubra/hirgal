@@ -2,37 +2,43 @@
 {% load i18n_tags %}
 {% block title %}{% t 'accounts_title' %} - Hirgal Kiro{% endblock %}
 {% block content %}
-<section class="mb-7 flex items-end justify-between">
+<section class="mb-7 flex items-end justify-between no-print">
   <div>
     <a class="text-sm font-semibold text-indigo-700" href="{% url 'home' %}">← {% t 'home' %}</a>
     <h1 class="mt-4 text-3xl font-bold">{% t 'accounts_title' %}</h1>
     <p class="mt-2 text-slate-500">{% t 'track_money' %}</p>
   </div>
-  <a class="rounded-lg bg-ink px-4 py-3 text-sm font-bold text-white" href="{% url 'web-account-create' %}">{% t 'add_account' %}</a>
+  <div class="flex gap-3">
+    <button onclick="window.print()" class="rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">🖨️ Print</button>
+    <a class="rounded-lg bg-ink px-4 py-3 text-sm font-bold text-white" href="{% url 'web-account-create' %}">{% t 'add_account' %}</a>
+  </div>
 </section>
 
-<section class="mb-6 rounded-xl border bg-white p-4 shadow-sm">
-  <p class="text-sm text-slate-600"><strong>{% t 'what_are_accounts' %}</strong> {% t 'accounts_explain' %}</p>
-</section>
+{# ── Print Header (only shows when printing) ── #}
+<div class="print-header">
+  <h1>Chart of Accounts</h1>
+  <p>Hirgal Kiro — Rent Management System</p>
+</div>
 
 <section class="rounded-xl border bg-white shadow-sm overflow-hidden">
   {% if accounts %}
   <div class="overflow-x-auto">
-    <table class="w-full text-left text-sm">
+    <table class="w-full text-left text-sm" id="accounts-table">
       <thead class="border-b bg-slate-50 text-slate-600">
         <tr>
-          <th class="px-4 py-3 font-semibold">{% t 'name' %}</th>
-          <th class="px-4 py-3 font-semibold">{% t 'type' %}</th>
-          <th class="px-4 py-3 font-semibold">{% t 'description' %}</th>
-          <th class="px-4 py-3 font-semibold text-right">{% t 'actions' %}</th>
+          <th class="px-4 py-3 font-semibold">Code</th>
+          <th class="px-4 py-3 font-semibold">Account Name</th>
+          <th class="px-4 py-3 font-semibold">Type</th>
+          <th class="px-4 py-3 font-semibold">Description</th>
+          <th class="px-4 py-3 font-semibold text-center">Status</th>
         </tr>
       </thead>
       <tbody class="divide-y">
         {% for account in accounts %}
         <tr class="hover:bg-slate-50">
+          <td class="px-4 py-3 font-mono font-semibold text-slate-700">{{ account.code }}</td>
           <td class="px-4 py-3">
             <div class="font-medium">{{ account.name }}</div>
-            <div class="text-xs text-slate-400">{% t 'code' %}: {{ account.code }}</div>
           </td>
           <td class="px-4 py-3">
             <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold
@@ -45,14 +51,21 @@
             </span>
           </td>
           <td class="px-4 py-3 text-slate-500">{{ account.description|default:"-" }}</td>
-          <td class="px-4 py-3 text-right">
-            <a href="{% url 'web-account-edit' account.pk %}" class="font-semibold text-indigo-600 hover:underline">{% t 'edit' %}</a>
-            <span class="mx-1 text-slate-300">|</span>
-            <a href="{% url 'web-account-delete' account.pk %}" class="font-semibold text-rose-600 hover:underline">{% t 'delete' %}</a>
+          <td class="px-4 py-3 text-center">
+            {% if account.is_active %}
+            <span class="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700">Active</span>
+            {% else %}
+            <span class="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-500">Inactive</span>
+            {% endif %}
           </td>
         </tr>
         {% endfor %}
       </tbody>
+      <tfoot class="border-t bg-slate-50">
+        <tr>
+          <td colspan="5" class="px-4 py-2 text-xs text-slate-500 font-semibold">Total Accounts: {{ accounts|length }}</td>
+        </tr>
+      </tfoot>
     </table>
   </div>
   {% else %}
@@ -62,4 +75,71 @@
   </div>
   {% endif %}
 </section>
+
+<style>
+  .print-header { display: none; }
+
+  @media print {
+    body { background: white !important; }
+    .no-print, header, nav, .sidebar, .topbar, .sidebar-overlay, footer,
+    button[onclick], a[href*="create"], a[href*="edit"], a[href*="delete"] {
+      display: none !important;
+    }
+    .main-content { margin: 0 !important; padding: 0 !important; }
+    .p-4, .p-6, .p-8, .p-10 { padding: 0 !important; }
+
+    .print-header {
+      display: block !important;
+      text-align: center;
+      margin-bottom: 20px;
+      padding-bottom: 15px;
+      border-bottom: 2px solid #10194f;
+    }
+    .print-header h1 {
+      font-size: 22px;
+      font-weight: 700;
+      color: #10194f;
+      margin: 0;
+    }
+    .print-header p {
+      font-size: 12px;
+      color: #64748b;
+      margin: 4px 0 0;
+    }
+
+    #accounts-table {
+      width: 100% !important;
+      border-collapse: collapse !important;
+      font-size: 11px !important;
+    }
+    #accounts-table thead {
+      background: #f1f5f9 !important;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    #accounts-table th {
+      border: 1px solid #333 !important;
+      padding: 8px 10px !important;
+      font-weight: 700 !important;
+      color: #1e293b !important;
+    }
+    #accounts-table td {
+      border: 1px solid #ccc !important;
+      padding: 6px 10px !important;
+    }
+    #accounts-table tfoot td {
+      border: 1px solid #333 !important;
+      font-weight: 700 !important;
+      background: #f1f5f9 !important;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    #accounts-table .inline-flex { border: 1px solid currentColor !important; }
+
+    @page {
+      margin: 1.5cm;
+      size: A4 landscape;
+    }
+  }
+</style>
 {% endblock %}

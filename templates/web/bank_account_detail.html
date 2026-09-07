@@ -1,50 +1,118 @@
 {% extends "base.html" %}
+{% load i18n_tags %}
 {% block title %}{{ bank_account.bank_name }} - Hirgal Kiro{% endblock %}
 {% block content %}
-<a class="text-sm font-semibold text-indigo-700" href="{% url 'web-bank-accounts' %}">← Xisaabaha Bangiga</a>
+<style>
+  @media print {
+    body * { visibility: hidden; }
+    .print-area, .print-area * { visibility: visible; }
+    .print-area { position: absolute; left: 0; top: 0; width: 100%; padding: 20px; }
+    .no-print { display: none !important; }
+    .print-header { display: block !important; }
+  }
+</style>
 
-<div class="mt-4 flex flex-wrap items-end justify-between gap-4">
-  <div>
-    <h1 class="text-3xl font-bold text-ink">{{ bank_account.bank_name }}</h1>
-    <p class="mt-2 text-slate-500">{{ bank_account.account_name }} · Lambarka: {{ bank_account.account_number }}</p>
-  </div>
-  <div class="flex gap-3">
-    <a class="rounded-xl bg-slate-200 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-300" href="{% url 'web-bank-account-edit' bank_account.pk %}">Wax ka beddel</a>
-    <a class="rounded-xl bg-red-100 px-4 py-2 text-sm font-bold text-red-700 hover:bg-red-200" href="{% url 'web-bank-account-delete' bank_account.pk %}">Tirtir</a>
-  </div>
+<div class="no-print">
+  <a class="text-sm font-semibold text-indigo-700" href="{% url 'web-bank-accounts' %}">← Xisaabaha Bangiga</a>
 </div>
 
-{% if payments %}
-<section class="mt-6 rounded-2xl border bg-white p-5 shadow-sm">
-  <h2 class="text-lg font-bold">Lacagihii Ugu Dambeeyay</h2>
-  <div class="mt-4 divide-y">
-    {% for p in payments %}
-    <div class="flex justify-between py-3">
-      <div>
-        <p class="font-semibold"><a href="{% url 'web-tenant-detail' p.rental_agreement.tenant.pk %}" class="text-indigo-600 hover:underline">{{ p.rental_agreement.tenant.full_name }}</a></p>
-        <p class="text-sm text-slate-500"><a href="{% url 'web-property-detail' p.rental_agreement.property.pk %}" class="text-indigo-500 hover:underline">{{ p.rental_agreement.property.name }}</a> · {{ p.payment_date }}</p>
-      </div>
-      <strong class="text-green-600">${{ p.amount }}</strong>
-    </div>
-    {% endfor %}
+<div class="print-area">
+  <div class="print-header hidden mb-4">
+    <h1 class="text-xl font-bold">Hirgal Kiro - Bank Account Report</h1>
+    <p class="text-sm text-slate-600">{{ bank_account.bank_name }} · {{ bank_account.account_number }}</p>
+    <hr class="my-2 border-slate-300">
   </div>
-</section>
-{% endif %}
 
-{% if expenses %}
-<section class="mt-6 rounded-2xl border bg-white p-5 shadow-sm">
-  <h2 class="text-lg font-bold">Kharashyadii Ugu Dambeeyay</h2>
-  <div class="mt-4 divide-y">
-    {% for e in expenses %}
-    <div class="flex justify-between py-3">
-      <div>
-        <p class="font-semibold"><a href="{% url 'web-expense-detail' e.pk %}" class="text-indigo-600 hover:underline">{{ e.title }}</a></p>
-        <p class="text-sm text-slate-500"><a href="{% url 'web-property-detail' e.property.pk %}" class="text-indigo-500 hover:underline">{{ e.property.name }}</a> · {{ e.expense_date }}</p>
-      </div>
-      <strong class="text-red-600">${{ e.amount }}</strong>
+  <div class="mt-4 flex flex-wrap items-end justify-between gap-4 no-print">
+    <div>
+      <h1 class="text-3xl font-bold text-ink">{{ bank_account.bank_name }}</h1>
+      <p class="mt-2 text-slate-500">{{ bank_account.account_name }} · Lambarka: {{ bank_account.account_number }}</p>
     </div>
-    {% endfor %}
+    <button onclick="window.print()" class="rounded-lg bg-green-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-green-700">🖨️ Print Report</button>
   </div>
-</section>
-{% endif %}
+
+  <div class="print-header hidden mt-4 mb-6">
+    <h1 class="text-2xl font-bold">{{ bank_account.bank_name }}</h1>
+    <p class="text-slate-500">{{ bank_account.account_name }} · {{ bank_account.account_number }}</p>
+  </div>
+
+  {# ── Summary ── #}
+  <div class="mt-6 grid gap-4 md:grid-cols-3">
+    <div class="rounded-2xl border bg-white p-5 shadow-sm text-center">
+      <p class="text-sm text-slate-500">Total Lacagta Soo Gashay</p>
+      <p class="text-2xl font-bold text-green-600">${{ total_in|floatformat:2 }}</p>
+    </div>
+    <div class="rounded-2xl border bg-white p-5 shadow-sm text-center">
+      <p class="text-sm text-slate-500">Total Lacagta Baxday</p>
+      <p class="text-2xl font-bold text-red-600">${{ total_out|floatformat:2 }}</p>
+    </div>
+    <div class="rounded-2xl border bg-white p-5 shadow-sm text-center">
+      <p class="text-sm text-slate-500">Haraga (Balance)</p>
+      {% if balance >= 0 %}
+      <p class="text-2xl font-bold text-green-600">${{ balance|floatformat:2 }}</p>
+      {% else %}
+      <p class="text-2xl font-bold text-red-600">${{ balance|floatformat:2 }}</p>
+      {% endif %}
+    </div>
+  </div>
+
+  {# ── Transactions Table ── #}
+  <section class="mt-6 rounded-2xl border bg-white p-5 shadow-sm">
+    <h2 class="text-lg font-bold mb-4">Dhammaan Lacagihii</h2>
+
+    {% if all_transactions %}
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-sm">
+        <thead class="border-b bg-slate-50 text-xs font-semibold uppercase text-slate-500">
+          <tr>
+            <th class="px-4 py-3">Taariikhda</th>
+            <th class="px-4 py-3">Nooca</th>
+            <th class="px-4 py-3">Faahfaahin</th>
+            <th class="px-4 py-3">Xogta</th>
+            <th class="px-4 py-3 text-right">Lacagta</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y">
+          {% for t in all_transactions %}
+          <tr class="hover:bg-slate-50">
+            <td class="px-4 py-3 text-slate-600">{{ t.date|date:"M d, Y" }}</td>
+            <td class="px-4 py-3">
+              {% if t.type == "in" %}
+              <span class="inline-block rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700">Soo Galay</span>
+              {% else %}
+              <span class="inline-block rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">Baxay</span>
+              {% endif %}
+            </td>
+            <td class="px-4 py-3 text-slate-600">{{ t.description }}</td>
+            <td class="px-4 py-3 text-slate-500">{{ t.detail }}</td>
+            <td class="px-4 py-3 text-right font-semibold {% if t.type == 'in' %}text-green-600{% else %}text-red-600{% endif %}">
+              {% if t.type == 'in' %}+{% else %}-{% endif %}${{ t.amount|floatformat:2 }}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot class="border-t bg-slate-50 font-semibold">
+          <tr>
+            <td class="px-4 py-3" colspan="4">Total</td>
+            <td class="px-4 py-3 text-right">
+              <span class="text-green-600">+${{ total_in|floatformat:2 }}</span> /
+              <span class="text-red-600">-${{ total_out|floatformat:2 }}</span>
+            </td>
+          </tr>
+          <tr>
+            <td class="px-4 py-3" colspan="4">Haraga (Balance)</td>
+            {% if balance >= 0 %}
+            <td class="px-4 py-3 text-right text-green-600 font-bold">${{ balance|floatformat:2 }}</td>
+            {% else %}
+            <td class="px-4 py-3 text-right text-red-600 font-bold">${{ balance|floatformat:2 }}</td>
+            {% endif %}
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+    {% else %}
+    <p class="text-center text-slate-400 text-sm py-4">Ma jiraan lacagihii bangigan.</p>
+    {% endif %}
+  </section>
+</div>
 {% endblock %}

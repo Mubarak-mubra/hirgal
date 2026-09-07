@@ -208,9 +208,11 @@ def explore_bank_accounts(user):
             incoming = b.payments.aggregate(t=Sum("amount"))["t"] or 0
             outgoing_exp = b.general_expenses.aggregate(t=Sum("amount"))["t"] or 0
             outgoing_rep = b.maintenance_repairs.aggregate(t=Sum("repair_cost"))["t"] or 0
+            acc_num = b.account_number
+            masked = "*" * max(0, len(acc_num) - 4) + acc_num[-4:] if len(acc_num) > 4 else acc_num
             results.append({
                 "name": b.bank_name,
-                "number": b.account_number,
+                "account": masked,
                 "balance": float(incoming - outgoing_exp - outgoing_rep),
             })
         return json.dumps(results, default=str)

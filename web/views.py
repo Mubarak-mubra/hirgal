@@ -1,3 +1,4 @@
+from django.contrib import messages
 from django.contrib.auth import get_user_model, login, logout
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.http import JsonResponse
@@ -29,8 +30,9 @@ class HomeView(LoginRequiredMixin, TemplateView):
     login_url = "/login/"
 
 
-class DashboardView(HomeView):
+class DashboardView(TemplateView):
     template_name = "web/dashboard.html"
+    login_url = "/login/"
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -184,6 +186,34 @@ class AgreementsByTenantView(LoginRequiredMixin, View):
             label += f" (${a['monthly_rent']}/mo)"
             result.append({"id": a["id"], "label": label})
         return JsonResponse({"agreements": result})
+
+
+class CheckTenantPaidView(LoginRequiredMixin, View):
+    login_url = "/login/"
+
+    def get(self, request):
+        from django.utils import timezone
+        tenant_id = request.GET.get("tenant_id")
+        if not tenant_id:
+            return JsonResponse({"paid": False})
+
+        now = timezone.now()
+        existing = Payment.objects.filter(
+            rental_agreement__tenant_id=tenant_id,
+            payment_date__year=now.year,
+            payment_date__month=now.month,
+        ).select_related("rental_agreement__tenant")
+
+        if existing.exists():
+            total = sum(p.amount for p in existing)
+            tenant_name = existing.first().rental_agreement.tenant.full_name
+            return JsonResponse({
+                "paid": True,
+                "tenant_name": tenant_name,
+                "total_paid": float(total),
+                "count": existing.count(),
+            })
+        return JsonResponse({"paid": False})
 
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
@@ -929,10 +959,24 @@ class AccountDeleteView(LoginRequiredMixin, View):
 
     def get(self, request, pk):
         account = get_object_or_404(Account, pk=pk, owner=request.user.get_data_owner())
+        if account.is_system:
+            messages.error(request, "System account ma tirtiri karto.")
+            return redirect("web-account-list")
+        has_transactions = JournalEntryLine.objects.filter(account=account).exists()
+        if has_transactions:
+            messages.error(request, f"Account '{account.name}' waxa leh transactions - marka bedel (deactivate) markii hore.")
+            return redirect("web-account-list")
         return render(request, "web/confirm_delete.html", {"object": account, "cancel_url": "web-account-list"})
 
     def post(self, request, pk):
         account = get_object_or_404(Account, pk=pk, owner=request.user.get_data_owner())
+        if account.is_system:
+            messages.error(request, "System account ma tirtiri karto.")
+            return redirect("web-account-list")
+        has_transactions = JournalEntryLine.objects.filter(account=account).exists()
+        if has_transactions:
+            messages.error(request, f"Account '{account.name}' waxa leh transactions - marka bedel (deactivate) markii hore.")
+            return redirect("web-account-list")
         account.delete()
         return redirect("web-account-list")
 
@@ -1058,9 +1102,13 @@ class InvoiceCreateView(LoginRequiredMixin, View):
         if form.is_valid() and formset.is_valid():
             invoice = form.save(commit=False)
             invoice.owner = request.user.get_data_owner()
+            # Save invoice first (so formset has an instance), then lines, then re-post
             invoice.save()
             formset.instance = invoice
             formset.save()
+            # Ensure journal entry is created now that lines exist
+            from accounting.services import post_invoice
+            post_invoice(invoice)
             return redirect("web-invoice-detail", invoice.pk)
         return render(request, "web/invoice_form.html", {"form": form, "formset": formset})
 
@@ -1081,6 +1129,9 @@ class InvoiceUpdateView(LoginRequiredMixin, View):
         if form.is_valid() and formset.is_valid():
             form.save()
             formset.save()
+            # Re-post journal entry with updated lines
+            from accounting.services import post_invoice
+            post_invoice(invoice)
             return redirect("web-invoice-detail", pk)
         return render(request, "web/invoice_form.html", {"form": form, "formset": formset, "editing": True})
 
@@ -1105,7 +1156,21 @@ class BankAccountListView(HomeView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["bank_accounts"] = BankAccount.objects.filter(owner=self.request.user.get_data_owner())
+        owner = self.request.user.get_data_owner()
+        bank_accounts = BankAccount.objects.filter(owner=owner)
+        for ba in bank_accounts:
+            if ba.linked_account:
+                from django.db.models import Sum
+                lines = JournalEntryLine.objects.filter(
+                    account=ba.linked_account,
+                    journal_entry__status="posted"
+                )
+                dr = lines.aggregate(t=Sum("debit"))["t"] or 0
+                cr = lines.aggregate(t=Sum("credit"))["t"] or 0
+                ba.balance = float(dr - cr)
+            else:
+                ba.balance = None
+        context["bank_accounts"] = bank_accounts
         return context
 
 
@@ -1120,11 +1185,68 @@ class BankAccountDetailView(LoginRequiredMixin, DetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["payments"] = Payment.objects.filter(bank_account=self.object).select_related(
+        bank = self.object
+
+        payments = Payment.objects.filter(bank_account=bank).select_related(
             "rental_agreement__tenant", "rental_agreement__property"
-        ).order_by("-payment_date")[:20]
-        context["expenses"] = GeneralExpense.objects.filter(bank_account=self.object).select_related("property").order_by("-expense_date")[:20]
-        context["repairs"] = MaintenanceRepair.objects.filter(bank_account=self.object).select_related("property").order_by("-reported_date")[:20]
+        ).order_by("-payment_date")
+        expenses = GeneralExpense.objects.filter(bank_account=bank).select_related("property").order_by("-expense_date")
+        repairs = MaintenanceRepair.objects.filter(bank_account=bank).select_related("property").order_by("-reported_date")
+
+        context["payments"] = payments[:20]
+        context["expenses"] = expenses[:20]
+        context["repairs"] = repairs[:20]
+
+        all_txns = []
+        total_in = 0
+        total_out = 0
+
+        for p in payments:
+            tenant = p.rental_agreement.tenant
+            prop = p.rental_agreement.property
+            amount = float(p.amount)
+            total_in += amount
+            all_txns.append({
+                "date": p.payment_date,
+                "type": "in",
+                "description": f"Lacag ka timid {tenant.full_name}",
+                "detail": f"{prop.name} — REF: {p.reference}",
+                "amount": amount,
+                "sort_date": p.payment_date,
+            })
+
+        for e in expenses:
+            prop = e.property
+            amount = float(e.amount)
+            total_out += amount
+            all_txns.append({
+                "date": e.expense_date,
+                "type": "out",
+                "description": f"Kharash: {e.title}",
+                "detail": f"{prop.name} — REF: {e.reference}",
+                "amount": amount,
+                "sort_date": e.expense_date,
+            })
+
+        for r in repairs:
+            prop = r.property
+            amount = float(r.cost)
+            total_out += amount
+            all_txns.append({
+                "date": r.reported_date,
+                "type": "out",
+                "description": f"Dayactir: {r.title}",
+                "detail": f"{prop.name} — REF: {r.reference}",
+                "amount": amount,
+                "sort_date": r.reported_date,
+            })
+
+        all_txns.sort(key=lambda x: x["sort_date"])
+
+        context["all_transactions"] = all_txns
+        context["total_in"] = total_in
+        context["total_out"] = total_out
+        context["balance"] = total_in - total_out
         return context
 
 

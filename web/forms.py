@@ -210,10 +210,16 @@ class PaymentForm(forms.ModelForm):
         label="Tenant",
         widget=forms.Select(attrs={"id": "id_tenant_select"}),
     )
+    invoice = forms.ModelChoiceField(
+        queryset=Invoice.objects.none(),
+        required=False,
+        label="Invoice (optional)",
+        empty_label="No invoice",
+    )
 
     class Meta:
         model = Payment
-        fields = ("rental_agreement", "amount", "payment_date", "payment_method", "bank_account", "destination_account", "reference_number", "notes")
+        fields = ("rental_agreement", "amount", "payment_date", "payment_method", "bank_account", "destination_account", "invoice", "reference_number", "notes")
         labels = {
             "rental_agreement": "Agreement", "amount": "Amount", "payment_date": "Date",
             "payment_method": "Payment Method", "bank_account": "Bank Account",
@@ -233,6 +239,9 @@ class PaymentForm(forms.ModelForm):
             )
             self.fields["bank_account"].queryset = BankAccount.objects.filter(owner=user)
             self.fields["destination_account"].queryset = Account.objects.filter(owner=user, category="asset")
+            self.fields["invoice"].queryset = Invoice.objects.filter(
+                owner=user, status__in=["sent", "draft"]
+            ).order_by("-date")
 
         # Auto-generate reference number if creating new payment
         if not self.instance.pk:
@@ -317,8 +326,9 @@ class GeneralExpenseForm(forms.ModelForm):
 class AccountForm(forms.ModelForm):
     class Meta:
         model = Account
-        fields = ("name", "category", "bank_account", "description", "is_active")
+        fields = ("code", "name", "category", "bank_account", "description", "is_active")
         labels = {
+            "code": "Lambarka Xisaabta",
             "name": "Magaca Xisaabta",
             "category": "Nooca",
             "bank_account": "Xisoabta Bangiga (ikhtiyaari)",
@@ -332,21 +342,40 @@ class AccountForm(forms.ModelForm):
             self.fields["bank_account"].queryset = BankAccount.objects.filter(owner=user)
         _style_fields(self)
         self.fields["description"].widget.attrs["rows"] = 2
+        if self.instance and self.instance.pk and self.instance.is_system:
+            self.fields["code"].disabled = True
+            self.fields["name"].disabled = True
+            self.fields["category"].disabled = True
 
-    def save(self, commit=True):
-        instance = super().save(commit=False)
-        if not instance.code:
-            if instance.owner_id:
-                last = Account.objects.filter(owner=instance.owner).order_by("-code").first()
-                if last and last.code.isdigit():
-                    instance.code = str(int(last.code) + 100)
-                else:
-                    instance.code = "1000"
-            else:
-                instance.code = "1000"
-        if commit:
-            instance.save()
-        return instance
+    def clean_code(self):
+        code = self.cleaned_data.get("code")
+        category = self.cleaned_data.get("category")
+        if not code or not category:
+            return code
+        from accounting.models import CODE_RANGES
+        lo, hi = CODE_RANGES.get(category, (0, 0))
+        try:
+            code_int = int(code)
+        except ValueError:
+            raise forms.ValidationError("Lambarku waa inuu noqdaa tiro.")
+        if not (lo <= code_int <= hi):
+            raise forms.ValidationError(f"Code {code} ma habboona {category}. Range-ka: {lo} - {hi}")
+        user = self.initial.get("user") or (self.instance.owner if self.instance.pk else None)
+        if user:
+            qs = Account.objects.filter(owner=user, code=code)
+            if self.instance.pk:
+                qs = qs.exclude(pk=self.instance.pk)
+            if qs.exists():
+                raise forms.ValidationError(f"Code {code} waa la isticmaalay.")
+        return code
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if self.instance and self.instance.pk and self.instance.is_system:
+            for field in ["name", "category"]:
+                if cleaned_data.get(field) != getattr(self.instance, field):
+                    self.add_error(field, "System account ma bedeli karto.")
+        return cleaned_data
 
 
 class BankAccountForm(forms.ModelForm):

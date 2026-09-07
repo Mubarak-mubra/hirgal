@@ -42,16 +42,6 @@
         <span>{% t 'net_income' %}</span>
         <span class="{% if net_income >= 0 %}text-green-600{% else %}text-red-600{% endif %}">${{ net_income|floatformat:2 }}</span>
     </div>
-
-    <div class="no-print mt-4 text-sm text-slate-500">
-        <p>💡 <strong>What does this mean?</strong>
-        {% if net_income >= 0 %}
-            You made a profit of ${{ net_income|floatformat:2 }} during this period. Your income exceeded your expenses.
-        {% else %}
-            You had a loss of ${{ net_income|floatformat:2 }} during this period. Your expenses exceeded your income.
-        {% endif %}
-        </p>
-    </div>
 </div>
 
 <!-- Related Reports -->

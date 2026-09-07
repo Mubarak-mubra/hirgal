@@ -60,7 +60,7 @@
     <div class="flex flex-wrap gap-2">
         <a href="{% url 'web-sales-report' %}?start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}" class="rounded-lg bg-white border px-3 py-1.5 text-sm text-indigo-600 hover:bg-indigo-50">Sales Report</a>
         <a href="{% url 'web-expense-report' %}?start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}" class="rounded-lg bg-white border px-3 py-1.5 text-sm text-indigo-600 hover:bg-indigo-50">Expense Report</a>
-        <a href="{% url 'web-income-statement' %}?start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}" class="rounded-lg bg-white border px-3 py-1.5 text-sm text-indigo-600 hover:bg-indigo-50">Income Statement</a>
+        <a href="{% url 'web-profit-loss' %}?start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}" class="rounded-lg bg-white border px-3 py-1.5 text-sm text-indigo-600 hover:bg-indigo-50">Profit & Loss</a>
         <a href="{% url 'web-cash-flow' %}?start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}" class="rounded-lg bg-white border px-3 py-1.5 text-sm text-indigo-600 hover:bg-indigo-50">Cash Flow</a>
     </div>
 </div>

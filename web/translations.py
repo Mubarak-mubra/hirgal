@@ -275,7 +275,7 @@ TRANSLATIONS = {
         "trial_balance": "Isku-dhafka",
         "general_ledger": "Gelidda Guud",
         "cash_flow": "Daqliga Lacagta",
-        "accounts_receivable": "Lacagaha La Waito",
+        "accounts_receivable": "Lacagaha  Dhiman",
         "accounts_payable": "Lacagaha La Bixiyo",
         "sales_report": "Iibka",
         "expense_report": "Kharashka",
@@ -295,7 +295,7 @@ TRANSLATIONS = {
         "cash_in": "Lacagta Soo Galaysa",
         "cash_out": "Lacagta Bixi Doonta",
         "net_cash_flow": "Net Cash Flow",
-        "outstanding_balance": "Lacagaha La Waito",
+        "outstanding_balance": "Lacagaha  Dhiman",
         "outstanding_payable": "Lacagaha La Bixiyo",
 
         # Forms

@@ -2,19 +2,29 @@ from django.db import models
 from django.conf import settings
 from properties.models import Property
 from rentals.models import Tenant, RentalAgreement
+   
 
 class AccountCategory(models.TextChoices):
     ASSET = 'asset', 'Hanti (Asset) - Wixii aad leedahay'
-    LIABILITY = 'liability', 'Deyn (Liability) - Wixii aad iska leedahay'
+    LIABILITY = 'liability', 'Deyn (Liability) - Wixii lagugu leeyahay'
     EQUITY = 'equity', 'Raasamaal (Equity) - Net-worth-kaaga'
     REVENUE = 'revenue', 'Dakhli (Revenue) - Wixii aad ku heshay'
     EXPENSE = 'expense', 'Kharash (Expense) - Wixii aad ku bixisay'
+
+CODE_RANGES = {
+    'asset':     (1000, 1999),
+    'liability': (2000, 2999),
+    'equity':    (3000, 3999),
+    'revenue':   (4000, 4999),
+    'expense':   (5000, 5999),
+}
 
 class Account(models.Model):
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='accounts')
     code = models.CharField('Lambarka', max_length=20)
     name = models.CharField('Magaca Xisaabta', max_length=150)
     category = models.CharField('Qaybta', max_length=20, choices=AccountCategory.choices)
+    is_system = models.BooleanField('Xisaabta System', default=False, help_text="Haddii ay tahay system, ma tirtiri karto")
     bank_account = models.ForeignKey('finance.BankAccount', on_delete=models.SET_NULL, null=True, blank=True, related_name='accounting_accounts', help_text="Xisoabta Bangiga ee la xiriirta (ikhtiyaari)")
     description = models.TextField('Faahfaahin', blank=True)
     is_active = models.BooleanField('Waa Shaqeyneysaa', default=True)
@@ -27,6 +37,28 @@ class Account(models.Model):
 
     def __str__(self):
         return f"{self.code} - {self.name}"
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        code = self.code
+        category = self.category
+
+        if code and category:
+            lo, hi = CODE_RANGES.get(category, (0, 0))
+            if not (lo <= int(code) <= hi):
+                raise ValidationError({
+                    'code': f'Code {code} ma habboona {category}. Range-ka: {lo} - {hi}'
+                })
+
+        if self.pk and self.is_system:
+            orig = Account.objects.get(pk=self.pk)
+            errors = {}
+            if self.name != orig.name:
+                errors['name'] = 'System account ma bedeli karto magaca.'
+            if self.category != orig.category:
+                errors['category'] = 'System account ma bedeli karto nooca.'
+            if errors:
+                raise ValidationError(errors)
 
 class JournalEntry(models.Model):
     STATUS_CHOICES = [

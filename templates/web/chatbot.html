@@ -1,19 +1,23 @@
 {% extends "base.html" %}
+{% load i18n_tags %}
 {% block title %}AI Assistant - Hirgal Kiro{% endblock %}
 
 {% block content %}
 <style>
   * { box-sizing: border-box; }
+  .chat-layout {
+    margin: -16px;
+    width: calc(100% + 32px);
+  }
+  @media (min-width: 768px) { .chat-layout { margin: -24px; width: calc(100% + 48px); } }
+  @media (min-width: 1024px) { .chat-layout { margin: -32px; width: calc(100% + 64px); } }
 
   .chat-layout {
     display: flex;
-    height: calc(100vh - 120px);
-    max-height: calc(100vh - 120px);
+    height: calc(100vh - 56px);
+    max-height: calc(100vh - 56px);
     background: white;
-    border-radius: 16px;
-    border: 1px solid #e2e8f0;
     overflow: hidden;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
   }
 
   /* ── Sidebar ── */
@@ -369,7 +373,7 @@
         {% for msg in messages %}
         <div class="msg-row {{ msg.role }}">
           <div class="msg-avatar {{ msg.role }}">{% if msg.role == 'ai' %}AI{% else %}U{% endif %}</div>
-          <div class="msg-bubble">{{ msg.content|linebreaksbr }}</div>
+          <div class="msg-bubble">{% if msg.role == 'ai' %}{{ msg.content|markdown_format }}{% else %}{{ msg.content|linebreaksbr }}{% endif %}</div>
         </div>
         {% endfor %}
       {% else %}
@@ -466,11 +470,19 @@ function escapeHtml(text) {
 }
 
 function formatText(text) {
-  return text
-    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*(.*?)\*/g, '<em>$1</em>')
-    .replace(/`([^`]+)`/g, '<code style="background:#e2e8f0;padding:2px 6px;border-radius:4px;font-size:12px;">$1</code>')
-    .replace(/\n/g, '<br>');
+  var s = text;
+  s = s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  s = s.replace(/\*\*\*(.*?)\*\*\*/g, '<strong><em>$1</em></strong>');
+  s = s.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+  s = s.replace(/\*(.*?)\*/g, '<em>$1</em>');
+  s = s.replace(/`([^`]+)`/g, '<code style="background:#e2e8f0;padding:2px 6px;border-radius:4px;font-size:12px;">$1</code>');
+  s = s.replace(/^[\*\-] (.+)$/gm, '<li>$1</li>');
+  s = s.replace(/\n/g, '<br>');
+  s = s.replace(/(<li>.*?<\/li>)(<br><li>)/g, '$1$2');
+  s = s.replace(/((?:<li>.*?<\/li>)(?:<br><li>.*?<\/li>)*)/g, '<ul style="list-style:disc;padding-left:20px;margin:8px 0;">$&</ul>');
+  s = s.replace(/<br><\/ul>/g, '</ul>');
+  s = s.replace(/<\/ul><br>/g, '</ul>');
+  return s;
 }
 
 function sendMessage() {

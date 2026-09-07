@@ -21,7 +21,19 @@
       <p class="text-xs text-slate-500">{{ bank.account_name }}</p>
     </div>
   </div>
-  <p class="text-xs text-slate-400">{% t 'account_number' %}: {{ bank.account_number }}</p>
+  <p class="text-xs text-slate-400 mb-3">{% t 'account_number' %}: {{ bank.account_number }}</p>
+  {% if bank.balance is not None %}
+  <div class="flex items-center justify-between border-t pt-3">
+    <span class="text-xs font-semibold text-slate-500">Balance</span>
+    {% if bank.balance > 0 %}
+    <span class="text-lg font-bold text-green-600">${{ bank.balance|floatformat:2 }}</span>
+    {% elif bank.balance < 0 %}
+    <span class="text-lg font-bold text-red-600">${{ bank.balance|floatformat:2 }}</span>
+    {% else %}
+    <span class="text-lg font-bold text-slate-400">$0.00</span>
+    {% endif %}
+  </div>
+  {% endif %}
 </a>
 {% empty %}
 <div class="rounded-2xl border border-dashed bg-white p-10 text-center md:col-span-3">

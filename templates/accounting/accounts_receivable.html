@@ -1,56 +1,193 @@
 {% extends "accounting/base_accounting.html" %}
-
-{% block report_title %}Lacagaha La Waito{% endblock %}
-{% block print_title %}Warbixinta Lacagaha La Waito (Accounts Receivable){% endblock %}
-{% block heading %}Warbixinta Lacagaha La Waito (Accounts Receivable){% endblock %}
-
+{% block report_title %}Lacagaha Dhiman{% endblock %}
+{% block print_title %}Warbixinta Lacagaha Dhiman (Accounts Receivable){% endblock %}
+{% block heading %}Warbixinta Lacagaha Dhiman (Accounts Receivable){% endblock %}
 {% block report_content %}
 {% include "accounting/_date_filter.html" %}
 
 <div class="bg-white rounded-xl border border-slate-200 p-6 mb-6">
-    <p class="text-sm text-slate-500 mb-4">Laga bilaabo {{ start_date }} ilaa {{ end_date }}</p>
-    <div class="space-y-4">
-        <div class="flex justify-between border-b pb-2">
-            <span class="font-semibold">Lacagaha La Waito (Outstanding Balance)</span>
-            <span class="text-orange-600 font-bold">${{ outstanding_balance|floatformat:2 }}</span>
-        </div>
+  <p class="text-sm text-slate-500 mb-4">
+    Laga bilaabo {{ start_date }} ilaa {{ end_date }}
+  </p>
+  <div class="space-y-4">
+    <div class="flex justify-between border-b pb-2">
+      <span class="font-semibold">Lacagaha Dhiman (Outstanding Balance)</span>
+      <span class="text-orange-600 font-bold"
+        >${{ outstanding_balance|floatformat:2 }}</span
+      >
     </div>
+  </div>
 </div>
+
+{# ── Tenant Breakdown + Search ── #}
+<div class="bg-white rounded-xl border border-slate-200 p-4 mb-6 no-print">
+  <div class="flex items-center justify-between mb-4">
+    <h3 class="font-bold text-ink">Tenant Balances</h3>
+    <form method="get" id="ar-search-form" class="flex gap-2">
+      <input
+        type="hidden"
+        name="start_date"
+        value="{{ start_date|date:'Y-m-d' }}"
+      />
+      <input
+        type="hidden"
+        name="end_date"
+        value="{{ end_date|date:'Y-m-d' }}"
+      />
+      <input
+        type="text"
+        name="search"
+        id="ar-search-input"
+        value="{{ search_query }}"
+        placeholder="Search by name or phone..."
+        autocomplete="off"
+        class="rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 w-64"
+      />
+      {% if search_query %}
+      <a
+        href="?start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}"
+        class="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+        >Clear</a
+      >
+      {% endif %}
+    </form>
+  </div>
+
+  {% if tenant_list %}
+  <div class="overflow-x-auto">
+    <table class="w-full text-left text-sm">
+      <thead
+        class="border-b bg-slate-50 text-xs font-semibold uppercase text-slate-500"
+      >
+        <tr>
+          <th class="px-4 py-3">Tenant</th>
+          <th class="px-4 py-3">Phone</th>
+          <th class="px-4 py-3 text-right">Invoiced (Debit)</th>
+          <th class="px-4 py-3 text-right">Paid (Credit)</th>
+          <th class="px-4 py-3 text-right">Balance Owed</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y">
+        {% for t in tenant_list %}
+        <tr class="hover:bg-slate-50">
+          <td class="px-4 py-3">
+            <a
+              href="{% url 'web-tenant-detail' t.tenant.pk %}"
+              class="font-semibold text-indigo-600 hover:underline"
+              >{{ t.tenant.full_name }}</a
+            >
+          </td>
+          <td class="px-4 py-3 text-slate-500">
+            {{ t.tenant.phone_number|default:"-" }}
+          </td>
+          <td class="px-4 py-3 text-right text-slate-600">
+            ${{ t.debit|floatformat:2 }}
+          </td>
+          <td class="px-4 py-3 text-right text-green-600">
+            ${{ t.credit|floatformat:2 }}
+          </td>
+          <td
+            class="px-4 py-3 text-right font-semibold {% if t.balance > 0 %}text-orange-600{% else %}text-green-600{% endif %}"
+          >
+            ${{ t.balance|floatformat:2 }}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot class="border-t bg-slate-50 font-semibold">
+        <tr>
+          <td class="px-4 py-3" colspan="2">Total</td>
+          <td class="px-4 py-3 text-right text-slate-600">
+            ${{ total_debit|floatformat:2 }}
+          </td>
+          <td class="px-4 py-3 text-right text-green-600">
+            ${{ total_credit|floatformat:2 }}
+          </td>
+          <td class="px-4 py-3 text-right text-orange-600">
+            ${{ outstanding_balance|floatformat:2 }}
+          </td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+  {% else %}
+  <p class="text-center text-slate-400 text-sm py-4">
+    {% if search_query %} No tenants found matching "{{ search_query }}". {%
+    else %} No outstanding balances in this period. {% endif %}
+  </p>
+  {% endif %}
+</div>
+
+{# ── Transaction Details ── #}
+<h3 class="font-bold text-ink mb-3">Transaction Details</h3>
 
 {% if items %}
 <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
-    <table class="w-full text-left text-sm">
-        <thead class="border-b bg-slate-50 text-xs font-semibold uppercase text-slate-500">
-            <tr>
-                <th class="px-5 py-3">Taariikhda</th>
-                <th class="px-5 py-3">Reference</th>
-                <th class="px-5 py-3">Faahfaahin</th>
-                <th class="px-5 py-3 text-right">Debit</th>
-                <th class="px-5 py-3 text-right">Credit</th>
-            </tr>
-        </thead>
-        <tbody class="divide-y">
-            {% for item in items %}
-            <tr class="hover:bg-slate-50">
-                <td class="px-5 py-4 text-slate-600">{{ item.date }}</td>
-                <td class="px-5 py-4 font-semibold text-ink">
-                    {% if item.source_url %}
-                        <a href="{{ item.source_url }}" class="text-indigo-700 hover:underline">{{ item.reference }}</a>
-                    {% else %}
-                        {{ item.reference }}
-                    {% endif %}
-                </td>
-                <td class="px-5 py-4 text-slate-600">{{ item.description }}</td>
-                <td class="px-5 py-4 text-right font-semibold text-orange-600">{% if item.debit %}${{ item.debit|floatformat:2 }}{% endif %}</td>
-                <td class="px-5 py-4 text-right text-slate-600">{% if item.credit %}${{ item.credit|floatformat:2 }}{% endif %}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+  <table class="w-full text-left text-sm">
+    <thead
+      class="border-b bg-slate-50 text-xs font-semibold uppercase text-slate-500"
+    >
+      <tr>
+        <th class="px-5 py-3">Tenant</th>
+        <th class="px-5 py-3">Taariikhda</th>
+        <th class="px-5 py-3">Reference</th>
+        <th class="px-5 py-3">Faahfaahin</th>
+        <th class="px-5 py-3 text-right">Debit</th>
+        <th class="px-5 py-3 text-right">Credit</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y">
+      {% for item in items %}
+      <tr class="hover:bg-slate-50">
+        <td class="px-5 py-4 text-slate-600">
+          {% if item.tenant %}
+          <a
+            href="{% url 'web-tenant-detail' item.tenant.pk %}"
+            class="text-indigo-600 hover:underline"
+            >{{ item.tenant.full_name }}</a
+          >
+          {% else %}-{% endif %}
+        </td>
+        <td class="px-5 py-4 text-slate-600">{{ item.date }}</td>
+        <td class="px-5 py-4 font-semibold text-ink">
+          {% if item.source_url %}
+          <a
+            href="{{ item.source_url }}"
+            class="text-indigo-700 hover:underline"
+            >{{ item.reference }}</a
+          >
+          {% else %} {{ item.reference }} {% endif %}
+        </td>
+        <td class="px-5 py-4 text-slate-600">{{ item.description }}</td>
+        <td class="px-5 py-4 text-right font-semibold text-orange-600">
+          {% if item.debit %}${{ item.debit|floatformat:2 }}{% endif %}
+        </td>
+        <td class="px-5 py-4 text-right text-slate-600">
+          {% if item.credit %}${{ item.credit|floatformat:2 }}{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
 </div>
 {% else %}
 <div class="rounded-xl border border-dashed bg-white p-10 text-center">
-    <p class="font-semibold text-slate-700">Ma jiraan lacagaha la sugayo.</p>
+  <p class="font-semibold text-slate-700">Ma jiraan lacagaha la sugayo.</p>
 </div>
 {% endif %}
+
+<script>
+  (function () {
+    const input = document.getElementById("ar-search-input");
+    const form = document.getElementById("ar-search-form");
+    let timer;
+    input.addEventListener("input", function () {
+      clearTimeout(timer);
+      timer = setTimeout(function () {
+        form.submit();
+      }, 400);
+    });
+    input.focus();
+  })();
+</script>
 {% endblock %}

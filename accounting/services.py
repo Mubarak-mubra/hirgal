@@ -10,8 +10,8 @@ from .models import Account, AccountCategory, JournalEntry, JournalEntryLine, In
 DEFAULT_COA = [
     {"code": "1010", "name": "Cash on Hand", "category": "asset", "description": "Petty cash and physical cash"},
     {"code": "1020", "name": "Bank / Mobile Money", "category": "asset", "description": "Bank accounts and mobile money wallets"},
-    {"code": "1200", "name": "Accounts Receivable", "category": "asset", "description": "Rent owed by tenants"},
-    {"code": "2010", "name": "Accounts Payable", "category": "liability", "description": "Amounts owed to suppliers"},
+    {"code": "1200", "name": "Accounts Receivable", "category": "asset", "description": "Lacagta aan kireystayaasha ku leenahay"},
+    {"code": "2010", "name": "Accounts Payable", "category": "liability", "description": "Lacagaha cid kale lagu leeyahay"},
     {"code": "2050", "name": "Security Deposits Held", "category": "liability", "description": "Tenant security deposits"},
     {"code": "3010", "name": "Owner's Equity", "category": "equity", "description": "Owner's capital investment"},
     {"code": "3020", "name": "Retained Earnings", "category": "equity", "description": "Accumulated net income"},

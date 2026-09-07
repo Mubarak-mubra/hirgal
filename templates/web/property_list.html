@@ -11,42 +11,59 @@
     <a class="rounded-lg bg-ink px-4 py-3 text-sm font-bold text-white" href="{% url 'web-property-create' %}">+ {% t 'add_property' %}</a>
 </section>
 
-<section class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-{% for property in properties %}
-<div class="rounded-2xl border bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:border-indigo-300 hover:shadow-md">
-    <a href="{% url 'web-property-detail' property.pk %}" class="block">
-        <h2 class="text-lg font-bold text-ink">{{ property.name }}</h2>
-        <p class="mt-1 text-sm text-slate-500">{{ property.location }} · {{ property.get_property_type_display }}</p>
-    </a>
-
-    <!-- Show active tenants -->
-    {% for agreement in property.active_agreements %}
-        {% if forloop.first %}
-        <div class="mt-3 space-y-1">
-        {% endif %}
-        <a href="{% url 'web-tenant-detail' agreement.tenant.pk %}" class="flex items-center gap-1 text-sm text-indigo-600 hover:underline">
-            <span class="w-2 h-2 rounded-full bg-green-500"></span>
-            {{ agreement.tenant.full_name }}
-            {% if agreement.unit %}<span class="text-xs text-slate-400">({{ agreement.unit.unit_number }})</span>{% endif %}
-        </a>
-        {% if forloop.last %}
-        </div>
-        {% endif %}
-    {% empty %}
-    <p class="mt-3 text-xs text-slate-400">No tenants</p>
-    {% endfor %}
-
-    <div class="mt-4 flex gap-3 border-t pt-3">
-        <a class="text-xs font-semibold text-indigo-700" href="{% url 'web-property-detail' property.pk %}">{% t 'view' %}</a>
-        <a class="text-xs font-semibold text-indigo-700" href="{% url 'web-property-edit' property.pk %}">{% t 'edit' %}</a>
-        <a class="text-xs font-semibold text-red-600" href="{% url 'web-property-delete' property.pk %}">{% t 'delete' %}</a>
-    </div>
+<section class="rounded-xl border bg-white shadow-sm overflow-hidden">
+{% if properties %}
+<div class="overflow-x-auto">
+    <table class="w-full text-left text-sm">
+        <thead class="border-b bg-slate-50 text-slate-600">
+            <tr>
+                <th class="px-4 py-3 font-semibold">Name</th>
+                <th class="px-4 py-3 font-semibold">Location</th>
+                <th class="px-4 py-3 font-semibold">Type</th>
+                <th class="px-4 py-3 font-semibold">Tenants</th>
+                <th class="px-4 py-3 font-semibold text-right">Actions</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y">
+        {% for property in properties %}
+            <tr class="hover:bg-slate-50">
+                <td class="px-4 py-3">
+                    <a href="{% url 'web-property-detail' property.pk %}" class="font-semibold text-indigo-600 hover:underline">{{ property.name }}</a>
+                </td>
+                <td class="px-4 py-3 text-slate-500">{{ property.location }}</td>
+                <td class="px-4 py-3">
+                    <span class="inline-flex items-center rounded-full bg-sky-100 px-2.5 py-0.5 text-xs font-semibold text-sky-700">{{ property.get_property_type_display }}</span>
+                </td>
+                <td class="px-4 py-3">
+                    {% for agreement in property.active_agreements %}
+                        {% if forloop.first %}<div class="space-y-0.5">{% endif %}
+                        <a href="{% url 'web-tenant-detail' agreement.tenant.pk %}" class="flex items-center gap-1 text-sm text-indigo-600 hover:underline">
+                            <span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                            {{ agreement.tenant.full_name }}
+                            {% if agreement.unit %}<span class="text-xs text-slate-400">({{ agreement.unit.unit_number }})</span>{% endif %}
+                        </a>
+                        {% if forloop.last %}</div>{% endif %}
+                    {% empty %}
+                        <span class="text-xs text-slate-400">No tenants</span>
+                    {% endfor %}
+                </td>
+                <td class="px-4 py-3 text-right">
+                    <a href="{% url 'web-property-detail' property.pk %}" class="font-semibold text-indigo-600 hover:underline">{% t 'view' %}</a>
+                    <span class="mx-1 text-slate-300">|</span>
+                    <a href="{% url 'web-property-edit' property.pk %}" class="font-semibold text-indigo-600 hover:underline">{% t 'edit' %}</a>
+                    <span class="mx-1 text-slate-300">|</span>
+                    <a href="{% url 'web-property-delete' property.pk %}" class="font-semibold text-red-600 hover:underline">{% t 'delete' %}</a>
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
 </div>
-{% empty %}
-<div class="rounded-2xl border border-dashed bg-white p-10 text-center md:col-span-3">
+{% else %}
+<div class="p-10 text-center">
     <p class="font-semibold text-slate-700">No properties yet.</p>
     <p class="mt-2 text-sm text-slate-500">Start by adding your first property.</p>
 </div>
-{% endfor %}
+{% endif %}
 </section>
 {% endblock %}

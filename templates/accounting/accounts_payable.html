@@ -12,16 +12,82 @@
     <div class="space-y-4">
         <div class="flex justify-between border-b pb-2">
             <span class="font-semibold">Lacagaha La Bixiyo (Outstanding Payable)</span>
-            <span class="text-purple-600 font-bold">${{ outstanding_payable|floatformat:2 }}</span>
+            <span class="text-purple-600 font-bold">${% firstof outstanding_payable "0.00" %}</span>
         </div>
     </div>
 </div>
+
+<div class="bg-white rounded-xl border border-slate-200 p-4 mb-6 no-print">
+    <div class="flex items-center justify-between mb-4">
+        <h3 class="font-bold text-ink">Vendor Balances</h3>
+        <form method="get" id="ap-search-form" class="flex gap-2">
+            <input type="hidden" name="start_date" value="{{ start_date|date:'Y-m-d' }}">
+            <input type="hidden" name="end_date" value="{{ end_date|date:'Y-m-d' }}">
+            <input type="text" name="search" id="ap-search-input" value="{{ search_query }}" placeholder="Search by name or phone..." autocomplete="off" class="rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 w-64">
+            {% if search_query %}
+            <a href="?start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}" class="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50">Clear</a>
+            {% endif %}
+        </form>
+    </div>
+
+    {% if vendor_list %}
+    <div class="overflow-x-auto">
+        <table class="w-full text-left text-sm">
+            <thead class="border-b bg-slate-50 text-xs font-semibold uppercase text-slate-500">
+                <tr>
+                    <th class="px-4 py-3">Vendor</th>
+                    <th class="px-4 py-3">Phone</th>
+                    <th class="px-4 py-3 text-right">Charged (Credit)</th>
+                    <th class="px-4 py-3 text-right">Paid (Debit)</th>
+                    <th class="px-4 py-3 text-right">Balance Owed</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y">
+                {% for v in vendor_list %}
+                <tr class="hover:bg-slate-50">
+                    <td class="px-4 py-3 font-semibold text-ink">
+                        {% if v.tenant %}
+                        <a href="{% url 'web-tenant-detail' v.tenant.pk %}" class="text-indigo-600 hover:underline">{{ v.name }}</a>
+                        {% else %}
+                        {{ v.name }}
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-3 text-slate-500">{% if v.tenant %}{{ v.tenant.phone_number|default:"-" }}{% else %}-{% endif %}</td>
+                    <td class="px-4 py-3 text-right text-slate-600">${{ v.credit|floatformat:2 }}</td>
+                    <td class="px-4 py-3 text-right text-green-600">${{ v.debit|floatformat:2 }}</td>
+                    <td class="px-4 py-3 text-right font-semibold balance-cell" data-positive="{% if v.balance > 0 %}true{% endif %}">${{ v.balance|floatformat:2 }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot class="border-t bg-slate-50 font-semibold">
+                <tr>
+                    <td class="px-4 py-3" colspan="2">Total</td>
+                    <td class="px-4 py-3 text-right text-slate-600">${{ total_credit|floatformat:2 }}</td>
+                    <td class="px-4 py-3 text-right text-green-600">${{ total_debit|floatformat:2 }}</td>
+                    <td class="px-4 py-3 text-right text-purple-600">${{ outstanding_payable|floatformat:2 }}</td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+    {% else %}
+    <p class="text-center text-slate-400 text-sm py-4">
+        {% if search_query %}
+            No vendors found matching "{{ search_query }}".
+        {% else %}
+            No outstanding payables in this period.
+        {% endif %}
+    </p>
+    {% endif %}
+</div>
+
+<h3 class="font-bold text-ink mb-3">Transaction Details</h3>
 
 {% if items %}
 <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
     <table class="w-full text-left text-sm">
         <thead class="border-b bg-slate-50 text-xs font-semibold uppercase text-slate-500">
             <tr>
+                <th class="px-5 py-3">Vendor</th>
                 <th class="px-5 py-3">Taariikhda</th>
                 <th class="px-5 py-3">Reference</th>
                 <th class="px-5 py-3">Faahfaahin</th>
@@ -32,6 +98,11 @@
         <tbody class="divide-y">
             {% for item in items %}
             <tr class="hover:bg-slate-50">
+                <td class="px-5 py-4 text-slate-600">
+                    {% if item.tenant %}
+                    <a href="{% url 'web-tenant-detail' item.tenant.pk %}" class="text-indigo-600 hover:underline">{{ item.tenant.full_name }}</a>
+                    {% else %}-{% endif %}
+                </td>
                 <td class="px-5 py-4 text-slate-600">{{ item.date }}</td>
                 <td class="px-5 py-4 font-semibold text-ink">
                     {% if item.source_url %}
@@ -53,4 +124,24 @@
     <p class="font-semibold text-slate-700">Ma jiraan lacagaha la bixiyay.</p>
 </div>
 {% endif %}
+
+<script>
+(function() {
+    var input = document.getElementById('ap-search-input');
+    var form = document.getElementById('ap-search-form');
+    var timer;
+    input.addEventListener('input', function() {
+        clearTimeout(timer);
+        timer = setTimeout(function() { form.submit(); }, 400);
+    });
+    document.querySelectorAll('.balance-cell').forEach(function(td) {
+        if (td.getAttribute('data-positive') === 'true') {
+            td.classList.add('text-purple-600');
+        } else {
+            td.classList.add('text-green-600');
+        }
+    });
+    input.focus();
+})();
+</script>
 {% endblock %}

@@ -5,7 +5,7 @@
 <a class="text-sm font-semibold text-indigo-700" href="{% url 'web-payments' %}">← {% t 'payments' %}</a>
 <h1 class="mt-4 text-3xl font-bold text-ink">{% if editing %}Edit Payment{% else %}Add Payment{% endif %}</h1>
 
-<form method="post" class="mt-6 rounded-xl border bg-white p-6 shadow-sm">
+<form method="post" id="payment-form" class="mt-6 rounded-xl border bg-white p-6 shadow-sm">
   {% csrf_token %}
 
   <div class="grid gap-4 md:grid-cols-2">
@@ -52,74 +52,55 @@
   </div>
   {% endif %}
 
-  <button class="mt-4 rounded-lg bg-ink px-5 py-3 font-bold text-white">{% t 'save' %}</button>
+  <button type="submit" id="submit-btn" class="mt-4 rounded-lg bg-ink px-5 py-3 font-bold text-white">{% t 'save' %}</button>
 </form>
+
+<!-- Duplicate Payment Warning Modal -->
+<div id="duplicate-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40">
+  <div class="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4">
+    <div class="flex items-center gap-3 mb-4">
+      <span class="grid h-10 w-10 place-items-center rounded-xl bg-amber-50 text-xl text-amber-600">⚠️</span>
+      <h3 class="text-lg font-bold text-ink">Lacag Bixin Hore Ayaa Jirta</h3>
+    </div>
+    <p class="text-slate-600 mb-2">
+      <strong id="dup-tenant-name"></strong> wuu uu bixshay lacagta bishan.
+    </p>
+    <p class="text-sm text-slate-500 mb-1">Lacagta la bixiyay: <strong id="dup-total-paid"></strong></p>
+    <p class="text-sm text-slate-500 mb-5">Fadlan iska hubi. Ma hubtaa inaad lacag badan ku dartid?</p>
+    <div class="flex gap-3 justify-end">
+      <button onclick="closeModal()" class="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancel</button>
+      <button onclick="confirmSubmit()" class="rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-indigo-700">Waan hubaa</button>
+    </div>
+  </div>
+</div>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const tenantSelect = document.getElementById('id_tenant_select');
     const agreementSelect = document.getElementById('id_rental_agreement');
     const hint = document.getElementById('agreement_hint');
+    const form = document.getElementById('payment-form');
+    const modal = document.getElementById('duplicate-modal');
+    let isDuplicate = false;
+    let previousTenantValue = tenantSelect ? tenantSelect.value : '';
 
     if (!tenantSelect || !agreementSelect) return;
 
-    // Store all agreements
-    const allOptions = Array.from(agreementSelect.options).map(opt => ({
-        id: opt.value,
-        text: opt.text,
-        tenantId: opt.dataset.tenantId || ''
-    }));
-
-    function filterAgreements() {
-        const selectedTenant = tenantSelect.value;
-
-        // Clear agreement dropdown
-        agreementSelect.innerHTML = '';
-
-        if (!selectedTenant) {
-            hint.textContent = 'Select a tenant first';
-            return;
-        }
-
-        // Filter agreements by selected tenant
-        const filtered = allOptions.filter(opt => opt.tenantId === selectedTenant);
-
-        if (filtered.length === 0) {
-            hint.textContent = 'No active agreements for this tenant';
-            return;
-        }
-
-        hint.textContent = '';
-
-        // Add filtered options
-        filtered.forEach(opt => {
-            const option = document.createElement('option');
-            option.value = opt.id;
-            option.textContent = opt.text;
-            agreementSelect.appendChild(option);
-        });
-    }
-
-    // Load tenant's agreements from API
     function loadAgreements(tenantId) {
         if (!tenantId) {
             agreementSelect.innerHTML = '';
             hint.textContent = 'Select a tenant first';
             return;
         }
-
         hint.textContent = 'Loading...';
-
         fetch(`/api/agreements-by-tenant/?tenant_id=${tenantId}`)
             .then(r => r.json())
             .then(data => {
                 agreementSelect.innerHTML = '';
-
                 if (data.agreements.length === 0) {
                     hint.textContent = 'No active agreements for this tenant';
                     return;
                 }
-
                 hint.textContent = '';
                 data.agreements.forEach(a => {
                     const opt = document.createElement('option');
@@ -128,19 +109,76 @@ document.addEventListener('DOMContentLoaded', function() {
                     agreementSelect.appendChild(opt);
                 });
             })
-            .catch(() => {
-                hint.textContent = 'Error loading agreements';
+            .catch(() => { hint.textContent = 'Error loading agreements'; });
+    }
+
+    function checkDuplicatePayment(tenantId) {
+        if (!tenantId || isDuplicate) return Promise.resolve();
+        return fetch(`/api/check-tenant-paid/?tenant_id=${tenantId}`)
+            .then(r => r.json())
+            .then(data => {
+                if (data.paid) {
+                    document.getElementById('dup-tenant-name').textContent = data.tenant_name;
+                    document.getElementById('dup-total-paid').textContent = '$' + data.total_paid.toFixed(2) + ' (' + data.count + 'x)';
+                    modal.classList.remove('hidden');
+                    modal.classList.add('flex');
+                    return true;
+                }
+                return false;
             });
     }
 
     tenantSelect.addEventListener('change', function() {
-        loadAgreements(this.value);
+        const selectedValue = this.value;
+        isDuplicate = false;
+
+        checkDuplicatePayment(selectedValue).then(paid => {
+            if (paid) {
+                // Don't load agreements yet — wait for user decision
+                return;
+            }
+            previousTenantValue = selectedValue;
+            loadAgreements(selectedValue);
+        });
     });
 
-    // Load on page load if tenant is already selected
     if (tenantSelect.value) {
+        previousTenantValue = tenantSelect.value;
         loadAgreements(tenantSelect.value);
+        checkDuplicatePayment(tenantSelect.value);
     }
+
+    form.addEventListener('submit', function(e) {
+        if (!isDuplicate) {
+            checkDuplicatePayment(tenantSelect.value).then(paid => {
+                if (!paid) form.submit();
+            });
+            e.preventDefault();
+        }
+    });
+
+    // Expose reset function for modal cancel
+    window.resetTenantSelection = function() {
+        tenantSelect.value = previousTenantValue;
+        loadAgreements(previousTenantValue);
+    };
 });
+
+function closeModal() {
+    const modal = document.getElementById('duplicate-modal');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+    window.resetTenantSelection();
+}
+
+function confirmSubmit() {
+    const form = document.getElementById('payment-form');
+    const modal = document.getElementById('duplicate-modal');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+    const newForm = form.cloneNode(true);
+    form.parentNode.replaceChild(newForm, form);
+    newForm.submit();
+}
 </script>
 {% endblock %}

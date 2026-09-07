@@ -38,26 +38,13 @@
     <h2 class="mb-3 text-lg font-bold text-ink">Warbixinnada Maaliyadda (Financial Reports)</h2>
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
 
-        <!-- Income Statement -->
-        <a href="{% url 'web-income-statement' %}" class="group rounded-2xl border bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:border-green-300 hover:shadow-md">
-            <div class="flex items-center gap-3 mb-3">
-                <span class="grid h-11 w-11 place-items-center rounded-xl bg-green-50 text-xl text-green-600">📈</span>
-                <div>
-                    <strong class="block text-lg text-ink">{% t 'income_statement' %}</strong>
-                    <small class="text-slate-500">Dakhli - Kharash = Faa'iido</small>
-                </div>
-            </div>
-            <p class="text-sm text-slate-600">Arag inta lacag ah oo kaatayd ama kaa baxday intii lagu jiray muddo cayiman. Wuxuu muujinayaa dakhliga guud ee kirada oo laga jaray kharashyada dhan.</p>
-            <p class="mt-2 text-xs text-green-600 font-semibold">Eeg warbixinta →</p>
-        </a>
-
         <!-- Profit & Loss -->
         <a href="{% url 'web-profit-loss' %}" class="group rounded-2xl border bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:border-green-300 hover:shadow-md">
             <div class="flex items-center gap-3 mb-3">
                 <span class="grid h-11 w-11 place-items-center rounded-xl bg-green-50 text-xl text-green-600">💰</span>
                 <div>
                     <strong class="block text-lg text-ink">{% t 'profit_loss' %}</strong>
-                    <small class="text-slate-500">La mid ah Income Statement</small>
+                    <small class="text-slate-500">Dakhli - Kharash = Faa'iido</small>
                 </div>
             </div>
             <p class="text-sm text-slate-600">Faa'iidada ama khasaraha guud. Haddii dakhligu ka badan yahay kharashka waa faa'iido, haddii kharashku badan yahayna waa khasaro.</p>

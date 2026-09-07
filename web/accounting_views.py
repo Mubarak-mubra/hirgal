@@ -395,22 +395,26 @@ class CashFlowStatementView(AccountingReportMixin, View):
 class AccountsReceivableView(AccountingReportMixin, View):
     def get(self, request):
         start, end = self.get_date_range(request)
+        search_query = request.GET.get("search", "").strip()
         ar_accounts = Account.objects.filter(owner=request.user.get_data_owner(), code="1200")
         lines = JournalEntryLine.objects.filter(
             account__in=ar_accounts,
             journal_entry__date__gte=start,
             journal_entry__date__lte=end,
-        ).select_related("journal_entry").order_by("-journal_entry__date")
+        ).select_related("journal_entry", "journal_entry__tenant").order_by("-journal_entry__date")
 
         dr = lines.aggregate(total=Sum("debit"))["total"] or 0
         cr = lines.aggregate(total=Sum("credit"))["total"] or 0
         balance = dr - cr
 
+        # Build items list first, then derive tenant breakdown from it
         items = []
         for line in lines:
             ref = line.journal_entry.reference or ""
             source_url = None
-            source_label = ""
+            source_label = ref
+            je = line.journal_entry
+
             if ref.startswith("INV-"):
                 from accounting.models import Invoice
                 try:
@@ -418,18 +422,50 @@ class AccountsReceivableView(AccountingReportMixin, View):
                     source_url = "/xisaabiyadda/biilasha/%d/" % inv.pk
                     source_label = inv.invoice_number
                 except Invoice.DoesNotExist:
-                    source_label = ref
-            else:
-                source_label = ref
+                    pass
+            elif hasattr(je, "payment_source"):
+                source_url = "/lacag-bixinta/%d/" % je.payment_source.pk
 
             items.append({
-                "date": line.journal_entry.date,
+                "date": je.date,
                 "reference": source_label,
                 "source_url": source_url,
                 "description": line.description,
-                "debit": line.debit,
-                "credit": line.credit,
+                "debit": float(line.debit),
+                "credit": float(line.credit),
+                "tenant": je.tenant,
             })
+
+        # Tenant breakdown from items
+        tenant_map = {}
+        for item in items:
+            t = item["tenant"]
+            if not t:
+                continue
+            tid = t.pk
+            if tid not in tenant_map:
+                tenant_map[tid] = {"tenant": t, "debit": 0, "credit": 0}
+            tenant_map[tid]["debit"] += item["debit"]
+            tenant_map[tid]["credit"] += item["credit"]
+
+        tenant_list = []
+        for data in tenant_map.values():
+            net = data["debit"] - data["credit"]
+            tenant_list.append({
+                "tenant": data["tenant"],
+                "debit": data["debit"],
+                "credit": data["credit"],
+                "balance": net,
+            })
+        tenant_list.sort(key=lambda x: abs(x["balance"]), reverse=True)
+
+        if search_query:
+            q = search_query.lower()
+            tenant_list = [t for t in tenant_list if q in t["tenant"].full_name.lower() or q in (t["tenant"].phone_number or "").lower()]
+            items = [i for i in items if i["tenant"] and (q in i["tenant"].full_name.lower() or q in (i["tenant"].phone_number or "").lower())]
+        else:
+            # Hide fully-paid tenants by default
+            tenant_list = [t for t in tenant_list if abs(t["balance"]) > 0.001]
 
         if request.GET.get("export") == "csv":
             rows = [["Date", "Reference", "Description", "Debit", "Credit"]]
@@ -443,6 +479,10 @@ class AccountsReceivableView(AccountingReportMixin, View):
             "start_date": start,
             "end_date": end,
             "items": items,
+            "tenant_list": tenant_list,
+            "total_debit": float(dr),
+            "total_credit": float(cr),
+            "search_query": search_query,
         })
 
 
@@ -451,29 +491,32 @@ class AccountsReceivableView(AccountingReportMixin, View):
 class AccountsPayableView(AccountingReportMixin, View):
     def get(self, request):
         start, end = self.get_date_range(request)
+        search_query = request.GET.get("search", "").strip()
         ap_accounts = Account.objects.filter(owner=request.user.get_data_owner(), code="2010")
         lines = JournalEntryLine.objects.filter(
             account__in=ap_accounts,
             journal_entry__date__gte=start,
             journal_entry__date__lte=end,
-        ).select_related("journal_entry").order_by("-journal_entry__date")
+        ).select_related("journal_entry", "journal_entry__tenant").order_by("-journal_entry__date")
 
         cr = lines.aggregate(total=Sum("credit"))["total"] or 0
         dr = lines.aggregate(total=Sum("debit"))["total"] or 0
         payable = cr - dr
 
+        # Build items list, resolve source links
         items = []
         for line in lines:
             ref = line.journal_entry.reference or ""
             source_url = None
             source_label = ref
+            je = line.journal_entry
+
             if ref.startswith("EXP-"):
                 pk = ref.split("-")[1]
                 try:
                     from finance.models import GeneralExpense
                     GeneralExpense.objects.get(pk=pk)
                     source_url = "/kharashka/%s/" % pk
-                    source_label = ref
                 except GeneralExpense.DoesNotExist:
                     pass
             elif ref.startswith("REP-"):
@@ -482,18 +525,47 @@ class AccountsPayableView(AccountingReportMixin, View):
                     from finance.models import MaintenanceRepair
                     MaintenanceRepair.objects.get(pk=pk)
                     source_url = "/dayactirka/%s/" % pk
-                    source_label = ref
                 except MaintenanceRepair.DoesNotExist:
                     pass
 
             items.append({
-                "date": line.journal_entry.date,
+                "date": je.date,
                 "reference": source_label,
                 "source_url": source_url,
                 "description": line.description,
-                "debit": line.debit,
-                "credit": line.credit,
+                "debit": float(line.debit),
+                "credit": float(line.credit),
+                "tenant": je.tenant,
             })
+
+        # Vendor/tenant breakdown from items
+        vendor_map = {}
+        for item in items:
+            t = item["tenant"]
+            key = t.pk if t else 0
+            if key not in vendor_map:
+                vendor_map[key] = {"tenant": t, "debit": 0, "credit": 0, "name": t.full_name if t else "Unknown"}
+            vendor_map[key]["debit"] += item["debit"]
+            vendor_map[key]["credit"] += item["credit"]
+
+        vendor_list = []
+        for data in vendor_map.values():
+            net = data["credit"] - data["debit"]
+            vendor_list.append({
+                "tenant": data["tenant"],
+                "name": data["name"],
+                "debit": data["debit"],
+                "credit": data["credit"],
+                "balance": net,
+            })
+        vendor_list.sort(key=lambda x: abs(x["balance"]), reverse=True)
+
+        if search_query:
+            q = search_query.lower()
+            vendor_list = [v for v in vendor_list if q in v["name"].lower() or (v["tenant"] and q in (getattr(v["tenant"], "phone_number", "") or "").lower())]
+            items = [i for i in items if i["tenant"] and (q in i["tenant"].full_name.lower() or q in (getattr(i["tenant"], "phone_number", "") or "").lower())]
+        else:
+            vendor_list = [v for v in vendor_list if abs(v["balance"]) > 0.001]
 
         if request.GET.get("export") == "csv":
             rows = [["Date", "Reference", "Description", "Debit", "Credit"]]
@@ -507,6 +579,10 @@ class AccountsPayableView(AccountingReportMixin, View):
             "start_date": start,
             "end_date": end,
             "items": items,
+            "vendor_list": vendor_list,
+            "total_debit": float(dr),
+            "total_credit": float(cr),
+            "search_query": search_query,
         })
 
 
