@@ -30,7 +30,7 @@ class HomeView(LoginRequiredMixin, TemplateView):
     login_url = "/login/"
 
 
-class DashboardView(TemplateView):
+class DashboardView(LoginRequiredMixin, TemplateView):
     template_name = "web/dashboard.html"
     login_url = "/login/"
 
