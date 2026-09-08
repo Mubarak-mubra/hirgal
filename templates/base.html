@@ -329,11 +329,16 @@
 </head>
 <body>
     <div class="app-layout">
+        {% if user.is_authenticated %}
         {% include "includes/sidebar.html" %}
+        {% endif %}
 
+        {% if user.is_authenticated %}
         <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+        {% endif %}
 
-        <div class="main-content">
+        <div class="main-content"{% if not user.is_authenticated %} style="margin-left: 0"{% endif %}>
+            {% if user.is_authenticated %}
             <div class="topbar no-print">
                 <div class="topbar-left">
                     <button class="sidebar-toggle-btn" onclick="toggleSidebar()">
@@ -348,6 +353,7 @@
                     <a href="?lang={% other_lang %}" class="rounded-lg bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-600 hover:bg-indigo-100">{% other_lang_name %}</a>
                 </div>
             </div>
+            {% endif %}
 
             <div class="p-4 md:p-6 lg:p-8">{% block content %}{% endblock %}</div>
         </div>
