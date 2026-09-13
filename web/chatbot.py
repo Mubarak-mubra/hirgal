@@ -1,10 +1,7 @@
 import os
 import json
 import traceback
-from dotenv import load_dotenv
 from pathlib import Path
-
-load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 import google.generativeai as genai
 from django.db.models import Sum
@@ -12,6 +9,10 @@ from django.utils import timezone
 
 
 def get_api_key():
+    from accounts.models import SiteSettings
+    key = SiteSettings.load().gemini_api_key
+    if key:
+        return key
     return os.getenv("API_GEMINI")
 
 

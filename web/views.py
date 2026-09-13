@@ -1326,6 +1326,12 @@ class BankAccountDeleteView(LoginRequiredMixin, View):
 class ChatbotView(LoginRequiredMixin, View):
     login_url = "/login/"
 
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.can_use_chatbot:
+            from django.shortcuts import redirect
+            return redirect("dashboard")
+        return super().dispatch(request, *args, **kwargs)
+
     def get(self, request):
         from finance.models import ChatSession, ChatMessage
         owner = request.user.get_data_owner()

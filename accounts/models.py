@@ -37,6 +37,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     is_active = models.BooleanField(default=True)
     is_approved = models.BooleanField("La ansixiyay", default=False)
     is_staff = models.BooleanField(default=False)
+    can_use_chatbot = models.BooleanField("AI Chatbot", default=False, help_text="Ikhtiyaari: Ogolow isticmaalahan inuu isticmaalo AI Chatbot")
     date_joined = models.DateTimeField(auto_now_add=True)
 
     objects = UserManager()
@@ -49,3 +50,23 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     def __str__(self):
         return f"{self.full_name} ({self.username})"
+
+
+class SiteSettings(models.Model):
+    gemini_api_key = models.CharField("Gemini API Key", max_length=255, blank=True, default="")
+
+    class Meta:
+        verbose_name = "Site Settings"
+        verbose_name_plural = "Site Settings"
+
+    def __str__(self):
+        return "Site Settings"
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def load(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
