@@ -8,7 +8,7 @@
 <div class="mb-6 rounded-2xl border-2 border-rose-300 bg-rose-50 px-5 py-4 flex items-start gap-3">
     <span class="text-2xl mt-0.5">🚨</span>
     <div>
-        <p class="font-bold text-rose-700">{{ rent_not_paid|length }} tenant{{ rent_not_paid|length|pluralize }} haven't paid rent this month!</p>
+        <p class="font-bold text-rose-700">{{ rent_not_paid|length }} customer{{ rent_not_paid|length|pluralize }} haven't paid rent this month!</p>
         <p class="text-sm text-rose-600 mt-0.5">
             {% for item in rent_not_paid %}
             <a href="{% url 'web-tenant-detail' item.agreement.tenant.pk %}" class="underline font-semibold">{{ item.agreement.tenant.full_name }}</a> (${{ item.monthly_rent|floatformat:0 }}){% if not forloop.last %}, {% endif %}
@@ -60,7 +60,7 @@
         <p class="mt-1 text-xs text-slate-400">Total owned</p>
     </a>
     <a href="{% url 'web-tenants' %}" class="rounded-2xl border bg-white p-5 shadow-sm hover:border-indigo-300 hover:shadow-md transition">
-        <p class="text-slate-500 text-sm">👥 Tenants</p>
+        <p class="text-slate-500 text-sm">👥 Customers</p>
         <strong class="mt-2 block text-3xl text-ink">{{ tenant_count }}</strong>
         <p class="mt-1 text-xs text-slate-400">{{ agreement_count }} active agreement{{ agreement_count|pluralize }}</p>
     </a>
@@ -84,7 +84,7 @@
     <h2 class="mb-3 text-lg font-bold text-ink">⚡ Quick Actions</h2>
     <div class="flex flex-wrap gap-3">
         <a href="{% url 'web-payment-create' %}" class="rounded-xl bg-green-600 px-4 py-2 text-sm font-bold text-white hover:bg-green-700 transition">💰 Record Payment</a>
-        <a href="{% url 'web-tenant-create' %}" class="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700 transition">👤 Add Tenant</a>
+        <a href="{% url 'web-tenant-create' %}" class="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700 transition">👤 Add Customer</a>
         <a href="{% url 'web-property-create' %}" class="rounded-xl bg-sky-600 px-4 py-2 text-sm font-bold text-white hover:bg-sky-700 transition">🏠 Add Property</a>
         <a href="{% url 'web-expense-create' %}" class="rounded-xl bg-rose-600 px-4 py-2 text-sm font-bold text-white hover:bg-rose-700 transition">📋 Add Expense</a>
         <a href="{% url 'web-maintenance-create' %}" class="rounded-xl bg-amber-600 px-4 py-2 text-sm font-bold text-white hover:bg-amber-700 transition">🔧 Report Repair</a>
@@ -112,7 +112,7 @@
                 <span class="text-sm font-semibold text-green-700">Paid Full</span>
             </div>
             <strong class="text-2xl text-green-700">{{ rent_paid_full|length }}</strong>
-            <span class="text-sm text-green-600"> tenants</span>
+            <span class="text-sm text-green-600"> customers</span>
         </div>
         <div class="rounded-2xl border-2 border-amber-200 bg-amber-50 p-4">
             <div class="flex items-center gap-2 mb-2">
@@ -120,7 +120,7 @@
                 <span class="text-sm font-semibold text-amber-700">Partial Payment</span>
             </div>
             <strong class="text-2xl text-amber-700">{{ rent_paid_partial|length }}</strong>
-            <span class="text-sm text-amber-600"> tenants</span>
+            <span class="text-sm text-amber-600"> customers</span>
         </div>
         <div class="rounded-2xl border-2 border-rose-200 bg-rose-50 p-4">
             <div class="flex items-center gap-2 mb-2">
@@ -128,7 +128,7 @@
                 <span class="text-sm font-semibold text-rose-700">Not Paid</span>
             </div>
             <strong class="text-2xl text-rose-700">{{ rent_not_paid|length }}</strong>
-            <span class="text-sm text-rose-600"> tenants</span>
+            <span class="text-sm text-rose-600"> customers</span>
         </div>
     </div>
 
@@ -146,7 +146,7 @@
                     <p class="text-xs text-green-600 font-semibold">${{ item.total_paid|floatformat:0 }} / ${{ item.monthly_rent|floatformat:0 }}</p>
                 </div>
                 {% empty %}
-                <p class="py-4 text-slate-400 text-xs text-center">No tenants paid in full yet.</p>
+                <p class="py-4 text-slate-400 text-xs text-center">No customers paid in full yet.</p>
                 {% endfor %}
             </div>
         </section>
@@ -188,7 +188,7 @@
                     <a href="{% url 'web-payment-create' %}" class="text-xs bg-green-100 text-green-700 font-bold px-2 py-1 rounded-lg hover:bg-green-200 transition whitespace-nowrap">+ Pay</a>
                 </div>
                 {% empty %}
-                <p class="py-4 text-green-600 text-xs text-center font-semibold">✅ All tenants have paid!</p>
+                <p class="py-4 text-green-600 text-xs text-center font-semibold">✅ All customers have paid!</p>
                 {% endfor %}
             </div>
         </section>

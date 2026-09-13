@@ -4,7 +4,7 @@ TRANSLATIONS = {
         "home": "Home",
         "dashboard": "Dashboard",
         "properties": "Properties",
-        "tenants": "Tenants",
+        "tenants": "Customers",
         "agreements": "Agreements",
         "finance": "Finance",
         "bank_accounts": "Bank Accounts",
@@ -35,7 +35,7 @@ TRANSLATIONS = {
         "general_expenses": "General expenses",
         "chart_of_accounts": "Chart of accounts",
         "general_journal": "General journal",
-        "tenant_invoices": "Tenant invoices",
+        "tenant_invoices": "Customer invoices",
         "financial_reports": "Financial reports",
 
         # Accounts
@@ -64,16 +64,16 @@ TRANSLATIONS = {
 
         # Payments
         "payments_title": "Payments",
-        "payments_desc": "Rent payments collected from tenants. (Kirada la soo uruuriyay.)",
+        "payments_desc": "Rent payments collected from customers. (Kirada la soo uruuriyay.)",
         "add_payment": "+ Add Payment",
-        "tenant": "Tenant",
+        "tenant": "Customer",
         "property": "Property",
         "amount": "Amount",
         "date": "Date",
         "method": "Method",
         "reference": "Reference",
         "no_payments": "No payments yet.",
-        "no_payments_hint": "Record a payment from a tenant. (Qor lacag ka timid kirayste.)",
+        "no_payments_hint": "Record a payment from a customer. (Qor lacag ka timid kirayste.)",
 
         # Maintenance
         "maintenance_title": "Maintenance",
@@ -102,10 +102,10 @@ TRANSLATIONS = {
 
         # Invoices
         "invoices_title": "Invoices",
-        "invoices_desc": "Tenant invoices. (Biilasha kiraystayaasha.)",
+        "invoices_desc": "Customer invoices. (Biilasha kiraystayaasha.)",
         "add_invoice": "+ Add Invoice",
         "no_invoices": "No invoices yet.",
-        "no_invoices_hint": "Create an invoice for a tenant. (Samee biil kiraystaha.)",
+        "no_invoices_hint": "Create an invoice for a customer. (Samee biil kiraystaha.)",
 
         # Reports
         "chart_of_accounts_report": "Chart of Accounts",

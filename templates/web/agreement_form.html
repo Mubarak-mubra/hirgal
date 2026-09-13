@@ -15,12 +15,12 @@
 
       <!-- Tenant (auto-filled or selectable) -->
       <div class="mb-4">
-        <label class="block text-sm font-medium text-gray-700 mb-1">1. Tenant</label>
+        <label class="block text-sm font-medium text-gray-700 mb-1">1. Customer</label>
         {{ form.tenant }}
         {% if tenant_id %}
-          <p class="text-xs text-green-600 mt-1">✓ Tenant auto-selected from profile</p>
+          <p class="text-xs text-green-600 mt-1">✓ Customer auto-selected from profile</p>
         {% else %}
-          <p class="text-xs text-slate-400 mt-1">Select the tenant for this agreement</p>
+          <p class="text-xs text-slate-400 mt-1">Select the customer for this agreement</p>
         {% endif %}
         {% if form.tenant.errors %}
         <p class="text-red-500 text-sm mt-1">{{ form.tenant.errors.0 }}</p>

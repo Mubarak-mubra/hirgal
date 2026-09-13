@@ -27,13 +27,13 @@
 <section class="mb-6 grid gap-4 sm:grid-cols-3">
     <div class="rounded-2xl bg-ink p-5 text-white"><p class="text-sm text-indigo-200">Expected Rent</p><strong class="mt-2 block text-2xl">${{ expected_rent }}/mo</strong></div>
     <div class="rounded-2xl border bg-white p-5"><p class="text-sm text-slate-500">Expenses</p><strong class="mt-2 block text-2xl text-rose-600">${{ monthly_expenses }}</strong></div>
-    <div class="rounded-2xl border bg-white p-5"><p class="text-sm text-slate-500">Active Tenants</p><strong class="mt-2 block text-2xl text-ink">{{ active_agreements|length }}</strong></div>
+    <div class="rounded-2xl border bg-white p-5"><p class="text-sm text-slate-500">Active Customers</p><strong class="mt-2 block text-2xl text-ink">{{ active_agreements|length }}</strong></div>
 </section>
 
 <div class="grid gap-6 lg:grid-cols-2">
     <!-- Tenants -->
     <section class="rounded-2xl border bg-white p-5 shadow-sm">
-        <h2 class="text-lg font-bold">Tenants in This Property</h2>
+        <h2 class="text-lg font-bold">Customers in This Property</h2>
         <div class="mt-4 divide-y">
             {% for agreement in active_agreements %}
             <div class="flex items-center justify-between py-3">
@@ -55,10 +55,10 @@
                 </div>
             </div>
             {% empty %}
-            <p class="py-4 text-slate-500">No tenants yet.</p>
+            <p class="py-4 text-slate-500">No customers yet.</p>
             {% endfor %}
         </div>
-        <a class="mt-4 inline-block rounded-lg bg-ink px-4 py-2 text-sm font-bold text-white hover:bg-indigo-800" href="{% url 'web-agreement-create' %}">+ Add Tenant</a>
+        <a class="mt-4 inline-block rounded-lg bg-ink px-4 py-2 text-sm font-bold text-white hover:bg-indigo-800" href="{% url 'web-agreement-create' %}">+ Add Customer</a>
     </section>
 
     <!-- Assets -->

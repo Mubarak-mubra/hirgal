@@ -22,7 +22,7 @@
 {# ── Tenant Breakdown + Search ── #}
 <div class="bg-white rounded-xl border border-slate-200 p-4 mb-6 no-print">
   <div class="flex items-center justify-between mb-4">
-    <h3 class="font-bold text-ink">Tenant Balances</h3>
+    <h3 class="font-bold text-ink">Customer Balances</h3>
     <form method="get" id="ar-search-form" class="flex gap-2">
       <input
         type="hidden"
@@ -60,7 +60,7 @@
         class="border-b bg-slate-50 text-xs font-semibold uppercase text-slate-500"
       >
         <tr>
-          <th class="px-4 py-3">Tenant</th>
+          <th class="px-4 py-3">Customer</th>
           <th class="px-4 py-3">Phone</th>
           <th class="px-4 py-3 text-right">Invoiced (Debit)</th>
           <th class="px-4 py-3 text-right">Paid (Credit)</th>
@@ -112,7 +112,7 @@
   </div>
   {% else %}
   <p class="text-center text-slate-400 text-sm py-4">
-    {% if search_query %} No tenants found matching "{{ search_query }}". {%
+    {% if search_query %} No customers found matching "{{ search_query }}". {%
     else %} No outstanding balances in this period. {% endif %}
   </p>
   {% endif %}
@@ -128,7 +128,7 @@
       class="border-b bg-slate-50 text-xs font-semibold uppercase text-slate-500"
     >
       <tr>
-        <th class="px-5 py-3">Tenant</th>
+        <th class="px-5 py-3">Customer</th>
         <th class="px-5 py-3">Taariikhda</th>
         <th class="px-5 py-3">Reference</th>
         <th class="px-5 py-3">Faahfaahin</th>

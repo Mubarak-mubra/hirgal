@@ -124,7 +124,7 @@ class RentalAgreementForm(forms.ModelForm):
         model = RentalAgreement
         fields = ("tenant", "property", "unit", "room", "monthly_rent", "start_date", "end_date", "status", "notes")
         labels = {
-            "tenant": "Tenant", "property": "Property", "unit": "Unit", "room": "Room",
+            "tenant": "Customer", "property": "Property", "unit": "Unit", "room": "Room",
             "monthly_rent": "Monthly Rent ($)",
             "start_date": "Start Date", "end_date": "End Date",
             "status": "Status", "notes": "Notes",
@@ -198,7 +198,7 @@ class RentalAgreementForm(forms.ModelForm):
             if self.instance.pk:
                 existing = existing.exclude(pk=self.instance.pk)
             if existing.exists():
-                raise forms.ValidationError("This tenant already has an active agreement for this property.")
+                raise forms.ValidationError("This customer already has an active agreement for this property.")
 
         return cleaned_data
 
@@ -207,7 +207,7 @@ class PaymentForm(forms.ModelForm):
     tenant = forms.ModelChoiceField(
         queryset=Tenant.objects.none(),
         required=False,
-        label="Tenant",
+        label="Customer",
         widget=forms.Select(attrs={"id": "id_tenant_select"}),
     )
     invoice = forms.ModelChoiceField(

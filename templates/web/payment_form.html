@@ -12,12 +12,12 @@
     <div>
       <label class="block text-sm font-medium text-slate-700 mb-1">1. {% t 'tenant' %}</label>
       {{ form.tenant }}
-      <p class="text-xs text-slate-400 mt-1">Choose tenant first, then select their agreement</p>
+      <p class="text-xs text-slate-400 mt-1">Choose customer first, then select their agreement</p>
     </div>
     <div>
       <label class="block text-sm font-medium text-slate-700 mb-1">2. Agreement</label>
       {{ form.rental_agreement }}
-      <p class="text-xs text-slate-400 mt-1" id="agreement_hint">Select a tenant first</p>
+      <p class="text-xs text-slate-400 mt-1" id="agreement_hint">Select a customer first</p>
     </div>
     <div>
       <label class="block text-sm font-medium text-slate-700 mb-1">{% t 'amount' %}</label>
@@ -89,7 +89,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function loadAgreements(tenantId) {
         if (!tenantId) {
             agreementSelect.innerHTML = '';
-            hint.textContent = 'Select a tenant first';
+            hint.textContent = 'Select a customer first';
             return;
         }
         hint.textContent = 'Loading...';
@@ -98,7 +98,7 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(data => {
                 agreementSelect.innerHTML = '';
                 if (data.agreements.length === 0) {
-                    hint.textContent = 'No active agreements for this tenant';
+                    hint.textContent = 'No active agreements for this customer';
                     return;
                 }
                 hint.textContent = '';
