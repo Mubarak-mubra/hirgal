@@ -5,6 +5,9 @@
 {% block heading %}Warbixinta Alaabaha (Inventory Report){% endblock %}
 
 {% block report_content %}
+<div class="mb-4 flex justify-end no-print">
+    <a href="{% url 'web-inventory-create' %}" class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700">+ Ku Dar Alaab</a>
+</div>
 <div class="bg-white rounded-xl border border-slate-200 overflow-hidden mb-6">
     <table class="w-full text-sm">
         <thead class="bg-slate-50 border-b border-slate-200">

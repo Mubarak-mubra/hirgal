@@ -393,6 +393,29 @@ class PropertyAssetCreateView(HomeView):
         return render(request, self.template_name, {"property": property_instance, "form": form})
 
 
+class InventoryItemCreateView(HomeView):
+    template_name = "web/inventory_item_form.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        user = self.request.user.get_data_owner()
+        context["properties"] = Property.objects.filter(owner=user)
+        context["form"] = PropertyAssetForm()
+        return context
+
+    def post(self, request):
+        user = request.user.get_data_owner()
+        property_id = request.POST.get("property")
+        property_instance = get_object_or_404(Property, pk=property_id, owner=user)
+        form = PropertyAssetForm(request.POST)
+        if form.is_valid():
+            asset = form.save(commit=False)
+            asset.property = property_instance
+            asset.save()
+            return redirect("web-inventory-report")
+        return render(request, self.template_name, {"properties": Property.objects.filter(owner=user), "form": form})
+
+
 class PropertyAssetUpdateView(LoginRequiredMixin, View):
     login_url = "/login/"
 
