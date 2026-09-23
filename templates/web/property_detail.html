@@ -29,6 +29,41 @@
     <div class="rounded-2xl border bg-white p-5"><p class="text-sm text-slate-500">Active Customers</p><strong class="mt-2 block text-2xl text-ink">{{ active_agreements|length }}</strong></div>
 </section>
 
+<!-- Occupancy Slider + Utility Accounts -->
+<section class="mb-6 grid gap-4 sm:grid-cols-2">
+    <div class="rounded-2xl border bg-white p-5 shadow-sm">
+        <div class="flex items-center justify-between mb-2">
+            <p class="text-sm text-slate-500">Occupancy</p>
+            {% if occupancy_color == 'green' %}
+            <span class="rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-bold text-green-700">{{ occupancy_label }}</span>
+            {% elif occupancy_color == 'amber' %}
+            <span class="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-bold text-amber-700">{{ occupancy_label }}</span>
+            {% else %}
+            <span class="rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-bold text-red-700">{{ occupancy_label }}</span>
+            {% endif %}
+        </div>
+        <div class="w-full bg-slate-200 rounded-full h-3">
+            <div class="h-3 rounded-full {% if occupancy_color == 'green' %}bg-green-500{% elif occupancy_color == 'amber' %}bg-amber-500{% else %}bg-red-500{% endif %}" style="width: {{ occupancy_rate }}%"></div>
+        </div>
+        <p class="mt-2 text-sm text-slate-600"><strong>{{ occupancy_rate }}%</strong> — {{ rented_spaces }} of {{ total_spaces }} space{{ total_spaces|pluralize }} rented</p>
+    </div>
+    <div class="rounded-2xl border bg-white p-5 shadow-sm">
+        <p class="text-sm text-slate-500 mb-3">Utility Account Numbers</p>
+        {% if property.electricity_account_no or property.water_account_no %}
+        <div class="space-y-2 text-sm">
+            {% if property.electricity_account_no %}
+            <div class="flex justify-between"><span class="text-slate-600">⚡ Electricity</span><span class="font-mono font-semibold text-ink">{{ property.electricity_account_no }}</span></div>
+            {% endif %}
+            {% if property.water_account_no %}
+            <div class="flex justify-between"><span class="text-slate-600">💧 Water</span><span class="font-mono font-semibold text-ink">{{ property.water_account_no }}</span></div>
+            {% endif %}
+        </div>
+        {% else %}
+        <p class="text-sm text-slate-400">No account numbers yet. <a href="{% url 'web-property-edit' property.pk %}" class="text-indigo-600 hover:underline">Add them</a> so you can settle final bills if a customer leaves unpaid.</p>
+        {% endif %}
+    </div>
+</section>
+
 <div class="grid gap-6 lg:grid-cols-2">
     <!-- Tenants -->
     <section class="rounded-2xl border bg-white p-5 shadow-sm">

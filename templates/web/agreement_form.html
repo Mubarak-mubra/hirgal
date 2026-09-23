@@ -78,6 +78,44 @@
         {{ form.status }}
       </div>
 
+      <!-- Utility Responsibility -->
+      <div class="border-t pt-4 mt-6">
+        <h2 class="text-lg font-semibold mb-1">Utility Responsibility</h2>
+        <p class="text-xs text-slate-400 mb-4">Record who agreed to pay each utility bill. This protects the company if a customer leaves with unpaid bills.</p>
+
+        <div class="grid grid-cols-2 gap-4 mb-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Electricity paid by</label>
+            {{ form.electricity_responsible }}
+            {% if form.electricity_responsible.errors %}
+            <p class="text-red-500 text-sm mt-1">{{ form.electricity_responsible.errors.0 }}</p>
+            {% endif %}
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Water paid by</label>
+            {{ form.water_responsible }}
+            {% if form.water_responsible.errors %}
+            <p class="text-red-500 text-sm mt-1">{{ form.water_responsible.errors.0 }}</p>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <!-- Final Bills Settlement -->
+      <div class="border-t pt-4 mt-6">
+        <h2 class="text-lg font-semibold mb-1">Final Bills (when agreement ends)</h2>
+        <p class="text-xs text-slate-400 mb-4">Fill this when the customer leaves — were the final electricity/water bills settled?</p>
+
+        <div class="mb-4">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Final electricity/water bills</label>
+          {{ form.final_bills_settlement }}
+        </div>
+        <div class="mb-4">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Settlement notes (optional)</label>
+          {{ form.final_bills_notes }}
+        </div>
+      </div>
+
       <!-- Notes -->
       <div class="mb-4">
         <label class="block text-sm font-medium text-gray-700 mb-1">Notes (optional)</label>
@@ -106,6 +144,17 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Warn when ending an agreement without checking final bills
+    document.getElementById('agreement-form').addEventListener('submit', function(e) {
+        const status = document.getElementById('id_status');
+        const settlement = document.getElementById('id_final_bills_settlement');
+        if (status && settlement && status.value === 'ended' && settlement.value === 'not_checked') {
+            if (!confirm('This agreement is being ended but final electricity/water bills are "Not checked".\n\nThe customer could leave with unpaid bills. Continue anyway?')) {
+                e.preventDefault();
+            }
+        }
+    });
+
     const propertySelect = document.getElementById('id_property');
     const unitSelect = document.getElementById('id_unit');
     const unitHint = document.getElementById('unit-hint');

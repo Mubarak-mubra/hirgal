@@ -28,6 +28,8 @@ class Tenant(models.Model):
 class RentalAgreement(models.Model):
     AGREEMENT_STATUSES = [("active", "Socda"), ("ended", "Dhammaaday"), ("cancelled", "La baajiyay")]
     RENTAL_SCOPES = [("whole_property", "Hantida oo dhan"), ("partial_property", "Qeyb ka mid ah")]
+    UTILITY_RESPONSIBILITY = [("customer", "Customer pays"), ("company", "Company pays")]
+    BILL_SETTLEMENT = [("not_checked", "Not checked"), ("paid", "Paid before leaving"), ("unpaid", "Unpaid")]
 
     tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="rental_agreements")
     property = models.ForeignKey(Property, on_delete=models.PROTECT, related_name="rental_agreements", null=True, blank=True)
@@ -40,6 +42,10 @@ class RentalAgreement(models.Model):
     end_date = models.DateField(null=True, blank=True)
     monthly_rent = models.DecimalField(max_digits=10, decimal_places=2)
     status = models.CharField(max_length=20, choices=AGREEMENT_STATUSES, default="active")
+    electricity_responsible = models.CharField(max_length=10, choices=UTILITY_RESPONSIBILITY, default="customer", verbose_name="Who pays electricity")
+    water_responsible = models.CharField(max_length=10, choices=UTILITY_RESPONSIBILITY, default="customer", verbose_name="Who pays water")
+    final_bills_settlement = models.CharField(max_length=12, choices=BILL_SETTLEMENT, default="not_checked", verbose_name="Final bills settlement")
+    final_bills_notes = models.TextField(blank=True, verbose_name="Final bills notes")
     notes = models.TextField(blank=True)
 
     class Meta:

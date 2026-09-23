@@ -15,6 +15,8 @@ class Property(models.Model):
     residential_structure = models.CharField(max_length=20, choices=RESIDENTIAL_STRUCTURES, default="villa")
     location = models.CharField(max_length=200)
     total_rentable_spaces = models.PositiveIntegerField(default=1)
+    electricity_account_no = models.CharField("Electricity account no.", max_length=50, blank=True)
+    water_account_no = models.CharField("Water account no.", max_length=50, blank=True)
     cover_image = models.ImageField(upload_to="property_covers/", null=True, blank=True)
     description = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)

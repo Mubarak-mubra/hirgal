@@ -338,6 +338,22 @@ class PropertyDetailView(LoginRequiredMixin, DetailView):
         context["expected_rent"] = sum(item.agreed_monthly_rent for item in agreements)
         context["monthly_expenses"] = sum(item.amount for item in self.object.general_expenses.all())
         context["space_count"] = sum(unit.rooms.count() for unit in self.object.units.all()) if self.object.property_type == "home" else self.object.units.count()
+
+        total_spaces = self.object.total_rentable_spaces or 1
+        rented_spaces = min(sum(item.rented_space_count for item in agreements), total_spaces)
+        occupancy_rate = round(rented_spaces / total_spaces * 100, 1)
+        context["total_spaces"] = total_spaces
+        context["rented_spaces"] = rented_spaces
+        context["occupancy_rate"] = occupancy_rate
+        if occupancy_rate >= 100:
+            context["occupancy_label"] = "Fully Rented"
+            context["occupancy_color"] = "green"
+        elif occupancy_rate > 0:
+            context["occupancy_label"] = "Partially Rented"
+            context["occupancy_color"] = "amber"
+        else:
+            context["occupancy_label"] = "Vacant"
+            context["occupancy_color"] = "red"
         return context
 
 

@@ -58,13 +58,15 @@ class UserProfileForm(forms.ModelForm):
 class PropertyForm(forms.ModelForm):
     class Meta:
         model = Property
-        fields = ("name", "property_type", "residential_structure", "location", "description")
+        fields = ("name", "property_type", "residential_structure", "location", "electricity_account_no", "water_account_no", "description")
         labels = {
             "name": "Property Name",
             "property_type": "Property Type",
             "residential_structure": "Structure Type",
             "location": "Location",
             "description": "Description",
+            "electricity_account_no": "Electricity Account No.",
+            "water_account_no": "Water Account No.",
         }
 
     def __init__(self, *args, **kwargs):
@@ -154,12 +156,17 @@ class TenantForm(forms.ModelForm):
 class RentalAgreementForm(forms.ModelForm):
     class Meta:
         model = RentalAgreement
-        fields = ("tenant", "property", "unit", "room", "monthly_rent", "start_date", "end_date", "status", "notes")
+        fields = ("tenant", "property", "unit", "room", "monthly_rent", "start_date", "end_date", "status",
+                  "electricity_responsible", "water_responsible", "final_bills_settlement", "final_bills_notes", "notes")
         labels = {
             "tenant": "Tenant", "property": "Property", "unit": "Unit", "room": "Room",
             "monthly_rent": "Monthly Rent ($)",
             "start_date": "Start Date", "end_date": "End Date",
             "status": "Status", "notes": "Notes",
+            "electricity_responsible": "Electricity paid by",
+            "water_responsible": "Water paid by",
+            "final_bills_settlement": "Final electricity/water bills",
+            "final_bills_notes": "Settlement notes",
         }
         widgets = {
             "start_date": forms.DateInput(attrs={"type": "date"}),
