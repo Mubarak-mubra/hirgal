@@ -1,16 +1,15 @@
 {% extends "base.html" %}
-{% load i18n_tags %}
-{% block title %}{% t 'accounts_title' %} - Hirgal Kiro{% endblock %}
+{% block title %}Accounts - Hirgal Kiro{% endblock %}
 {% block content %}
 <section class="mb-7 flex items-end justify-between no-print">
   <div>
-    <a class="text-sm font-semibold text-indigo-700" href="{% url 'home' %}">← {% t 'home' %}</a>
-    <h1 class="mt-4 text-3xl font-bold">{% t 'accounts_title' %}</h1>
-    <p class="mt-2 text-slate-500">{% t 'track_money' %}</p>
+    <a class="text-sm font-semibold text-indigo-700" href="{% url 'home' %}">← Home</a>
+    <h1 class="mt-4 text-3xl font-bold">Accounts</h1>
+    <p class="mt-2 text-slate-500">Track your money and financial accounts</p>
   </div>
   <div class="flex gap-3">
     <button onclick="window.print()" class="rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">🖨️ Print</button>
-    <a class="rounded-lg bg-ink px-4 py-3 text-sm font-bold text-white" href="{% url 'web-account-create' %}">{% t 'add_account' %}</a>
+    <a class="rounded-lg bg-ink px-4 py-3 text-sm font-bold text-white" href="{% url 'web-account-create' %}">+ Add Account</a>
   </div>
 </section>
 
@@ -70,8 +69,8 @@
   </div>
   {% else %}
   <div class="p-10 text-center">
-    <p class="font-semibold text-slate-700">{% t 'no_accounts' %}</p>
-    <p class="mt-2 text-sm text-slate-500">{% t 'no_accounts_hint' %}</p>
+    <p class="font-semibold text-slate-700">No accounts yet.</p>
+    <p class="mt-2 text-sm text-slate-500">Add an account to start tracking money.</p>
   </div>
   {% endif %}
 </section>

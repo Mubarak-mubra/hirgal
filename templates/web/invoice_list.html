@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% block title %}Bilaha - Hirgal Kiro{% endblock %}
+{% block title %}Invoices - Hirgal Kiro{% endblock %}
 {% block content %}
 <section class="mb-7 flex items-end justify-between">
   <div>
-    <a class="text-sm font-semibold text-indigo-700" href="{% url 'home' %}">← Bogga hore</a>
-    <h1 class="mt-4 text-3xl font-bold">Bilaha</h1>
-    <p class="mt-2 text-slate-500">Dhammaan biilaha kirada.</p>
+    <a class="text-sm font-semibold text-indigo-700" href="{% url 'home' %}">← Home</a>
+    <h1 class="mt-4 text-3xl font-bold">Invoices</h1>
+    <p class="mt-2 text-slate-500">All rent invoices.</p>
   </div>
   <a class="rounded-lg bg-ink px-4 py-3 text-sm font-bold text-white" href="{% url 'web-invoice-create' %}">+ Ku cusub</a>
 </section>
@@ -16,13 +16,13 @@
     <table class="w-full text-left text-sm">
       <thead class="border-b bg-slate-50 text-slate-600">
         <tr>
-          <th class="px-4 py-3 font-semibold">Nambarka</th>
-          <th class="px-4 py-3 font-semibold">Kiraystaha</th>
-          <th class="px-4 py-3 font-semibold">Taariikhda</th>
-          <th class="px-4 py-3 font-semibold">Kama Dambaysta</th>
-          <th class="px-4 py-3 font-semibold text-right">Qiimaha</th>
-          <th class="px-4 py-3 font-semibold">Xaaladda</th>
-          <th class="px-4 py-3 font-semibold text-right">Ficillo</th>
+          <th class="px-4 py-3 font-semibold">Number</th>
+          <th class="px-4 py-3 font-semibold">Tenant</th>
+          <th class="px-4 py-3 font-semibold">Date</th>
+          <th class="px-4 py-3 font-semibold">Due Date</th>
+          <th class="px-4 py-3 font-semibold text-right">Amount</th>
+          <th class="px-4 py-3 font-semibold">Status</th>
+          <th class="px-4 py-3 font-semibold text-right">Actions</th>
         </tr>
       </thead>
       <tbody class="divide-y">
@@ -39,7 +39,7 @@
             <span class="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-700">{{ invoice.get_status_display }}</span>
           </td>
           <td class="px-4 py-3 text-right">
-            <a href="{% url 'web-invoice-detail' invoice.pk %}" class="font-semibold text-indigo-600 hover:underline">Faahfaahin</a>
+            <a href="{% url 'web-invoice-detail' invoice.pk %}" class="font-semibold text-indigo-600 hover:underline">Description</a>
           </td>
         </tr>
         {% endfor %}
@@ -48,8 +48,8 @@
   </div>
   {% else %}
   <div class="p-10 text-center">
-    <p class="font-semibold text-slate-700">Ma jiraan bilaha.</p>
-    <p class="mt-2 text-sm text-slate-500">Ku cusub biil cusub si aad bilowdo.</p>
+    <p class="font-semibold text-slate-700">No invoices.</p>
+    <p class="mt-2 text-sm text-slate-500">Add a new invoice to get started.</p>
   </div>
   {% endif %}
 </section>

@@ -1,14 +1,13 @@
 {% extends "base.html" %}
-{% load i18n_tags %}
-{% block title %}{% t 'payments' %} - Hirgal Kiro{% endblock %}
+{% block title %}Payments - Hirgal Kiro{% endblock %}
 {% block content %}
 <section class="mb-7 flex items-end justify-between">
     <div>
-        <a class="text-sm font-semibold text-indigo-700" href="{% url 'home' %}">← {% t 'home' %}</a>
-        <h1 class="mt-4 text-3xl font-bold">{% t 'payments' %}</h1>
+        <a class="text-sm font-semibold text-indigo-700" href="{% url 'home' %}">← Home</a>
+        <h1 class="mt-4 text-3xl font-bold">Payments</h1>
         <p class="mt-2 text-slate-500">All rent payments collected.</p>
     </div>
-    <a class="rounded-lg bg-ink px-4 py-3 text-sm font-bold text-white" href="{% url 'web-payment-create' %}">+ {% t 'add_payment' %}</a>
+    <a class="rounded-lg bg-ink px-4 py-3 text-sm font-bold text-white" href="{% url 'web-payment-create' %}">+ + Record Payment</a>
 </section>
 
 <section class="rounded-xl border bg-white shadow-sm overflow-hidden">
@@ -48,9 +47,9 @@
                     <a href="{% url 'web-journal-detail' payment.journal_entry.pk %}" class="text-xs text-indigo-500 hover:underline">JE →</a>
                     <span class="mx-1 text-slate-300">|</span>
                     {% endif %}
-                    <a href="{% url 'web-payment-edit' payment.pk %}" class="font-semibold text-indigo-600 hover:underline">{% t 'edit' %}</a>
+                    <a href="{% url 'web-payment-edit' payment.pk %}" class="font-semibold text-indigo-600 hover:underline">Edit</a>
                     <span class="mx-1 text-slate-300">|</span>
-                    <a href="{% url 'web-payment-delete' payment.pk %}" class="font-semibold text-red-600 hover:underline">{% t 'delete' %}</a>
+                    <a href="{% url 'web-payment-delete' payment.pk %}" class="font-semibold text-red-600 hover:underline">Delete</a>
                 </td>
             </tr>
         {% endfor %}

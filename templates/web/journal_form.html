@@ -1,13 +1,13 @@
 {% extends "base.html" %}
-{% block title %}{% if editing %}Wax ka beddel diiwaanka{% else %}Diiwaan cusub{% endif %} - Hirgal Kiro{% endblock %}
+{% block title %}{% if editing %}Edit journal entry{% else %}New journal entry{% endif %} - Hirgal Kiro{% endblock %}
 {% block content %}
 <div class="max-w-4xl mx-auto p-6">
   <div class="bg-white rounded-xl border shadow-sm p-6">
     <h1 class="text-2xl font-bold mb-6">
       {% if editing %}
-        Wax ka beddel diiwaanka
+        Edit journal entry
       {% else %}
-        Diiwaan cusub
+        New journal entry
       {% endif %}
     </h1>
 
@@ -19,19 +19,19 @@
       </div>
 
       <div class="border-t pt-6">
-        <h3 class="text-lg font-bold mb-4">Qaybaha (Lines)</h3>
+        <h3 class="text-lg font-bold mb-4">Lines</h3>
         {{ formset.management_form }}
 
         <div class="overflow-x-auto rounded-lg border">
           <table class="w-full text-left text-sm">
             <thead class="bg-slate-50 text-slate-600">
               <tr>
-                <th class="px-4 py-3 font-semibold">Xisaabta</th>
-                <th class="px-4 py-3 font-semibold">Faahfaahin</th>
+                <th class="px-4 py-3 font-semibold">Account</th>
+                <th class="px-4 py-3 font-semibold">Description</th>
                 <th class="px-4 py-3 font-semibold">Debit</th>
                 <th class="px-4 py-3 font-semibold">Credit</th>
-                <th class="px-4 py-3 font-semibold">Hantida</th>
-                <th class="px-4 py-3 font-semibold">Tirtir</th>
+                <th class="px-4 py-3 font-semibold">Property</th>
+                <th class="px-4 py-3 font-semibold">Delete</th>
               </tr>
             </thead>
             <tbody class="divide-y">
@@ -64,9 +64,9 @@
 
       <div class="flex gap-3 mt-6">
         <button type="submit" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition">
-          Kaydi
+          Save
         </button>
-        <a href="{% url 'web-journal-list' %}" class="border px-6 py-2 rounded-lg hover:bg-gray-50 transition">Jooji</a>
+        <a href="{% url 'web-journal-list' %}" class="border px-6 py-2 rounded-lg hover:bg-gray-50 transition">Cancel</a>
       </div>
     </form>
   </div>

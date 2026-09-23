@@ -1,7 +1,6 @@
 {% extends "base.html" %}
-{% load i18n_tags %}
 
-{% block title %}{% t 'accounting' %} - {% block report_title %}{% endblock %}{% endblock %}
+{% block title %}Accounting - {% block report_title %}{% endblock %}{% endblock %}
 
 {% block content %}
 <div class="no-print mb-6">
@@ -11,7 +10,7 @@
 
 <div class="no-print mb-4 flex flex-wrap gap-3 items-center">
     <button onclick="window.print()" class="inline-flex items-center gap-2 rounded-lg bg-green-600 px-5 py-2 text-sm font-bold text-white hover:bg-green-700 transition">
-        🖨️ {% t 'print' %}
+        🖨️ Print
     </button>
     <a href="?{% block csv_params %}{% endblock %}export=csv"
        class="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-5 py-2 text-sm font-bold text-white hover:bg-emerald-700 transition">
@@ -23,7 +22,7 @@
 <div class="rounded-xl border bg-white p-6 shadow-sm">
     <div class="print-header mb-4 hidden print:block">
         <h1 class="text-xl font-bold">Hirgal Kiro - {% block print_title %}{% endblock %}</h1>
-        <p class="text-sm text-slate-600">{% t 'date' %}: {% now "d/m/Y" %} | User: {{ request.user.full_name|default:request.user.username }}</p>
+        <p class="text-sm text-slate-600">Date: {% now "d/m/Y" %} | User: {{ request.user.full_name|default:request.user.username }}</p>
         <hr class="my-2 border-slate-300">
     </div>
     {% block report_content %}{% endblock %}

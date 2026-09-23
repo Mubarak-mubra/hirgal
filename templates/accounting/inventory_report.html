@@ -1,21 +1,21 @@
 {% extends "accounting/base_accounting.html" %}
 
-{% block report_title %}Alaabaha{% endblock %}
-{% block print_title %}Warbixinta Alaabaha (Inventory Report){% endblock %}
-{% block heading %}Warbixinta Alaabaha (Inventory Report){% endblock %}
+{% block report_title %}Inventory{% endblock %}
+{% block print_title %}Inventory Report (Inventory Report){% endblock %}
+{% block heading %}Inventory Report (Inventory Report){% endblock %}
 
 {% block report_content %}
 <div class="mb-4 flex justify-end no-print">
-    <a href="{% url 'web-inventory-create' %}" class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700">+ Ku Dar Alaab</a>
+    <a href="{% url 'web-inventory-create' %}" class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700">+ Add Item</a>
 </div>
 <div class="bg-white rounded-xl border border-slate-200 overflow-hidden mb-6">
     <table class="w-full text-sm">
         <thead class="bg-slate-50 border-b border-slate-200">
             <tr>
-                <th class="text-left px-4 py-3 font-semibold text-slate-700">Hantida</th>
-                <th class="text-left px-4 py-3 font-semibold text-slate-700">Magaca Alaabta</th>
-                <th class="text-right px-4 py-3 font-semibold text-slate-700">Tirada</th>
-                <th class="text-left px-4 py-3 font-semibold text-slate-700">Xaaladda</th>
+                <th class="text-left px-4 py-3 font-semibold text-slate-700">Property</th>
+                <th class="text-left px-4 py-3 font-semibold text-slate-700">Item Name</th>
+                <th class="text-right px-4 py-3 font-semibold text-slate-700">Quantity</th>
+                <th class="text-left px-4 py-3 font-semibold text-slate-700">Status</th>
             </tr>
         </thead>
         <tbody class="divide-y divide-slate-100">
@@ -27,7 +27,7 @@
                 <td class="px-4 py-3 text-slate-600">{{ asset.get_condition_display }}</td>
             </tr>
             {% empty %}
-            <tr><td colspan="4" class="px-4 py-8 text-center text-slate-400">Ma jiraan alaab.</td></tr>
+            <tr><td colspan="4" class="px-4 py-8 text-center text-slate-400">No inventory items.</td></tr>
             {% endfor %}
         </tbody>
     </table>

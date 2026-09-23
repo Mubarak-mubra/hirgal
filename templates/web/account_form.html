@@ -1,23 +1,23 @@
 {% extends "base.html" %}
-{% block title %}{% if editing %}Wax ka beddel xisaabta{% else %}Ku dar xisaab cusub{% endif %} - Hirgal Kiro{% endblock %}
+{% block title %}{% if editing %}Edit account{% else %}Add new account{% endif %} - Hirgal Kiro{% endblock %}
 {% block content %}
 <div class="max-w-2xl mx-auto p-6">
   <div class="bg-white rounded-xl border shadow-sm p-6">
     <h1 class="text-2xl font-bold mb-2">
       {% if editing %}
-        Wax ka beddel xisaabta
+        Edit account
       {% else %}
-        Ku dar xisaab cusub
+        Add new account
       {% endif %}
     </h1>
 
     <div class="mb-6 rounded-lg bg-amber-50 p-4 text-sm text-amber-800">
-      <strong>Xisaabtu waa maxay?</strong>
-      <p class="mt-1">Xisaabta waa meel aad ku qorto lacagaha. Tusaale:</p>
+      <strong>What is an Account?</strong>
+      <p class="mt-1">An account is where you record money. Example:</p>
       <ul class="mt-2 space-y-1">
-        <li><strong>Bangiga</strong> - Lacagta aad ku shubato bankiga</li>
-        <li><strong>Kirada</strong> - Lacagta ka timid kiraystayaasha</li>
-        <li><strong>Biilka</strong> - Kharashka aad bixisay (koronto, biyo, iwm)</li>
+        <li><strong>Bank</strong> - Money you deposit at the bank</li>
+        <li><strong>Rent</strong> - Money from tenants</li>
+        <li><strong>Bills</strong> - Expenses you paid (electricity, water, etc.)</li>
       </ul>
     </div>
 
@@ -28,7 +28,7 @@
         <label class="block text-sm font-medium text-slate-700">{{ form.name.label }}</label>
         {{ form.name }}
         {% if form.name.errors %}<p class="text-red-500 text-sm">{{ form.name.errors.0 }}</p>{% endif %}
-        <p class="mt-1 text-xs text-slate-500">Magaca xisaabta si fudud u qor. Tusaale: "Bangiga", "Kirada Bishan"</p>
+        <p class="mt-1 text-xs text-slate-500">Name the account simply. E.g., 'Bank', 'Rent This Month'</p>
       </div>
 
       <div class="mb-4">
@@ -36,11 +36,11 @@
         {{ form.category }}
         {% if form.category.errors %}<p class="text-red-500 text-sm">{{ form.category.errors.0 }}</p>{% endif %}
         <div class="mt-2 grid grid-cols-2 gap-2 text-xs">
-          <div class="rounded bg-green-50 p-2 text-green-700"><strong>Hanti</strong> = Wixii aad leedahay</div>
-          <div class="rounded bg-red-50 p-2 text-red-700"><strong>Deyn</strong> = Wixii aad iska leedahay</div>
-          <div class="rounded bg-purple-50 p-2 text-purple-700"><strong>Raasamaal</strong> = Net-worth-kaaga</div>
-          <div class="rounded bg-blue-50 p-2 text-blue-700"><strong>Dakhli</strong> = Wixii aad ku heshay</div>
-          <div class="rounded bg-orange-50 p-2 text-orange-700"><strong>Kharash</strong> = Wixii aad ku bixisay</div>
+          <div class="rounded bg-green-50 p-2 text-green-700"><strong>Assets</strong> = What you own</div>
+          <div class="rounded bg-red-50 p-2 text-red-700"><strong>Liabilities</strong> = What you owe</div>
+          <div class="rounded bg-purple-50 p-2 text-purple-700"><strong>Equity</strong> = Your net worth</div>
+          <div class="rounded bg-blue-50 p-2 text-blue-700"><strong>Revenue</strong> = What you earned</div>
+          <div class="rounded bg-orange-50 p-2 text-orange-700"><strong>Expense</strong> = What you spent</div>
         </div>
       </div>
 
@@ -48,7 +48,7 @@
         <label class="block text-sm font-medium text-slate-700">{{ form.bank_account.label }}</label>
         {{ form.bank_account }}
         {% if form.bank_account.errors %}<p class="text-red-500 text-sm">{{ form.bank_account.errors.0 }}</p>{% endif %}
-        <p class="mt-1 text-xs text-slate-500">Haddii xisaabtani ay la xiriirto bangi, dooro bangiga halkan. Tusaale: "Bangiga" → Teletsom</p>
+        <p class="mt-1 text-xs text-slate-500">If this account is linked to a bank, select the bank here. E.g., 'Bank' -> Teletsom</p>
       </div>
 
       <div class="mb-4">
@@ -65,8 +65,8 @@
       </div>
 
       <div class="flex gap-3 mt-6">
-        <button type="submit" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition">Kaydi</button>
-        <a href="{% url 'web-account-list' %}" class="border px-6 py-2 rounded-lg hover:bg-gray-50 transition">Jooji</a>
+        <button type="submit" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition">Save</button>
+        <a href="{% url 'web-account-list' %}" class="border px-6 py-2 rounded-lg hover:bg-gray-50 transition">Cancel</a>
       </div>
     </form>
   </div>

@@ -610,22 +610,31 @@ class TenantCreateView(HomeView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        context["form"] = TenantForm()
         context["properties"] = Property.objects.filter(owner=self.request.user.get_data_owner())
         return context
 
     def post(self, request):
+        form = TenantForm(request.POST)
+        if not form.is_valid():
+            return render(request, self.template_name, {
+                "form": form,
+                "properties": Property.objects.filter(owner=request.user.get_data_owner()),
+            })
         tenant, created = Tenant.objects.get_or_create(
-            owner=request.user.get_data_owner(), phone_number=request.POST.get("phone_number"),
-            defaults={"full_name": request.POST.get("full_name"), "tenant_type": request.POST.get("tenant_type", "person")},
+            owner=request.user.get_data_owner(), phone_number=form.cleaned_data["phone_number"],
+            defaults={"full_name": form.cleaned_data["full_name"], "tenant_type": form.cleaned_data.get("tenant_type", "person")},
         )
-        property_instance = get_object_or_404(Property, pk=request.POST.get("property_id"), owner=request.user.get_data_owner())
-        RentalAgreement.objects.create(
-            tenant=tenant, property=property_instance, rental_scope="whole_property",
-            rented_space_count=property_instance.total_rentable_spaces,
-            agreed_monthly_rent=request.POST.get("agreed_monthly_rent"),
-            monthly_rent=request.POST.get("agreed_monthly_rent"),
-            start_date=request.POST.get("start_date"),
-        )
+        property_id = request.POST.get("property")
+        if property_id:
+            property_instance = get_object_or_404(Property, pk=property_id, owner=request.user.get_data_owner())
+            RentalAgreement.objects.create(
+                tenant=tenant, property=property_instance, rental_scope="whole_property",
+                rented_space_count=property_instance.total_rentable_spaces,
+                agreed_monthly_rent=request.POST.get("agreed_monthly_rent"),
+                monthly_rent=request.POST.get("agreed_monthly_rent"),
+                start_date=request.POST.get("start_date"),
+            )
         return redirect("web-tenant-detail", tenant.pk)
 
 

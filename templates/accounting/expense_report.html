@@ -1,9 +1,8 @@
 {% extends "accounting/base_accounting.html" %}
-{% load i18n_tags %}
 
-{% block report_title %}{% t 'expense_report' %}{% endblock %}
-{% block print_title %}{% t 'expense_report' %}{% endblock %}
-{% block heading %}{% t 'expense_report' %}{% endblock %}
+{% block report_title %}Expense Report{% endblock %}
+{% block print_title %}Expense Report{% endblock %}
+{% block heading %}Expense Report{% endblock %}
 
 {% block report_content %}
 {% include "accounting/_date_filter.html" %}

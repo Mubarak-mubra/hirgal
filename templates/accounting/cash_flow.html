@@ -1,9 +1,8 @@
 {% extends "accounting/base_accounting.html" %}
-{% load i18n_tags %}
 
-{% block report_title %}{% t 'cash_flow' %}{% endblock %}
-{% block print_title %}{% t 'cash_flow' %}{% endblock %}
-{% block heading %}{% t 'cash_flow' %}{% endblock %}
+{% block report_title %}Cash Flow{% endblock %}
+{% block print_title %}Cash Flow{% endblock %}
+{% block heading %}Cash Flow{% endblock %}
 
 {% block report_content %}
 {% include "accounting/_date_filter.html" %}
@@ -14,18 +13,18 @@
     <div class="space-y-4">
         <div class="flex justify-between items-center border-b pb-2">
             <a href="{% url 'web-payments' %}" class="text-indigo-600 hover:underline font-semibold">
-                {% t 'cash_in' %} (Rent collected) →
+                Cash In (Rent collected) →
             </a>
             <span class="text-green-600 font-bold">${{ cash_in|floatformat:2 }}</span>
         </div>
         <div class="flex justify-between items-center border-b pb-2">
             <a href="{% url 'web-expense-list' %}" class="text-indigo-600 hover:underline font-semibold">
-                {% t 'cash_out' %} (Expenses paid) →
+                Cash Out (Expenses paid) →
             </a>
             <span class="text-red-600 font-bold">${{ cash_out|floatformat:2 }}</span>
         </div>
         <div class="flex justify-between border-t-2 pt-3 text-lg font-bold">
-            <span>{% t 'net_cash_flow' %}</span>
+            <span>Net Cash Flow</span>
             <span class="{% if net_cash_flow >= 0 %}text-green-600{% else %}text-red-600{% endif %}">${{ net_cash_flow|floatformat:2 }}</span>
         </div>
     </div>

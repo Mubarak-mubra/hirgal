@@ -1,9 +1,8 @@
 {% extends "accounting/base_accounting.html" %}
-{% load i18n_tags %}
 
-{% block report_title %}{% t 'trial_balance' %}{% endblock %}
-{% block print_title %}{% t 'trial_balance' %}{% endblock %}
-{% block heading %}{% t 'trial_balance' %}{% endblock %}
+{% block report_title %}Trial Balance{% endblock %}
+{% block print_title %}Trial Balance{% endblock %}
+{% block heading %}Trial Balance{% endblock %}
 
 {% block report_content %}
 {% include "accounting/_date_filter.html" %}

@@ -21,8 +21,8 @@ def _style_fields(form):
 
 
 class RegistrationForm(forms.ModelForm):
-    password = forms.CharField(label="Furaha sirta ah", widget=forms.PasswordInput)
-    password2 = forms.CharField(label="Xaqiijinta furaha sirta ah", widget=forms.PasswordInput)
+    password = forms.CharField(label="Password", widget=forms.PasswordInput)
+    password2 = forms.CharField(label="Confirm Password", widget=forms.PasswordInput)
 
     class Meta:
         model = User
@@ -37,7 +37,7 @@ class RegistrationForm(forms.ModelForm):
         p1 = cleaned_data.get("password")
         p2 = cleaned_data.get("password2")
         if p1 and p2 and p1 != p2:
-            raise forms.ValidationError("Password-ku uma quruxsana")
+            raise forms.ValidationError("Passwords do not match.")
         return cleaned_data
 
 
@@ -45,6 +45,10 @@ class UserProfileForm(forms.ModelForm):
     class Meta:
         model = User
         fields = ("full_name", "phone_number")
+        labels = {
+            "full_name": "Full Name",
+            "phone_number": "Phone Number",
+        }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -55,7 +59,13 @@ class PropertyForm(forms.ModelForm):
     class Meta:
         model = Property
         fields = ("name", "property_type", "residential_structure", "location", "description")
-        labels = {"name": "Magaca hantida", "property_type": "Nooca", "residential_structure": "Qaabka guriga", "location": "Goobta", "description": "Faahfaahin"}
+        labels = {
+            "name": "Property Name",
+            "property_type": "Property Type",
+            "residential_structure": "Structure Type",
+            "location": "Location",
+            "description": "Description",
+        }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -67,7 +77,13 @@ class PropertyAssetForm(forms.ModelForm):
     class Meta:
         model = PropertyAsset
         fields = ("name", "quantity", "condition", "responsible_party", "notes")
-        labels = {"name": "Magaca alaabta", "quantity": "Tirada", "condition": "Xaaladda alaabta", "responsible_party": "Qofka mas'ulka ah", "notes": "Faahfaahin"}
+        labels = {
+            "name": "Item Name",
+            "quantity": "Quantity",
+            "condition": "Condition",
+            "responsible_party": "Responsible Party",
+            "notes": "Notes",
+        }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -79,7 +95,15 @@ class UnitForm(forms.ModelForm):
     class Meta:
         model = Unit
         fields = ("floor_number", "unit_number", "unit_type", "total_rooms", "bathrooms", "living_rooms", "rental_mode")
-        labels = {"floor_number": "Dabaqa", "unit_number": "Magaca apartment-ka", "unit_type": "Nooca qaybta", "total_rooms": "Tirada qolalka gudaha", "bathrooms": "Tirada musqulaha", "living_rooms": "Tirada qolalka fadhiga", "rental_mode": "Qaabka loo kiraynayo"}
+        labels = {
+            "floor_number": "Floor Number",
+            "unit_number": "Unit Number",
+            "unit_type": "Unit Type",
+            "total_rooms": "Total Rooms",
+            "bathrooms": "Bathrooms",
+            "living_rooms": "Living Rooms",
+            "rental_mode": "Rental Mode",
+        }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -90,7 +114,10 @@ class RoomForm(forms.ModelForm):
     class Meta:
         model = Room
         fields = ("room_type", "room_name")
-        labels = {"room_type": "Nooca qolka", "room_name": "Magaca qolka"}
+        labels = {
+            "room_type": "Room Type",
+            "room_name": "Room Name",
+        }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -98,9 +125,9 @@ class RoomForm(forms.ModelForm):
 
 
 class VillaDetailsForm(forms.Form):
-    total_rooms = forms.IntegerField(min_value=1, label="Tirada qolalka")
-    bathrooms = forms.IntegerField(min_value=1, label="Tirada musqulaha")
-    living_rooms = forms.IntegerField(min_value=1, label="Tirada qolalka fadhiga")
+    total_rooms = forms.IntegerField(min_value=1, label="Total Rooms")
+    bathrooms = forms.IntegerField(min_value=1, label="Bathrooms")
+    living_rooms = forms.IntegerField(min_value=1, label="Living Rooms")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -111,7 +138,12 @@ class TenantForm(forms.ModelForm):
     class Meta:
         model = Tenant
         fields = ("full_name", "tenant_type", "phone_number", "notes")
-        labels = {"full_name": "Magaca", "tenant_type": "Nooca kiraystaha", "phone_number": "Lambarka taleefanka", "notes": "Faahfaahin"}
+        labels = {
+            "full_name": "Full Name",
+            "tenant_type": "Tenant Type",
+            "phone_number": "Phone Number",
+            "notes": "Notes",
+        }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -124,7 +156,7 @@ class RentalAgreementForm(forms.ModelForm):
         model = RentalAgreement
         fields = ("tenant", "property", "unit", "room", "monthly_rent", "start_date", "end_date", "status", "notes")
         labels = {
-            "tenant": "Customer", "property": "Property", "unit": "Unit", "room": "Room",
+            "tenant": "Tenant", "property": "Property", "unit": "Unit", "room": "Room",
             "monthly_rent": "Monthly Rent ($)",
             "start_date": "Start Date", "end_date": "End Date",
             "status": "Status", "notes": "Notes",
@@ -198,7 +230,7 @@ class RentalAgreementForm(forms.ModelForm):
             if self.instance.pk:
                 existing = existing.exclude(pk=self.instance.pk)
             if existing.exists():
-                raise forms.ValidationError("This customer already has an active agreement for this property.")
+                raise forms.ValidationError("This tenant already has an active agreement for this property.")
 
         return cleaned_data
 
@@ -207,7 +239,7 @@ class PaymentForm(forms.ModelForm):
     tenant = forms.ModelChoiceField(
         queryset=Tenant.objects.none(),
         required=False,
-        label="Customer",
+        label="Tenant",
         widget=forms.Select(attrs={"id": "id_tenant_select"}),
     )
     invoice = forms.ModelChoiceField(
@@ -272,14 +304,14 @@ class MaintenanceRepairForm(forms.ModelForm):
         model = MaintenanceRepair
         fields = ("property", "unit", "title", "description", "category", "status", "repair_cost", "payment_status", "expense_account", "bank_account", "reported_date", "fixed_date", "notes")
         labels = {
-            "property": "Hantida", "unit": "Qaybta (ikhtiyaari)",
-            "title": "Ciwaanka", "description": "Faahfaahin",
-            "category": "Nooca", "status": "Xaaladda", "repair_cost": "Qiimaha dayactirka",
-            "payment_status": "Xaaladda lacag-bixinta",
-            "expense_account": "Xisaabta Kharashka (ikhtiyaari)",
-            "bank_account": "Xisaabta Bangiga",
-            "reported_date": "Taariikhda", "fixed_date": "Taariikhda hagaajinta",
-            "notes": "Faahfaahin kale",
+            "property": "Property", "unit": "Unit (optional)",
+            "title": "Title", "description": "Description",
+            "category": "Category", "status": "Status", "repair_cost": "Repair Cost ($)",
+            "payment_status": "Payment Status",
+            "expense_account": "Expense Account (optional)",
+            "bank_account": "Bank Account",
+            "reported_date": "Reported Date", "fixed_date": "Fixed Date",
+            "notes": "Additional Notes",
         }
         widgets = {
             "reported_date": forms.DateInput(attrs={"type": "date"}),
@@ -303,11 +335,11 @@ class GeneralExpenseForm(forms.ModelForm):
         model = GeneralExpense
         fields = ("property", "title", "category", "amount", "payment_status", "expense_account", "bank_account", "expense_date", "notes")
         labels = {
-            "property": "Hantida", "title": "Ciwaanka", "category": "Qaybta",
-            "amount": "Qiimaha", "payment_status": "Xaaladda lacag-bixinta",
-            "expense_account": "Xisaabta Kharashka (ikhtiyaari)",
-            "bank_account": "Xisaabta Bangiga",
-            "expense_date": "Taariikhda", "notes": "Faahfaahin",
+            "property": "Property", "title": "Title", "category": "Category",
+            "amount": "Amount ($)", "payment_status": "Payment Status",
+            "expense_account": "Expense Account (optional)",
+            "bank_account": "Bank Account",
+            "expense_date": "Date", "notes": "Notes",
         }
         widgets = {
             "expense_date": forms.DateInput(attrs={"type": "date"}),
@@ -328,12 +360,12 @@ class AccountForm(forms.ModelForm):
         model = Account
         fields = ("code", "name", "category", "bank_account", "description", "is_active")
         labels = {
-            "code": "Lambarka Xisaabta",
-            "name": "Magaca Xisaabta",
-            "category": "Nooca",
-            "bank_account": "Xisoabta Bangiga (ikhtiyaari)",
-            "description": "Faahfaahin (ikhtiyaari)",
-            "is_active": "Waa shaqeyneysaa",
+            "code": "Account Code",
+            "name": "Account Name",
+            "category": "Category",
+            "bank_account": "Linked Bank Account (optional)",
+            "description": "Description (optional)",
+            "is_active": "Active",
         }
 
     def __init__(self, *args, user=None, **kwargs):
@@ -357,16 +389,16 @@ class AccountForm(forms.ModelForm):
         try:
             code_int = int(code)
         except ValueError:
-            raise forms.ValidationError("Lambarku waa inuu noqdaa tiro.")
+            raise forms.ValidationError("Code must be a number.")
         if not (lo <= code_int <= hi):
-            raise forms.ValidationError(f"Code {code} ma habboona {category}. Range-ka: {lo} - {hi}")
+            raise forms.ValidationError(f"Code {code} is not valid for {category}. Valid range: {lo} - {hi}")
         user = self.initial.get("user") or (self.instance.owner if self.instance.pk else None)
         if user:
             qs = Account.objects.filter(owner=user, code=code)
             if self.instance.pk:
                 qs = qs.exclude(pk=self.instance.pk)
             if qs.exists():
-                raise forms.ValidationError(f"Code {code} waa la isticmaalay.")
+                raise forms.ValidationError(f"Code {code} is already in use.")
         return code
 
     def clean(self):
@@ -374,7 +406,7 @@ class AccountForm(forms.ModelForm):
         if self.instance and self.instance.pk and self.instance.is_system:
             for field in ["name", "category"]:
                 if cleaned_data.get(field) != getattr(self.instance, field):
-                    self.add_error(field, "System account ma bedeli karto.")
+                    self.add_error(field, "System accounts cannot be modified.")
         return cleaned_data
 
 
@@ -383,11 +415,11 @@ class BankAccountForm(forms.ModelForm):
         model = BankAccount
         fields = ("bank_name", "account_number", "account_name", "notes", "is_active")
         labels = {
-            "bank_name": "Magaca Bangiga",
-            "account_number": "Lambarka Xisaabta",
-            "account_name": "Magaca Xisaabta",
-            "notes": "Faahfaahin",
-            "is_active": "Waa shaqeyneysaa",
+            "bank_name": "Bank Name",
+            "account_number": "Account Number",
+            "account_name": "Account Name",
+            "notes": "Notes",
+            "is_active": "Active",
         }
 
     def __init__(self, *args, **kwargs):
@@ -400,7 +432,13 @@ class JournalEntryForm(forms.ModelForm):
     class Meta:
         model = JournalEntry
         fields = ("date", "reference", "description", "status", "tenant")
-        labels = {"date": "Taariikhda", "reference": "Tixraaca", "description": "Faahfaahin", "status": "Xaaladda", "tenant": "Kiraystaha"}
+        labels = {
+            "date": "Date",
+            "reference": "Reference",
+            "description": "Description",
+            "status": "Status",
+            "tenant": "Tenant (optional)",
+        }
         widgets = {
             "date": forms.DateInput(attrs={"type": "date"}),
         }
@@ -417,7 +455,13 @@ class JournalEntryLineForm(forms.ModelForm):
     class Meta:
         model = JournalEntryLine
         fields = ("account", "description", "debit", "credit", "property")
-        labels = {"account": "Xisaabta", "description": "Faahfaahin", "debit": "Debit", "credit": "Credit", "property": "Hantida"}
+        labels = {
+            "account": "Account",
+            "description": "Description",
+            "debit": "Debit ($)",
+            "credit": "Credit ($)",
+            "property": "Property (optional)",
+        }
 
     def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)
@@ -432,9 +476,9 @@ class InvoiceForm(forms.ModelForm):
         model = Invoice
         fields = ("tenant", "rental_agreement", "property", "invoice_number", "date", "due_date", "status", "notes")
         labels = {
-            "tenant": "Kiraystaha", "rental_agreement": "Heshiisyada kirada", "property": "Hantida",
-            "invoice_number": "Numbarka biilka", "date": "Taariikhda", "due_date": "Taariikhda kama dambaysta",
-            "status": "Xaaladda", "notes": "Faahfaahin",
+            "tenant": "Tenant", "rental_agreement": "Rental Agreement", "property": "Property",
+            "invoice_number": "Invoice Number", "date": "Invoice Date", "due_date": "Due Date",
+            "status": "Status", "notes": "Notes",
         }
         widgets = {
             "date": forms.DateInput(attrs={"type": "date"}),
@@ -466,7 +510,11 @@ class InvoiceLineForm(forms.ModelForm):
     class Meta:
         model = InvoiceLine
         fields = ("account", "description", "amount")
-        labels = {"account": "Xisaabta", "description": "Faahfaahin", "amount": "Qiimaha"}
+        labels = {
+            "account": "Revenue Account",
+            "description": "Description",
+            "amount": "Amount ($)",
+        }
 
     def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)

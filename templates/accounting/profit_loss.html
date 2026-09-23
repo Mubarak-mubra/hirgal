@@ -1,9 +1,8 @@
 {% extends "accounting/base_accounting.html" %}
-{% load i18n_tags %}
 
-{% block report_title %}Faa'iidada & Khasaaraha{% endblock %}
-{% block print_title %}Warbixinta Faa'iidada & Khasaaraha (Profit & Loss Statement){% endblock %}
-{% block heading %}Warbixinta Faa'iidada & Khasaaraha (Profit & Loss Statement){% endblock %}
+{% block report_title %}Profit & Loss{% endblock %}
+{% block print_title %}Profit & Loss Statement{% endblock %}
+{% block heading %}Profit & Loss Statement{% endblock %}
 
 {% block report_content %}
 {% include "accounting/_date_filter.html" %}
@@ -17,7 +16,7 @@
         <div class="space-y-2">
             <div class="flex justify-between items-center border-b pb-2">
                 <a href="{% url 'web-sales-report' %}?start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}" class="text-indigo-600 hover:underline font-semibold">
-                    Dakhliga Guud (Total Revenue) →
+                    Total Revenue →
                 </a>
                 <span class="text-green-600 font-bold">${{ total_revenue|floatformat:2 }}</span>
             </div>
@@ -30,7 +29,7 @@
         <div class="space-y-2">
             <div class="flex justify-between items-center border-b pb-2">
                 <a href="{% url 'web-expense-report' %}?start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}" class="text-indigo-600 hover:underline font-semibold">
-                    Kharashka Guud (Total Expenses) →
+                    Total Expenses →
                 </a>
                 <span class="text-red-600 font-bold">${{ total_expenses|floatformat:2 }}</span>
             </div>
@@ -39,16 +38,16 @@
 
     <!-- Net Income -->
     <div class="flex justify-between border-t-2 pt-3 text-lg font-bold">
-        <span>Faa'iidada Nadiifka ah (Net Income)</span>
+        <spanNet Income</span>
         <span class="{% if net_income >= 0 %}text-green-600{% else %}text-red-600{% endif %}">${{ net_income|floatformat:2 }}</span>
     </div>
 
     <div class="no-print mt-4 text-sm text-slate-500">
         <p>
         {% if net_income >= 0 %}
-            Waxaad samaysay faa'ido dhan ${{ net_income|floatformat:2 }} muddadaan.
+            You made a profit of ${{ net_income|floatformat:2 }} during this period.
         {% else %}
-            Waxaad ku waajirtay khasaare dhan ${{ net_income|floatformat:2 }} muddadaan.
+            You incurred a loss of ${{ net_income|floatformat:2 }} during this period.
         {% endif %}
         </p>
     </div>

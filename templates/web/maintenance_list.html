@@ -1,14 +1,13 @@
 {% extends "base.html" %}
-{% load i18n_tags %}
-{% block title %}{% t 'repairs' %} - Hirgal Kiro{% endblock %}
+{% block title %}Repairs - Hirgal Kiro{% endblock %}
 {% block content %}
 <section class="mb-7 flex items-end justify-between">
   <div>
-    <a class="text-sm font-semibold text-indigo-700" href="{% url 'home' %}">← {% t 'home' %}</a>
-    <h1 class="mt-4 text-3xl font-bold">{% t 'repairs' %}</h1>
+    <a class="text-sm font-semibold text-indigo-700" href="{% url 'home' %}">← Home</a>
+    <h1 class="mt-4 text-3xl font-bold">Repairs</h1>
     <p class="mt-2 text-slate-500">All maintenance and repair records.</p>
   </div>
-  <a class="rounded-lg bg-ink px-4 py-3 text-sm font-bold text-white" href="{% url 'web-maintenance-create' %}">+ {% t 'add_repair' %}</a>
+  <a class="rounded-lg bg-ink px-4 py-3 text-sm font-bold text-white" href="{% url 'web-maintenance-create' %}">+ + Report Repair</a>
 </section>
 
 {% if repairs %}
@@ -39,9 +38,9 @@
           <td class="px-5 py-4 text-slate-600">{{ repair.get_status_display }}</td>
           <td class="px-5 py-4">
             {% if repair.payment_status == 'paid' %}
-              <span class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-semibold text-green-800">La bixiyay</span>
+              <span class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-semibold text-green-800">Paid</span>
             {% else %}
-              <span class="inline-flex items-center rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-semibold text-orange-800">Aan la bixin</span>
+              <span class="inline-flex items-center rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-semibold text-orange-800">Unpaid</span>
             {% endif %}
           </td>
           <td class="px-5 py-4 text-slate-600">{{ repair.reported_date }}</td>

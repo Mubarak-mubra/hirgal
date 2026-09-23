@@ -1,14 +1,13 @@
 {% extends "base.html" %}
-{% load i18n_tags %}
-{% block title %}{% t 'properties' %} - Hirgal Kiro{% endblock %}
+{% block title %}Properties - Hirgal Kiro{% endblock %}
 {% block content %}
 <section class="mb-7 flex items-end justify-between">
     <div>
-        <a class="text-sm font-semibold text-indigo-700" href="{% url 'home' %}">← {% t 'home' %}</a>
-        <h1 class="mt-4 text-3xl font-bold">{% t 'properties' %}</h1>
+        <a class="text-sm font-semibold text-indigo-700" href="{% url 'home' %}">← Home</a>
+        <h1 class="mt-4 text-3xl font-bold">Properties</h1>
         <p class="mt-2 text-slate-500">All your properties and their tenants.</p>
     </div>
-    <a class="rounded-lg bg-ink px-4 py-3 text-sm font-bold text-white" href="{% url 'web-property-create' %}">+ {% t 'add_property' %}</a>
+    <a class="rounded-lg bg-ink px-4 py-3 text-sm font-bold text-white" href="{% url 'web-property-create' %}">+ + Add Property</a>
 </section>
 
 <section class="rounded-xl border bg-white shadow-sm overflow-hidden">
@@ -48,11 +47,11 @@
                     {% endfor %}
                 </td>
                 <td class="px-4 py-3 text-right">
-                    <a href="{% url 'web-property-detail' property.pk %}" class="font-semibold text-indigo-600 hover:underline">{% t 'view' %}</a>
+                    <a href="{% url 'web-property-detail' property.pk %}" class="font-semibold text-indigo-600 hover:underline">View</a>
                     <span class="mx-1 text-slate-300">|</span>
-                    <a href="{% url 'web-property-edit' property.pk %}" class="font-semibold text-indigo-600 hover:underline">{% t 'edit' %}</a>
+                    <a href="{% url 'web-property-edit' property.pk %}" class="font-semibold text-indigo-600 hover:underline">Edit</a>
                     <span class="mx-1 text-slate-300">|</span>
-                    <a href="{% url 'web-property-delete' property.pk %}" class="font-semibold text-red-600 hover:underline">{% t 'delete' %}</a>
+                    <a href="{% url 'web-property-delete' property.pk %}" class="font-semibold text-red-600 hover:underline">Delete</a>
                 </td>
             </tr>
         {% endfor %}

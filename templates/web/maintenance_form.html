@@ -1,8 +1,8 @@
 {% extends "base.html" %}
-{% block title %}{% if editing %}Wax ka beddel dayactirka{% else %}Ku dar dayactirka cusub{% endif %} - Hirgal Kiro{% endblock %}
+{% block title %}{% if editing %}Edit repair{% else %}Add new repair{% endif %} - Hirgal Kiro{% endblock %}
 {% block content %}
-<a class="text-sm font-semibold text-indigo-700" href="{% url 'web-maintenance-list' %}">← Dayactirro</a>
-<h1 class="mt-4 text-3xl font-bold text-ink">{% if editing %}Wax ka beddel dayactirka{% else %}Ku dar dayactirka cusub{% endif %}</h1>
+<a class="text-sm font-semibold text-indigo-700" href="{% url 'web-maintenance-list' %}">← Repairs</a>
+<h1 class="mt-4 text-3xl font-bold text-ink">{% if editing %}Edit repair{% else %}Add new repair{% endif %}</h1>
 
 <form method="post" class="mt-6 rounded-xl border bg-white p-6 shadow-sm">
   {% csrf_token %}
@@ -76,14 +76,14 @@
     {% if form.notes.errors %}<p class="text-red-500 text-sm">{{ form.notes.errors.0 }}</p>{% endif %}
   </div>
 
-  <button class="mt-4 rounded-lg bg-ink px-5 py-3 font-bold text-white">Kaydi</button>
+  <button class="mt-4 rounded-lg bg-ink px-5 py-3 font-bold text-white">Save</button>
 </form>
 
 <script>
 document.getElementById('id_property').addEventListener('change', function() {
     const propertyId = this.value;
     const unitSelect = document.getElementById('id_unit');
-    unitSelect.innerHTML = '<option value="">--- Dooro qaybta ---</option>';
+    unitSelect.innerHTML = '<option value=""--- Select unit ---</option>';
     if (propertyId) {
         fetch(`/api/units-by-property/?property_id=${propertyId}`)
             .then(r => r.json())

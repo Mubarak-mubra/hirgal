@@ -1,9 +1,8 @@
 {% extends "accounting/base_accounting.html" %}
-{% load i18n_tags %}
 
-{% block report_title %}{% t 'income_statement' %}{% endblock %}
-{% block print_title %}{% t 'income_statement' %}{% endblock %}
-{% block heading %}{% t 'income_statement' %}{% endblock %}
+{% block report_title %}Income Statement{% endblock %}
+{% block print_title %}Income Statement{% endblock %}
+{% block heading %}Income Statement{% endblock %}
 
 {% block report_content %}
 {% include "accounting/_date_filter.html" %}
@@ -17,7 +16,7 @@
         <div class="space-y-2">
             <div class="flex justify-between items-center border-b pb-2">
                 <a href="{% url 'web-sales-report' %}?start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}" class="text-indigo-600 hover:underline font-semibold">
-                    {% t 'total_revenue' %} →
+                    Total Revenue →
                 </a>
                 <span class="text-green-600 font-bold">${{ total_revenue|floatformat:2 }}</span>
             </div>
@@ -30,7 +29,7 @@
         <div class="space-y-2">
             <div class="flex justify-between items-center border-b pb-2">
                 <a href="{% url 'web-expense-report' %}?start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}" class="text-indigo-600 hover:underline font-semibold">
-                    {% t 'total_expenses' %} →
+                    Total Expenses →
                 </a>
                 <span class="text-red-600 font-bold">${{ total_expenses|floatformat:2 }}</span>
             </div>
@@ -39,7 +38,7 @@
 
     <!-- Net Income -->
     <div class="flex justify-between border-t-2 pt-3 text-lg font-bold">
-        <span>{% t 'net_income' %}</span>
+        <span>Net Income</span>
         <span class="{% if net_income >= 0 %}text-green-600{% else %}text-red-600{% endif %}">${{ net_income|floatformat:2 }}</span>
     </div>
 </div>

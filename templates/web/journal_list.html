@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% block title %}Diiwaanka Guud - Hirgal Kiro{% endblock %}
+{% block title %}Journal - Hirgal Kiro{% endblock %}
 {% block content %}
 <section class="mb-7 flex items-end justify-between">
   <div>
-    <a class="text-sm font-semibold text-indigo-700" href="{% url 'home' %}">← Bogga hore</a>
-    <h1 class="mt-4 text-3xl font-bold">Diiwaanka Guud</h1>
-    <p class="mt-2 text-slate-500">Dhammaan diiwaannada lacagaha.</p>
+    <a class="text-sm font-semibold text-indigo-700" href="{% url 'home' %}">← Home</a>
+    <h1 class="mt-4 text-3xl font-bold">Journal</h1>
+    <p class="mt-2 text-slate-500">All journal entries.</p>
   </div>
   <a class="rounded-lg bg-ink px-4 py-3 text-sm font-bold text-white" href="{% url 'web-journal-create' %}">+ Ku cusub</a>
 </section>
@@ -16,12 +16,12 @@
     <table class="w-full text-left text-sm">
       <thead class="border-b bg-slate-50 text-slate-600">
         <tr>
-          <th class="px-4 py-3 font-semibold">Nambarka</th>
-          <th class="px-4 py-3 font-semibold">Taariikhda</th>
-          <th class="px-4 py-3 font-semibold">Faahfaahin</th>
-          <th class="px-4 py-3 font-semibold">Xaaladda</th>
-          <th class="px-4 py-3 font-semibold">Kiraystaha</th>
-          <th class="px-4 py-3 font-semibold text-right">Ficillo</th>
+          <th class="px-4 py-3 font-semibold">Number</th>
+          <th class="px-4 py-3 font-semibold">Date</th>
+          <th class="px-4 py-3 font-semibold">Description</th>
+          <th class="px-4 py-3 font-semibold">Status</th>
+          <th class="px-4 py-3 font-semibold">Tenant</th>
+          <th class="px-4 py-3 font-semibold text-right">Actions</th>
         </tr>
       </thead>
       <tbody class="divide-y">
@@ -37,7 +37,7 @@
           </td>
           <td class="px-4 py-3">{% if entry.tenant %}<a href="{% url 'web-tenant-detail' entry.tenant.pk %}" class="text-indigo-600 hover:underline">{{ entry.tenant }}</a>{% else %}—{% endif %}</td>
           <td class="px-4 py-3 text-right">
-            <a href="{% url 'web-journal-detail' entry.pk %}" class="font-semibold text-indigo-600 hover:underline">Faahfaahin</a>
+            <a href="{% url 'web-journal-detail' entry.pk %}" class="font-semibold text-indigo-600 hover:underline">Description</a>
           </td>
         </tr>
         {% endfor %}
@@ -46,8 +46,8 @@
   </div>
   {% else %}
   <div class="p-10 text-center">
-    <p class="font-semibold text-slate-700">Ma jiraan diiwaanno.</p>
-    <p class="mt-2 text-sm text-slate-500">Ku cusub diiwaan cusub si aad bilowdo.</p>
+    <p class="font-semibold text-slate-700">No journal entries.</p>
+    <p class="mt-2 text-sm text-slate-500">Add a new entry to get started.</p>
   </div>
   {% endif %}
 </section>

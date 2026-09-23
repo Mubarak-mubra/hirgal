@@ -1,7 +1,7 @@
 {% extends "base.html" %}
-{% block title %}JE-{{ entry.id }} - Diiwaanka Guud - Hirgal Kiro{% endblock %}
+{% block title %}JE-{{ entry.id }} - Journal - Hirgal Kiro{% endblock %}
 {% block content %}
-<a class="text-sm font-semibold text-indigo-700" href="{% url 'web-journal-list' %}">← Diiwaanka Guud</a>
+<a class="text-sm font-semibold text-indigo-700" href="{% url 'web-journal-list' %}">← Journal</a>
 
 <div class="mt-4 rounded-xl border bg-white shadow-sm p-6">
   <div class="flex items-start justify-between">
@@ -10,26 +10,26 @@
       <p class="mt-2 text-slate-500">{{ entry.description }}</p>
     </div>
     <div class="flex gap-2">
-      <a href="{% url 'web-journal-edit' entry.pk %}" class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold hover:bg-slate-50 transition">Wax ka beddel</a>
-      <a href="{% url 'web-journal-delete' entry.pk %}" class="rounded-lg bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-600 hover:bg-rose-100 transition">Tirtir</a>
+      <a href="{% url 'web-journal-edit' entry.pk %}" class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold hover:bg-slate-50 transition">Edit</a>
+      <a href="{% url 'web-journal-delete' entry.pk %}" class="rounded-lg bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-600 hover:bg-rose-100 transition">Delete</a>
     </div>
   </div>
 
   <div class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
     <div>
-      <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Taariikhda</p>
+      <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Date</p>
       <p class="mt-1 font-medium">{{ entry.date }}</p>
     </div>
     <div>
-      <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Kaydka</p>
+      <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Reference</p>
       <p class="mt-1 font-medium">{{ entry.reference|default:"—" }}</p>
     </div>
     <div>
-      <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Xaaladda</p>
+      <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Status</p>
       <p class="mt-1"><span class="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-700">{{ entry.get_status_display }}</span></p>
     </div>
     <div>
-      <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Kiraystaha</p>
+      <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Tenant</p>
       {% if entry.tenant %}<p class="mt-1 font-medium"><a href="{% url 'web-tenant-detail' entry.tenant.pk %}" class="text-indigo-600 hover:underline">{{ entry.tenant }}</a></p>{% else %}<p class="mt-1 font-medium">—</p>{% endif %}
     </div>
   </div>
@@ -37,18 +37,18 @@
 
 <div class="mt-6 rounded-xl border bg-white shadow-sm overflow-hidden">
   <div class="border-b px-4 py-3">
-    <h2 class="text-lg font-bold">Qaybaha Diiwaanka</h2>
+    <h2 class="text-lg font-bold">Journal Lines</h2>
   </div>
   {% if lines %}
   <div class="overflow-x-auto">
     <table class="w-full text-left text-sm">
       <thead class="border-b bg-slate-50 text-slate-600">
         <tr>
-          <th class="px-4 py-3 font-semibold">Xisaabta</th>
-          <th class="px-4 py-3 font-semibold">Faahfaahin</th>
+          <th class="px-4 py-3 font-semibold">Account</th>
+          <th class="px-4 py-3 font-semibold">Description</th>
           <th class="px-4 py-3 font-semibold text-right">Debit</th>
           <th class="px-4 py-3 font-semibold text-right">Credit</th>
-          <th class="px-4 py-3 font-semibold">Hantida</th>
+          <th class="px-4 py-3 font-semibold">Property</th>
         </tr>
       </thead>
       <tbody class="divide-y">
@@ -64,7 +64,7 @@
       </tbody>
       <tfoot class="border-t bg-slate-50 font-semibold">
         <tr>
-          <td class="px-4 py-3" colspan="2">Wadarta</td>
+          <td class="px-4 py-3" colspan="2">Total</td>
           <td class="px-4 py-3 text-right font-mono text-xs">{{ total_debit }}</td>
           <td class="px-4 py-3 text-right font-mono text-xs">{{ total_credit }}</td>
           <td class="px-4 py-3"></td>
@@ -74,7 +74,7 @@
   </div>
   {% else %}
   <div class="p-10 text-center">
-    <p class="text-slate-500">Ma jiraan qaybo.</p>
+    <p class="text-slate-500">No lines.</p>
   </div>
   {% endif %}
 </div>

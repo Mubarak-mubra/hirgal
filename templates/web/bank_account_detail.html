@@ -1,5 +1,4 @@
 {% extends "base.html" %}
-{% load i18n_tags %}
 {% block title %}{{ bank_account.bank_name }} - Hirgal Kiro{% endblock %}
 {% block content %}
 <style>
@@ -13,7 +12,7 @@
 </style>
 
 <div class="no-print">
-  <a class="text-sm font-semibold text-indigo-700" href="{% url 'web-bank-accounts' %}">← Xisaabaha Bangiga</a>
+  <a class="text-sm font-semibold text-indigo-700" href="{% url 'web-bank-accounts' %}">← Bank Accounts</a>
 </div>
 
 <div class="print-area">
@@ -26,7 +25,7 @@
   <div class="mt-4 flex flex-wrap items-end justify-between gap-4 no-print">
     <div>
       <h1 class="text-3xl font-bold text-ink">{{ bank_account.bank_name }}</h1>
-      <p class="mt-2 text-slate-500">{{ bank_account.account_name }} · Lambarka: {{ bank_account.account_number }}</p>
+      <p class="mt-2 text-slate-500">{{ bank_account.account_name }} · Number: {{ bank_account.account_number }}</p>
     </div>
     <button onclick="window.print()" class="rounded-lg bg-green-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-green-700">🖨️ Print Report</button>
   </div>
@@ -39,15 +38,15 @@
   {# ── Summary ── #}
   <div class="mt-6 grid gap-4 md:grid-cols-3">
     <div class="rounded-2xl border bg-white p-5 shadow-sm text-center">
-      <p class="text-sm text-slate-500">Total Lacagta Soo Gashay</p>
+      <p class="text-sm text-slate-500">Total Money Received</p>
       <p class="text-2xl font-bold text-green-600">${{ total_in|floatformat:2 }}</p>
     </div>
     <div class="rounded-2xl border bg-white p-5 shadow-sm text-center">
-      <p class="text-sm text-slate-500">Total Lacagta Baxday</p>
+      <p class="text-sm text-slate-500">Total Money Spent</p>
       <p class="text-2xl font-bold text-red-600">${{ total_out|floatformat:2 }}</p>
     </div>
     <div class="rounded-2xl border bg-white p-5 shadow-sm text-center">
-      <p class="text-sm text-slate-500">Haraga (Balance)</p>
+      <p class="text-sm text-slate-500">Balance</p>
       {% if balance >= 0 %}
       <p class="text-2xl font-bold text-green-600">${{ balance|floatformat:2 }}</p>
       {% else %}
@@ -58,17 +57,17 @@
 
   {# ── Transactions Table ── #}
   <section class="mt-6 rounded-2xl border bg-white p-5 shadow-sm">
-    <h2 class="text-lg font-bold mb-4">Dhammaan Lacagihii</h2>
+    <h2 class="text-lg font-bold mb-4">All Transactions</h2>
 
     {% if all_transactions %}
     <div class="overflow-x-auto">
       <table class="w-full text-left text-sm">
         <thead class="border-b bg-slate-50 text-xs font-semibold uppercase text-slate-500">
           <tr>
-            <th class="px-4 py-3">Taariikhda</th>
-            <th class="px-4 py-3">Nooca</th>
-            <th class="px-4 py-3">Faahfaahin</th>
-            <th class="px-4 py-3">Xogta</th>
+            <th class="px-4 py-3">Date</th>
+            <th class="px-4 py-3">Type</th>
+            <th class="px-4 py-3">Description</th>
+            <th class="px-4 py-3">Detail</th>
             <th class="px-4 py-3 text-right">Lacagta</th>
           </tr>
         </thead>
@@ -78,9 +77,9 @@
             <td class="px-4 py-3 text-slate-600">{{ t.date|date:"M d, Y" }}</td>
             <td class="px-4 py-3">
               {% if t.type == "in" %}
-              <span class="inline-block rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700">Soo Galay</span>
+              <span class="inline-block rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700">Incoming</span>
               {% else %}
-              <span class="inline-block rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">Baxay</span>
+              <span class="inline-block rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">Outgoing</span>
               {% endif %}
             </td>
             <td class="px-4 py-3 text-slate-600">{{ t.description }}</td>
@@ -100,7 +99,7 @@
             </td>
           </tr>
           <tr>
-            <td class="px-4 py-3" colspan="4">Haraga (Balance)</td>
+            <td class="px-4 py-3" colspan="4">Balance</td>
             {% if balance >= 0 %}
             <td class="px-4 py-3 text-right text-green-600 font-bold">${{ balance|floatformat:2 }}</td>
             {% else %}
@@ -111,7 +110,7 @@
       </table>
     </div>
     {% else %}
-    <p class="text-center text-slate-400 text-sm py-4">Ma jiraan lacagihii bangigan.</p>
+    <p class="text-center text-slate-400 text-sm py-4">No transactions for this account.</p>
     {% endif %}
   </section>
 </div>

@@ -1,105 +1,104 @@
 {% extends "base.html" %}
-{% load i18n_tags %}
-{% block title %}{% t 'accounting' %} - Hirgal Kiro{% endblock %}
+{% block title %}Accounting - Hirgal Kiro{% endblock %}
 {% block content %}
-<a class="text-sm font-semibold text-indigo-700" href="{% url 'home' %}">← {% t 'home' %}</a>
-<h1 class="mt-4 text-3xl font-bold text-ink">{% t 'accounting' %}</h1>
+<a class="text-sm font-semibold text-indigo-700" href="{% url 'home' %}">← Home</a>
+<h1 class="mt-4 text-3xl font-bold text-ink">Accounting</h1>
 
 <!-- Management Links -->
 <section class="mt-6 mb-8">
-    <h2 class="mb-3 text-lg font-bold text-ink">Maamulka (Management)</h2>
+    <h2 class="mb-3 text-lg font-bold text-ink">Management</h2>
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <a href="{% url 'web-account-list' %}" class="group rounded-2xl border bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:border-indigo-300 hover:shadow-md">
             <span class="mb-4 grid h-11 w-11 place-items-center rounded-xl bg-purple-50 text-xl text-purple-600">≡</span>
-            <strong class="block text-lg text-ink">{% t 'accounts' %}</strong>
+            <strong class="block text-lg text-ink">Accounts</strong>
         </a>
         <a href="{% url 'web-journal-list' %}" class="group rounded-2xl border bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:border-indigo-300 hover:shadow-md">
             <span class="mb-4 grid h-11 w-11 place-items-center rounded-xl bg-blue-50 text-xl text-blue-600">✎</span>
-            <strong class="block text-lg text-ink">{% t 'journal' %}</strong>
+            <strong class="block text-lg text-ink">Journal</strong>
         </a>
         <a href="{% url 'web-invoice-list' %}" class="group rounded-2xl border bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:border-indigo-300 hover:shadow-md">
             <span class="mb-4 grid h-11 w-11 place-items-center rounded-xl bg-green-50 text-xl text-green-600">📄</span>
-            <strong class="block text-lg text-ink">{% t 'invoices' %}</strong>
+            <strong class="block text-lg text-ink">Invoices</strong>
         </a>
         <a href="{% url 'web-chart-of-accounts' %}" class="group rounded-2xl border bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:border-indigo-300 hover:shadow-md">
             <span class="mb-4 grid h-11 w-11 place-items-center rounded-xl bg-indigo-50 text-xl text-indigo-600">📊</span>
-            <strong class="block text-lg text-ink">{% t 'chart_of_accounts_report' %}</strong>
+            <strong class="block text-lg text-ink">Chart of Accounts</strong>
         </a>
     </div>
 </section>
 
 <!-- Financial Reports -->
 <section class="mb-8">
-    <h2 class="mb-3 text-lg font-bold text-ink">Warbixinnada Maaliyadda (Financial Reports)</h2>
+    <h2 class="mb-3 text-lg font-bold text-ink">Financial Reports</h2>
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
 
         <a href="{% url 'web-profit-loss' %}" class="group rounded-2xl border bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:border-green-300 hover:shadow-md">
             <div class="flex items-center gap-3">
                 <span class="grid h-11 w-11 place-items-center rounded-xl bg-green-50 text-xl text-green-600">💰</span>
-                <strong class="text-lg text-ink">{% t 'profit_loss' %}</strong>
+                <strong class="text-lg text-ink">Profit & Loss</strong>
             </div>
         </a>
 
         <a href="{% url 'web-balance-sheet' %}" class="group rounded-2xl border bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:border-blue-300 hover:shadow-md">
             <div class="flex items-center gap-3">
                 <span class="grid h-11 w-11 place-items-center rounded-xl bg-blue-50 text-xl text-blue-600">⚖️</span>
-                <strong class="text-lg text-ink">{% t 'balance_sheet' %}</strong>
+                <strong class="text-lg text-ink">Balance Sheet</strong>
             </div>
         </a>
 
         <a href="{% url 'web-cash-flow' %}" class="group rounded-2xl border bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:border-emerald-300 hover:shadow-md">
             <div class="flex items-center gap-3">
                 <span class="grid h-11 w-11 place-items-center rounded-xl bg-emerald-50 text-xl text-emerald-600">💵</span>
-                <strong class="text-lg text-ink">{% t 'cash_flow' %}</strong>
+                <strong class="text-lg text-ink">Cash Flow</strong>
             </div>
         </a>
 
         <a href="{% url 'web-trial-balance' %}" class="group rounded-2xl border bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:border-purple-300 hover:shadow-md">
             <div class="flex items-center gap-3">
                 <span class="grid h-11 w-11 place-items-center rounded-xl bg-purple-50 text-xl text-purple-600">✅</span>
-                <strong class="text-lg text-ink">{% t 'trial_balance' %}</strong>
+                <strong class="text-lg text-ink">Trial Balance</strong>
             </div>
         </a>
 
         <a href="{% url 'web-general-ledger' %}" class="group rounded-2xl border bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:border-slate-300 hover:shadow-md">
             <div class="flex items-center gap-3">
                 <span class="grid h-11 w-11 place-items-center rounded-xl bg-slate-50 text-xl text-slate-600">📒</span>
-                <strong class="text-lg text-ink">{% t 'general_ledger' %}</strong>
+                <strong class="text-lg text-ink">General Ledger</strong>
             </div>
         </a>
 
         <a href="{% url 'web-ar' %}" class="group rounded-2xl border bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:border-orange-300 hover:shadow-md">
             <div class="flex items-center gap-3">
                 <span class="grid h-11 w-11 place-items-center rounded-xl bg-orange-50 text-xl text-orange-600">📋</span>
-                <strong class="text-lg text-ink">{% t 'accounts_receivable' %}</strong>
+                <strong class="text-lg text-ink">Accounts Receivable</strong>
             </div>
         </a>
 
         <a href="{% url 'web-ap' %}" class="group rounded-2xl border bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:border-red-300 hover:shadow-md">
             <div class="flex items-center gap-3">
                 <span class="grid h-11 w-11 place-items-center rounded-xl bg-red-50 text-xl text-red-600">📝</span>
-                <strong class="text-lg text-ink">{% t 'accounts_payable' %}</strong>
+                <strong class="text-lg text-ink">Accounts Payable</strong>
             </div>
         </a>
 
         <a href="{% url 'web-sales-report' %}" class="group rounded-2xl border bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:border-teal-300 hover:shadow-md">
             <div class="flex items-center gap-3">
                 <span class="grid h-11 w-11 place-items-center rounded-xl bg-teal-50 text-xl text-teal-600">🏠</span>
-                <strong class="text-lg text-ink">{% t 'sales_report' %}</strong>
+                <strong class="text-lg text-ink">Sales Report</strong>
             </div>
         </a>
 
         <a href="{% url 'web-expense-report' %}" class="group rounded-2xl border bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:border-rose-300 hover:shadow-md">
             <div class="flex items-center gap-3">
                 <span class="grid h-11 w-11 place-items-center rounded-xl bg-rose-50 text-xl text-rose-600">💸</span>
-                <strong class="text-lg text-ink">{% t 'expense_report' %}</strong>
+                <strong class="text-lg text-ink">Expense Report</strong>
             </div>
         </a>
 
         <a href="{% url 'web-inventory-report' %}" class="group rounded-2xl border bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:border-amber-300 hover:shadow-md">
             <div class="flex items-center gap-3">
                 <span class="grid h-11 w-11 place-items-center rounded-xl bg-amber-50 text-xl text-amber-600">📦</span>
-                <strong class="text-lg text-ink">{% t 'inventory_report' %}</strong>
+                <strong class="text-lg text-ink">Inventory Report</strong>
             </div>
         </a>
 

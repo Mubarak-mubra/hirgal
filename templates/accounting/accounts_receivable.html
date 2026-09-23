@@ -1,17 +1,17 @@
 {% extends "accounting/base_accounting.html" %}
-{% block report_title %}Lacagaha Dhiman{% endblock %}
-{% block print_title %}Warbixinta Lacagaha Dhiman (Accounts Receivable){% endblock %}
-{% block heading %}Warbixinta Lacagaha Dhiman (Accounts Receivable){% endblock %}
+{% block report_title %}Accounts Receivable{% endblock %}
+{% block print_title %}Accounts Receivable Report{% endblock %}
+{% block heading %}Accounts Receivable Report{% endblock %}
 {% block report_content %}
 {% include "accounting/_date_filter.html" %}
 
 <div class="bg-white rounded-xl border border-slate-200 p-6 mb-6">
   <p class="text-sm text-slate-500 mb-4">
-    Laga bilaabo {{ start_date }} ilaa {{ end_date }}
+    From ... to ...
   </p>
   <div class="space-y-4">
     <div class="flex justify-between border-b pb-2">
-      <span class="font-semibold">Lacagaha Dhiman (Outstanding Balance)</span>
+      <span class="font-semibold">Outstanding Balance</span>
       <span class="text-orange-600 font-bold"
         >${{ outstanding_balance|floatformat:2 }}</span
       >
@@ -129,9 +129,9 @@
     >
       <tr>
         <th class="px-5 py-3">Customer</th>
-        <th class="px-5 py-3">Taariikhda</th>
+        <th class="px-5 py-3">Date</th>
         <th class="px-5 py-3">Reference</th>
-        <th class="px-5 py-3">Faahfaahin</th>
+        <th class="px-5 py-3">Description</th>
         <th class="px-5 py-3 text-right">Debit</th>
         <th class="px-5 py-3 text-right">Credit</th>
       </tr>
@@ -172,7 +172,7 @@
 </div>
 {% else %}
 <div class="rounded-xl border border-dashed bg-white p-10 text-center">
-  <p class="font-semibold text-slate-700">Ma jiraan lacagaha la sugayo.</p>
+  <p class="font-semibold text-slate-700">No pending payments.</p>
 </div>
 {% endif %}
 

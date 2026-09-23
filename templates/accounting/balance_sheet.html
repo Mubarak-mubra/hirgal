@@ -1,9 +1,8 @@
 {% extends "accounting/base_accounting.html" %}
-{% load i18n_tags %}
 
-{% block report_title %}{% t 'balance_sheet' %}{% endblock %}
-{% block print_title %}{% t 'balance_sheet' %}{% endblock %}
-{% block heading %}{% t 'balance_sheet' %}{% endblock %}
+{% block report_title %}Balance Sheet{% endblock %}
+{% block print_title %}Balance Sheet{% endblock %}
+{% block heading %}Balance Sheet{% endblock %}
 
 {% block report_content %}
 {% include "accounting/_date_filter.html" %}
@@ -16,7 +15,7 @@
         <h3 class="text-lg font-bold text-blue-800 mb-3">Assets (What You Own)</h3>
         <div class="flex justify-between items-center border-b pb-2">
             <a href="{% url 'web-general-ledger' %}?start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}" class="text-indigo-600 hover:underline font-semibold">
-                {% t 'total_assets' %} →
+                Total Assets →
             </a>
             <span class="text-blue-600 font-bold">${{ total_assets|floatformat:2 }}</span>
         </div>
@@ -28,7 +27,7 @@
         <h3 class="text-lg font-bold text-red-800 mb-3">Liabilities (What You Owe)</h3>
         <div class="flex justify-between items-center border-b pb-2">
             <a href="{% url 'web-ap' %}?start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}" class="text-indigo-600 hover:underline font-semibold">
-                {% t 'total_liabilities' %} →
+                Total Liabilities →
             </a>
             <span class="text-red-600 font-bold">${{ total_liabilities|floatformat:2 }}</span>
         </div>
@@ -45,7 +44,7 @@
             </div>
             <div class="flex justify-between items-center border-b pb-2">
                 <a href="{% url 'web-profit-loss' %}?start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}" class="text-indigo-600 hover:underline font-semibold">
-                    {% t 'net_income' %} →
+                    Net Income →
                 </a>
                 <span class="{% if net_income >= 0 %}text-green-600{% else %}text-red-600{% endif %} font-bold">${{ net_income|floatformat:2 }}</span>
             </div>
