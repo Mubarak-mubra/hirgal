@@ -49,8 +49,8 @@
             >
           </td>
           <td class="px-4 py-3">
-            {% for agreement in tenant.rental_agreements.all %} {% if
-            agreement.status == 'active' %}
+            {% for agreement in tenant.rental_agreements.all %}
+            {% if agreement.status == 'active' %}
             <a
               href="{% url 'web-property-detail' agreement.property.pk %}"
               class="flex items-center gap-1 text-sm text-indigo-600 hover:underline"
@@ -66,8 +66,8 @@
             {% endfor %}
           </td>
           <td class="px-4 py-3 text-right text-slate-700">
-            {% for agreement in tenant.rental_agreements.all %} {% if
-            agreement.status == 'active' %}
+            {% for agreement in tenant.rental_agreements.all %}
+            {% if agreement.status == 'active' %}
             <span class="font-semibold">${{ agreement.monthly_rent }}/mo</span>
             {% endif %} {% endfor %}
           </td>
