@@ -1,76 +1,107 @@
-{% extends "base.html" %}
-{% block title %}Tenants - Hirgal Kiro{% endblock %}
+{% extends "base.html" %} {% block title %}Tenants - Hirgal Kiro{% endblock %}
 {% block content %}
 <section class="mb-7 flex items-end justify-between">
-    <div>
-        <a class="text-sm font-semibold text-indigo-700" href="{% url 'home' %}">← Home</a>
-        <h1 class="mt-4 text-3xl font-bold">Tenants</h1>
-        <p class="mt-2 text-slate-500">All tenants and their properties.</p>
-    </div>
-    <a class="rounded-lg bg-ink px-4 py-3 text-sm font-bold text-white" href="{% url 'web-tenant-create' %}">+ + Add Tenant</a>
+  <div>
+    <a class="text-sm font-semibold text-indigo-700" href="{% url 'home' %}"
+      >← Home</a
+    >
+    <h1 class="mt-4 text-3xl font-bold">Kireyste</h1>
+    <p class="mt-2 text-slate-500">All customers and their properties.</p>
+  </div>
+  <a
+    class="rounded-lg bg-ink px-4 py-3 text-sm font-bold text-white"
+    href="{% url 'web-tenant-create' %}"
+    >+ + Add Tenant</a
+  >
 </section>
 
 <section class="rounded-xl border bg-white shadow-sm overflow-hidden">
-{% if tenants %}
-<div class="overflow-x-auto">
+  {% if tenants %}
+  <div class="overflow-x-auto">
     <table class="w-full text-left text-sm">
-        <thead class="border-b bg-slate-50 text-slate-600">
-            <tr>
-                <th class="px-4 py-3 font-semibold">Name</th>
-                <th class="px-4 py-3 font-semibold">Phone</th>
-                <th class="px-4 py-3 font-semibold">Type</th>
-                <th class="px-4 py-3 font-semibold">Property / Unit</th>
-                <th class="px-4 py-3 font-semibold text-right">Rent</th>
-                <th class="px-4 py-3 font-semibold text-right">Actions</th>
-            </tr>
-        </thead>
-        <tbody class="divide-y">
+      <thead class="border-b bg-slate-50 text-slate-600">
+        <tr>
+          <th class="px-4 py-3 font-semibold">Name</th>
+          <th class="px-4 py-3 font-semibold">Phone</th>
+          <th class="px-4 py-3 font-semibold">Type</th>
+          <th class="px-4 py-3 font-semibold">Property / Unit</th>
+          <th class="px-4 py-3 font-semibold text-right">Rent</th>
+          <th class="px-4 py-3 font-semibold text-right">Actions</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y">
         {% for tenant in tenants %}
-            <tr class="hover:bg-slate-50">
-                <td class="px-4 py-3">
-                    <a href="{% url 'web-tenant-detail' tenant.pk %}" class="font-semibold text-indigo-600 hover:underline">{{ tenant.full_name }}</a>
-                </td>
-                <td class="px-4 py-3 text-slate-500">{{ tenant.phone_number|default:"-" }}</td>
-                <td class="px-4 py-3">
-                    <span class="inline-flex items-center rounded-full bg-purple-100 px-2.5 py-0.5 text-xs font-semibold text-purple-700">{{ tenant.get_tenant_type_display }}</span>
-                </td>
-                <td class="px-4 py-3">
-                    {% for agreement in tenant.rental_agreements.all %}
-                        {% if agreement.status == 'active' %}
-                        <a href="{% url 'web-property-detail' agreement.property.pk %}" class="flex items-center gap-1 text-sm text-indigo-600 hover:underline">
-                            <span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>
-                            {{ agreement.property.name }}
-                            {% if agreement.unit %}<span class="text-xs text-slate-400">({{ agreement.unit.unit_number }})</span>{% endif %}
-                        </a>
-                        {% endif %}
-                    {% empty %}
-                        <span class="text-xs text-slate-400">No agreement</span>
-                    {% endfor %}
-                </td>
-                <td class="px-4 py-3 text-right text-slate-700">
-                    {% for agreement in tenant.rental_agreements.all %}
-                        {% if agreement.status == 'active' %}
-                        <span class="font-semibold">${{ agreement.monthly_rent }}/mo</span>
-                        {% endif %}
-                    {% endfor %}
-                </td>
-                <td class="px-4 py-3 text-right">
-                    <a href="{% url 'web-tenant-detail' tenant.pk %}" class="font-semibold text-indigo-600 hover:underline">View</a>
-                    <span class="mx-1 text-slate-300">|</span>
-                    <a href="{% url 'web-tenant-edit' tenant.pk %}" class="font-semibold text-indigo-600 hover:underline">Edit</a>
-                    <span class="mx-1 text-slate-300">|</span>
-                    <a href="{% url 'web-tenant-delete' tenant.pk %}" class="font-semibold text-red-600 hover:underline">Delete</a>
-                </td>
-            </tr>
+        <tr class="hover:bg-slate-50">
+          <td class="px-4 py-3">
+            <a
+              href="{% url 'web-tenant-detail' tenant.pk %}"
+              class="font-semibold text-indigo-600 hover:underline"
+              >{{ tenant.full_name }}</a
+            >
+          </td>
+          <td class="px-4 py-3 text-slate-500">
+            {{ tenant.phone_number|default:"-" }}
+          </td>
+          <td class="px-4 py-3">
+            <span
+              class="inline-flex items-center rounded-full bg-purple-100 px-2.5 py-0.5 text-xs font-semibold text-purple-700"
+              >{{ tenant.get_tenant_type_display }}</span
+            >
+          </td>
+          <td class="px-4 py-3">
+            {% for agreement in tenant.rental_agreements.all %} {% if
+            agreement.status == 'active' %}
+            <a
+              href="{% url 'web-property-detail' agreement.property.pk %}"
+              class="flex items-center gap-1 text-sm text-indigo-600 hover:underline"
+            >
+              <span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+              {{ agreement.property.name }} {% if agreement.unit %}<span
+                class="text-xs text-slate-400"
+                >({{ agreement.unit.unit_number }})</span
+              >{% endif %}
+            </a>
+            {% endif %} {% empty %}
+            <span class="text-xs text-slate-400">No agreement</span>
+            {% endfor %}
+          </td>
+          <td class="px-4 py-3 text-right text-slate-700">
+            {% for agreement in tenant.rental_agreements.all %} {% if
+            agreement.status == 'active' %}
+            <span class="font-semibold">${{ agreement.monthly_rent }}/mo</span>
+            {% endif %} {% endfor %}
+          </td>
+          <td class="px-4 py-3 text-right">
+            <a
+              href="{% url 'web-tenant-detail' tenant.pk %}"
+              class="font-semibold text-indigo-600 hover:underline"
+              >View</a
+            >
+            <span class="mx-1 text-slate-300">|</span>
+            <a
+              href="{% url 'web-tenant-edit' tenant.pk %}"
+              class="font-semibold text-indigo-600 hover:underline"
+              >Edit</a
+            >
+            <span class="mx-1 text-slate-300">|</span>
+            <a
+              href="{% url 'web-tenant-delete' tenant.pk %}"
+              class="font-semibold text-red-600 hover:underline"
+              >Delete</a
+            >
+          </td>
+        </tr>
         {% endfor %}
-        </tbody>
+      </tbody>
     </table>
-</div>
-{% else %}
-<div class="p-10 text-center">
+  </div>
+  {% else %}
+  <div class="p-10 text-center">
     <p class="font-semibold text-slate-700">No customers yet.</p>
-    <p class="mt-2 text-sm text-slate-500">Add customers and their rental agreements.</p>
-</div>
-{% endif %}
+    <p class="mt-2 text-sm text-slate-500">
+      Add customers and their rental agreements.
+    </p>
+  </div>
+  {% endif %}
 </section>
 {% endblock %}
