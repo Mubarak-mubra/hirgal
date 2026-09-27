@@ -1,13 +1,13 @@
 {% extends "base.html" %}
+{% load static %}
 {% block title %}{{ bank_account.bank_name }} - Hirgal Kiro{% endblock %}
 {% block content %}
 <style>
   @media print {
     body * { visibility: hidden; }
     .print-area, .print-area * { visibility: visible; }
-    .print-area { position: absolute; left: 0; top: 0; width: 100%; padding: 20px; }
+    .print-area { position: absolute; left: 0; top: 0; width: 100%; padding: 0; }
     .no-print { display: none !important; }
-    .print-header { display: block !important; }
   }
 </style>
 
@@ -16,10 +16,18 @@
 </div>
 
 <div class="print-area">
-  <div class="print-header hidden mb-4">
-    <h1 class="text-xl font-bold">Hirgal Kiro - Bank Account Report</h1>
-    <p class="text-sm text-slate-600">{{ bank_account.bank_name }} · {{ bank_account.account_number }}</p>
-    <hr class="my-2 border-slate-300">
+  <div class="report-print-header">
+    <div class="rph-brand">
+      <img class="rph-logo" src="{% static 'logoHirgal.png' %}" alt="Hirgal Kiro">
+      <div>
+        <div class="rph-name">Hirgal Kiro</div>
+        <div class="rph-tag">Property &amp; Rent Management</div>
+      </div>
+    </div>
+    <div class="rph-titlebox">
+      <div class="rph-title">Bank Account Report</div>
+      <div class="rph-meta">{{ bank_account.bank_name }} &middot; {{ bank_account.account_number }} &middot; {% now "d/m/Y" %}</div>
+    </div>
   </div>
 
   <div class="mt-4 flex flex-wrap items-end justify-between gap-4 no-print">
@@ -28,11 +36,6 @@
       <p class="mt-2 text-slate-500">{{ bank_account.account_name }} · Number: {{ bank_account.account_number }}</p>
     </div>
     <button onclick="window.print()" class="rounded-lg bg-green-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-green-700">🖨️ Print Report</button>
-  </div>
-
-  <div class="print-header hidden mt-4 mb-6">
-    <h1 class="text-2xl font-bold">{{ bank_account.bank_name }}</h1>
-    <p class="text-slate-500">{{ bank_account.account_name }} · {{ bank_account.account_number }}</p>
   </div>
 
   {# ── Summary ── #}
@@ -113,5 +116,10 @@
     <p class="text-center text-slate-400 text-sm py-4">No transactions for this account.</p>
     {% endif %}
   </section>
+
+  <div class="report-print-footer">
+    <span><strong>Hirgal Kiro</strong> &middot; Property &amp; Rent Management</span>
+    <span>Generated {% now "d/m/Y H:i" %} &middot; {{ request.user.full_name|default:request.user.username }}</span>
+  </div>
 </div>
 {% endblock %}

@@ -9,19 +9,84 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script>tailwind.config = { theme: { extend: { colors: { ink: '#10194f' } } } }</script>
     <style>
+        /* ── Premium print report design ── */
+        .report-print-header, .report-print-footer { display: none; }
+
         @media print {
-            body { background: white !important; }
-            header, nav, .no-print, footer, a[href*="delete"], button { display: none !important; }
-            main { margin: 0 !important; padding: 0 !important; }
+            * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+            @page { margin: 16mm 13mm; size: A4; }
+
+            body { background: white !important; color: #0f172a; font-size: 10.5pt; }
+
+            /* Hide app chrome */
+            .sidebar, .sidebar-overlay, .topbar, .sidebar-toggle-btn, .no-print,
+            header, nav, footer, button,
+            a[href*="create"], a[href*="edit"], a[href*="delete"] { display: none !important; }
+
+            .app-layout, .main-content { display: block !important; margin: 0 !important; padding: 0 !important; min-height: 0 !important; }
+            .main-content .p-4, .main-content .p-6, .main-content .p-8 { padding: 0 !important; }
+
             .print-break { page-break-before: always; }
-            table { border-collapse: collapse !important; }
-            th, td { border: 1px solid #333 !important; padding: 6px 10px !important; }
+            thead { display: table-header-group; }
+            tfoot { display: table-footer-group; }
+            tr, img { page-break-inside: avoid; }
+
+            /* Premium tables */
+            table { border-collapse: collapse !important; width: 100%; }
+            th, td { border: none !important; padding: 7px 10px !important; }
+            thead th {
+                background: #10194f !important; color: #ffffff !important;
+                font-size: 8.5pt !important; font-weight: 700 !important;
+                text-transform: uppercase; letter-spacing: 0.06em;
+            }
+            thead th + th { border-left: 1px solid rgba(255, 255, 255, 0.25) !important; }
+            tbody td { border-bottom: 1px solid #e2e8f0 !important; }
+            tbody tr:nth-child(even) td { background: #f8fafc !important; }
+            tfoot td {
+                background: #eef2ff !important;
+                border-top: 2px solid #10194f !important;
+                border-bottom: 1px solid #10194f !important;
+                color: #10194f !important; font-weight: 700 !important;
+            }
+
+            h1, h2, h3, h4 { color: #10194f !important; }
+            .report-sheet { border: none !important; }
             .rounded-2xl, .rounded-xl, .rounded-lg { border-radius: 0 !important; }
-            .shadow-sm, .shadow-md { box-shadow: none !important; }
-            .bg-slate-50, .bg-slate-100 { background: white !important; }
-            .bg-ink { background: #10194f !important; color: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-            .text-white { color: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-            @page { margin: 1cm; size: A4; }
+            .shadow-sm, .shadow-md, .shadow { box-shadow: none !important; }
+            .bg-ink { background: #10194f !important; color: white !important; }
+
+            /* Branded report header (logo + brand + title) */
+            .report-print-header {
+                display: flex !important;
+                align-items: flex-end;
+                justify-content: space-between;
+                gap: 16px;
+                margin-bottom: 16px;
+                padding-bottom: 10px;
+                border-width: 0 0 4px 0;
+                border-style: solid;
+                border-image: linear-gradient(90deg, #10194f 0%, #1e3a8a 55%, #f59e0b 100%) 1;
+            }
+            .rph-brand { display: flex; align-items: center; gap: 10px; }
+            .rph-logo { width: 44px; height: 44px; border-radius: 8px; object-fit: cover; }
+            .rph-name { font-size: 17pt; font-weight: 800; color: #10194f; line-height: 1.1; letter-spacing: -0.01em; }
+            .rph-tag { font-size: 7.5pt; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: #64748b; margin-top: 2px; }
+            .rph-titlebox { text-align: right; }
+            .rph-title { font-size: 12.5pt; font-weight: 800; color: #10194f; text-transform: uppercase; letter-spacing: 0.05em; }
+            .rph-meta { font-size: 8.5pt; color: #64748b; margin-top: 3px; }
+
+            /* Branded report footer */
+            .report-print-footer {
+                display: flex !important;
+                justify-content: space-between;
+                gap: 12px;
+                margin-top: 18px;
+                padding-top: 8px;
+                border-top: 1px solid #cbd5e1;
+                font-size: 8pt;
+                color: #64748b;
+            }
+            .report-print-footer strong { color: #10194f; }
         }
 
         /* ── Sidebar Styles ── */

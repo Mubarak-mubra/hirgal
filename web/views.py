@@ -1258,7 +1258,7 @@ class BankAccountDetailView(LoginRequiredMixin, DetailView):
                 "date": p.payment_date,
                 "type": "in",
                 "description": f"Lacag ka timid {tenant.full_name}",
-                "detail": f"{prop.name} — REF: {p.reference}",
+                "detail": f"{prop.name}" + (f" — REF: {p.reference_number}" if p.reference_number else ""),
                 "amount": amount,
                 "sort_date": p.payment_date,
             })
@@ -1271,20 +1271,20 @@ class BankAccountDetailView(LoginRequiredMixin, DetailView):
                 "date": e.expense_date,
                 "type": "out",
                 "description": f"Kharash: {e.title}",
-                "detail": f"{prop.name} — REF: {e.reference}",
+                "detail": f"{prop.name} — {e.category}",
                 "amount": amount,
                 "sort_date": e.expense_date,
             })
 
         for r in repairs:
             prop = r.property
-            amount = float(r.cost)
+            amount = float(r.repair_cost)
             total_out += amount
             all_txns.append({
                 "date": r.reported_date,
                 "type": "out",
                 "description": f"Dayactir: {r.title}",
-                "detail": f"{prop.name} — REF: {r.reference}",
+                "detail": f"{prop.name} — {r.get_category_display()}",
                 "amount": amount,
                 "sort_date": r.reported_date,
             })

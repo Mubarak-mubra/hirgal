@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}Accounting - {% block report_title %}{% endblock %}{% endblock %}
 
@@ -19,12 +20,24 @@
     {% block extra_actions %}{% endblock %}
 </div>
 
-<div class="rounded-xl border bg-white p-6 shadow-sm">
-    <div class="print-header mb-4 hidden print:block">
-        <h1 class="text-xl font-bold">Hirgal Kiro - {% block print_title %}{% endblock %}</h1>
-        <p class="text-sm text-slate-600">Date: {% now "d/m/Y" %} | User: {{ request.user.full_name|default:request.user.username }}</p>
-        <hr class="my-2 border-slate-300">
+<div class="report-sheet rounded-xl border bg-white p-6 shadow-sm">
+    <div class="report-print-header">
+        <div class="rph-brand">
+            <img class="rph-logo" src="{% static 'logoHirgal.png' %}" alt="Hirgal Kiro">
+            <div>
+                <div class="rph-name">Hirgal Kiro</div>
+                <div class="rph-tag">Property &amp; Rent Management</div>
+            </div>
+        </div>
+        <div class="rph-titlebox">
+            <div class="rph-title">{% block print_title %}{% endblock %}</div>
+            <div class="rph-meta">Report date: {% now "d/m/Y" %} &middot; Prepared by {{ request.user.full_name|default:request.user.username }}</div>
+        </div>
     </div>
     {% block report_content %}{% endblock %}
+    <div class="report-print-footer">
+        <span><strong>Hirgal Kiro</strong> &middot; Property &amp; Rent Management</span>
+        <span>Generated {% now "d/m/Y H:i" %} &middot; {{ request.user.full_name|default:request.user.username }}</span>
+    </div>
 </div>
 {% endblock %}
