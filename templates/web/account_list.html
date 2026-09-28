@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 {% block title %}Accounts - Hirgal Kiro{% endblock %}
 {% block content %}
 <section class="mb-7 flex items-end justify-between no-print">
@@ -15,6 +16,7 @@
 
 {# ── Branded Print Header (only shows when printing) ── #}
 <div class="report-print-header">
+  <img class="rph-logo" src="{% static 'logoHirgal.png' %}" alt="Hirgal Kiro">
   <div class="rph-brand">Hirgal Kiro</div>
   <div class="rph-subtitle">Chart of Accounts</div>
   <div class="rph-meta-bar">

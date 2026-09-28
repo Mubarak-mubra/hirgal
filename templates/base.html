@@ -55,10 +55,20 @@
             .shadow-sm, .shadow-md, .shadow { box-shadow: none !important; }
             .bg-ink { background: #10194f !important; color: white !important; }
 
-            /* Branded report header — centered brand, subtitle, meta bar */
+            /* Branded report header — centered logo, brand, subtitle, meta bar */
             .report-print-header {
                 display: block !important;
                 margin-bottom: 18px;
+                text-align: center;
+            }
+            .rph-logo {
+                display: block;
+                width: 64px;
+                height: 64px;
+                object-fit: cover;
+                border-radius: 14px;
+                margin: 0 auto 12px;
+                border: 1px solid #e2e8f0;
             }
             .rph-brand {
                 text-align: center;
