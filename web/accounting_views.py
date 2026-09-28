@@ -229,11 +229,15 @@ class BalanceSheetView(AccountingReportMixin, View):
             ]
             return render_csv_response("balance_sheet", ["Category", "Amount ($)"], rows)
 
+        liabilities_equity_total = total_liabilities + total_equity + net_income
+
         return render(request, "accounting/balance_sheet.html", {
             "total_assets": total_assets,
             "total_liabilities": total_liabilities,
             "total_equity": total_equity,
             "net_income": net_income,
+            "liabilities_equity_total": liabilities_equity_total,
+            "balance_ok": abs(float(total_assets) - float(liabilities_equity_total)) < 0.005,
             "start_date": start,
             "end_date": end,
         })

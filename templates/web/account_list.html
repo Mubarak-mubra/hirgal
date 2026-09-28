@@ -1,5 +1,4 @@
 {% extends "base.html" %}
-{% load static %}
 {% block title %}Accounts - Hirgal Kiro{% endblock %}
 {% block content %}
 <section class="mb-7 flex items-end justify-between no-print">
@@ -16,16 +15,21 @@
 
 {# ── Branded Print Header (only shows when printing) ── #}
 <div class="report-print-header">
-  <div class="rph-brand">
-    <img class="rph-logo" src="{% static 'logoHirgal.png' %}" alt="Hirgal Kiro">
-    <div>
-      <div class="rph-name">Hirgal Kiro</div>
-      <div class="rph-tag">Property &amp; Rent Management</div>
+  <div class="rph-brand">Hirgal Kiro</div>
+  <div class="rph-subtitle">Chart of Accounts</div>
+  <div class="rph-meta-bar">
+    <div class="rph-meta-cell">
+      <span class="rph-meta-label">Report date</span>
+      <span class="rph-meta-value">{% now "F j, Y" %}</span>
     </div>
-  </div>
-  <div class="rph-titlebox">
-    <div class="rph-title">Chart of Accounts</div>
-    <div class="rph-meta">Report date: {% now "d/m/Y" %} &middot; Prepared by {{ request.user.full_name|default:request.user.username }}</div>
+    <div class="rph-meta-cell">
+      <span class="rph-meta-label">Prepared for</span>
+      <span class="rph-meta-value">{{ request.user.full_name|default:request.user.username }}</span>
+    </div>
+    <div class="rph-meta-cell">
+      <span class="rph-meta-label">Report type</span>
+      <span class="rph-meta-value">Chart of accounts</span>
+    </div>
   </div>
 </div>
 
@@ -91,6 +95,10 @@
   </div>
   {% endif %}
 </section>
+
+<div class="report-print-footer">
+  <span><strong>Hirgal Kiro</strong> &middot; <span class="js-print-footer-title">Report</span> &middot; {% now "d M Y" %}</span>
+</div>
 
 <style>
   @media print {

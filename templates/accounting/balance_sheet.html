@@ -2,66 +2,129 @@
 
 {% block report_title %}Balance Sheet{% endblock %}
 {% block print_title %}Balance Sheet{% endblock %}
+{% block print_report_type %}Statement of financial position{% endblock %}
 {% block heading %}Balance Sheet{% endblock %}
 
 {% block report_content %}
 {% include "accounting/_date_filter.html" %}
 
+<style>
+    .bs-asof { font-size: 13px; color: #64748b; margin-bottom: 14px; }
+    .bs-section { margin-bottom: 20px; }
+    .bs-band {
+        padding: 8px 14px;
+        font-size: 12px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+    }
+    .bs-band-assets { background: #eff6ff; color: #1e40af; }
+    .bs-band-liabilities { background: #fef2f2; color: #991b1b; }
+    .bs-band-equity { background: #f5f3ff; color: #6b21a8; }
+    .bs-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        padding: 11px 14px;
+        border-bottom: 1px solid #e5e7eb;
+        font-size: 14px;
+        font-weight: 700;
+        color: #0f172a;
+    }
+    .bs-amount { font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .bs-amount-assets { color: #1d4ed8; }
+    .bs-amount-liabilities { color: #dc2626; }
+    .bs-amount-equity { color: #7c3aed; }
+    .bs-amount-net { color: #16a34a; }
+    .bs-desc { font-size: 12px; color: #64748b; padding: 8px 14px 0; }
+    .bs-totals { margin-top: 18px; border-top: 3px solid #10194f; }
+    .bs-totals .bs-row { border-bottom: none; font-size: 15px; color: #10194f; padding: 12px 14px; }
+    .bs-totals .bs-row:last-child { border-bottom: 3px solid #10194f; }
+    .bs-check {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        margin-top: 16px;
+        padding: 11px 14px;
+        font-size: 13px;
+    }
+    .bs-check-ok { background: #ecfdf5; border: 1px solid #a7f3d0; }
+    .bs-check-bad { background: #fef2f2; border: 1px solid #fecaca; }
+    .bs-check-label { font-weight: 800; padding-right: 16px; border-right: 1px solid #d1d5db; }
+    .bs-check-eq { flex: 1; color: #64748b; }
+    .bs-check-ok .bs-check-result { color: #16a34a; }
+    .bs-check-bad .bs-check-result { color: #dc2626; }
+    .bs-check-result { font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; }
+    .bs-note { margin-top: 14px; font-size: 12px; color: #64748b; }
+
+    @media print {
+        .bs-band, .bs-row, .bs-check, .bs-note { page-break-inside: avoid; }
+    }
+</style>
+
 <div class="bg-white rounded-xl border border-slate-200 p-6 mb-6">
-    <p class="text-sm text-slate-500 mb-4">As of {{ end_date }}</p>
+    <p class="bs-asof">As of {{ end_date|date:"F j, Y" }}</p>
 
     <!-- Assets -->
-    <div class="mb-6">
-        <h3 class="text-lg font-bold text-blue-800 mb-3">Assets (What You Own)</h3>
-        <div class="flex justify-between items-center border-b pb-2">
-            <a href="{% url 'web-general-ledger' %}?start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}" class="text-indigo-600 hover:underline font-semibold">
-                Total Assets →
+    <div class="bs-section">
+        <div class="bs-band bs-band-assets">Assets</div>
+        <div class="bs-row">
+            <a href="{% url 'web-general-ledger' %}?start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}">
+                Total Assets <span class="no-print">→</span>
             </a>
-            <span class="text-blue-600 font-bold">${{ total_assets|floatformat:2 }}</span>
+            <span class="bs-amount bs-amount-assets">${{ total_assets|floatformat:2 }}</span>
         </div>
-        <p class="text-xs text-slate-500 mt-1">Cash, bank accounts, money owed to you, property value</p>
+        <p class="bs-desc">Cash, bank accounts, money owed to you, property value</p>
     </div>
 
     <!-- Liabilities -->
-    <div class="mb-6">
-        <h3 class="text-lg font-bold text-red-800 mb-3">Liabilities (What You Owe)</h3>
-        <div class="flex justify-between items-center border-b pb-2">
-            <a href="{% url 'web-ap' %}?start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}" class="text-indigo-600 hover:underline font-semibold">
-                Total Liabilities →
+    <div class="bs-section">
+        <div class="bs-band bs-band-liabilities">Liabilities</div>
+        <div class="bs-row">
+            <a href="{% url 'web-ap' %}?start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}">
+                Total Liabilities <span class="no-print">→</span>
             </a>
-            <span class="text-red-600 font-bold">${{ total_liabilities|floatformat:2 }}</span>
+            <span class="bs-amount bs-amount-liabilities">${{ total_liabilities|floatformat:2 }}</span>
         </div>
-        <p class="text-xs text-slate-500 mt-1">Bills to pay, loans, security deposits held</p>
+        <p class="bs-desc">Bills to pay, loans, security deposits held</p>
     </div>
 
     <!-- Equity -->
-    <div class="mb-6">
-        <h3 class="text-lg font-bold text-purple-800 mb-3">Equity (Your Net Worth)</h3>
-        <div class="space-y-2">
-            <div class="flex justify-between items-center border-b pb-2">
-                <span class="font-semibold">Owner's Equity</span>
-                <span class="text-purple-600 font-bold">${{ total_equity|floatformat:2 }}</span>
-            </div>
-            <div class="flex justify-between items-center border-b pb-2">
-                <a href="{% url 'web-profit-loss' %}?start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}" class="text-indigo-600 hover:underline font-semibold">
-                    Net Income →
-                </a>
-                <span class="{% if net_income >= 0 %}text-green-600{% else %}text-red-600{% endif %} font-bold">${{ net_income|floatformat:2 }}</span>
-            </div>
+    <div class="bs-section">
+        <div class="bs-band bs-band-equity">Equity</div>
+        <div class="bs-row">
+            <span>Owner's Equity</span>
+            <span class="bs-amount bs-amount-equity">${{ total_equity|floatformat:2 }}</span>
+        </div>
+        <div class="bs-row">
+            <a href="{% url 'web-profit-loss' %}?start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}">
+                Net Income <span class="no-print">→</span>
+            </a>
+            <span class="bs-amount {% if net_income >= 0 %}bs-amount-net{% else %}bs-amount-liabilities{% endif %}">${{ net_income|floatformat:2 }}</span>
+        </div>
+    </div>
+
+    <!-- Totals -->
+    <div class="bs-totals">
+        <div class="bs-row">
+            <span>Total Assets</span>
+            <span class="bs-amount bs-amount-assets">${{ total_assets|floatformat:2 }}</span>
+        </div>
+        <div class="bs-row">
+            <span>Total Liabilities + Equity</span>
+            <span class="bs-amount bs-amount-equity">${{ liabilities_equity_total|floatformat:2 }}</span>
         </div>
     </div>
 
     <!-- Balance Check -->
-    <div class="border-t-2 pt-3">
-        <div class="flex justify-between text-lg font-bold">
-            <span>Total Assets</span>
-            <span class="text-blue-600">${{ total_assets|floatformat:2 }}</span>
-        </div>
-        <div class="flex justify-between text-lg font-bold">
-            <span>Total Liabilities + Equity</span>
-            <span class="text-purple-600">${{ total_liabilities|add:total_equity|add:net_income|floatformat:2 }}</span>
-        </div>
+    <div class="bs-check {% if balance_ok %}bs-check-ok{% else %}bs-check-bad{% endif %}">
+        <span class="bs-check-label">Balance check</span>
+        <span class="bs-check-eq">Assets = Liabilities + Equity</span>
+        <span class="bs-check-result">{% if balance_ok %}Balanced{% else %}Not balanced{% endif %}</span>
     </div>
+
+    <p class="bs-note">This report presents the financial position recorded for the selected date. Amounts are shown in U.S. dollars.</p>
 </div>
 
 <!-- Related Reports -->
@@ -70,7 +133,7 @@
     <div class="flex flex-wrap gap-2">
         <a href="{% url 'web-trial-balance' %}?start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}" class="rounded-lg bg-white border px-3 py-1.5 text-sm text-indigo-600 hover:bg-indigo-50">Trial Balance</a>
         <a href="{% url 'web-general-ledger' %}?start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}" class="rounded-lg bg-white border px-3 py-1.5 text-sm text-indigo-600 hover:bg-indigo-50">General Ledger</a>
-        <a href="{% url 'web-profit-loss' %}?start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}" class="rounded-lg bg-white border px-3 py-1.5 text-sm text-indigo-600 hover:bg-indigo-50">Profit & Loss</a>
+        <a href="{% url 'web-profit-loss' %}?start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}" class="rounded-lg bg-white border px-3 py-1.5 text-sm text-indigo-600 hover:bg-indigo-50">Profit &amp; Loss</a>
     </div>
 </div>
 {% endblock %}

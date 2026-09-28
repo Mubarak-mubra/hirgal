@@ -55,32 +55,66 @@
             .shadow-sm, .shadow-md, .shadow { box-shadow: none !important; }
             .bg-ink { background: #10194f !important; color: white !important; }
 
-            /* Branded report header (logo + brand + title) */
+            /* Branded report header — centered brand, subtitle, meta bar */
             .report-print-header {
-                display: flex !important;
-                align-items: flex-end;
-                justify-content: space-between;
-                gap: 16px;
-                margin-bottom: 16px;
-                padding-bottom: 10px;
-                border-width: 0 0 4px 0;
-                border-style: solid;
-                border-image: linear-gradient(90deg, #10194f 0%, #1e3a8a 55%, #f59e0b 100%) 1;
+                display: block !important;
+                margin-bottom: 18px;
             }
-            .rph-brand { display: flex; align-items: center; gap: 10px; }
-            .rph-logo { width: 44px; height: 44px; border-radius: 8px; object-fit: cover; }
-            .rph-name { font-size: 17pt; font-weight: 800; color: #10194f; line-height: 1.1; letter-spacing: -0.01em; }
-            .rph-tag { font-size: 7.5pt; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: #64748b; margin-top: 2px; }
-            .rph-titlebox { text-align: right; }
-            .rph-title { font-size: 12.5pt; font-weight: 800; color: #10194f; text-transform: uppercase; letter-spacing: 0.05em; }
-            .rph-meta { font-size: 8.5pt; color: #64748b; margin-top: 3px; }
+            .rph-brand {
+                text-align: center;
+                font-size: 27pt;
+                font-weight: 800;
+                letter-spacing: 0.16em;
+                text-transform: uppercase;
+                color: #10194f;
+                line-height: 1.1;
+            }
+            .rph-subtitle {
+                font-size: 13.5pt;
+                font-weight: 600;
+                color: #0f172a;
+                margin-top: 14px;
+                padding-bottom: 8px;
+                border-bottom: 1px solid #cbd5e1;
+            }
+            .rph-meta-bar {
+                display: flex;
+                background: #f1f5f9;
+                border: 1px solid #e2e8f0;
+                border-top: none;
+                margin-top: 10px;
+            }
+            .rph-meta-cell {
+                flex: 1;
+                padding: 8px 14px;
+                border-left: 1px solid #e2e8f0;
+            }
+            .rph-meta-cell:first-child { border-left: none; }
+            .rph-meta-label {
+                display: block;
+                font-size: 8pt;
+                font-weight: 700;
+                color: #334155;
+            }
+            .rph-meta-value {
+                display: block;
+                font-size: 10pt;
+                color: #0f172a;
+                margin-top: 2px;
+            }
+
+            /* Links print as plain report text */
+            .report-sheet a, .print-area a {
+                color: inherit !important;
+                text-decoration: none !important;
+            }
 
             /* Branded report footer */
             .report-print-footer {
                 display: flex !important;
                 justify-content: space-between;
                 gap: 12px;
-                margin-top: 18px;
+                margin-top: 20px;
                 padding-top: 8px;
                 border-top: 1px solid #cbd5e1;
                 font-size: 8pt;
@@ -424,6 +458,16 @@
     </div>
 
     <script>
+    // Fill print-footer title from the page title (e.g. "Accounting - Balance Sheet" -> "Balance Sheet")
+    (function () {
+        var t = document.title
+            .replace(/\s*[-–]\s*Hirgal Kiro\s*$/, '')
+            .replace(/^Accounting\s*[-–]\s*/, '');
+        document.querySelectorAll('.js-print-footer-title').forEach(function (el) {
+            el.textContent = t;
+        });
+    })();
+
     function toggleSidebar() {
         document.getElementById('sidebar').classList.toggle('open');
         document.getElementById('sidebarOverlay').classList.toggle('open');

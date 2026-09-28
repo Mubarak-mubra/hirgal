@@ -22,22 +22,26 @@
 
 <div class="report-sheet rounded-xl border bg-white p-6 shadow-sm">
     <div class="report-print-header">
-        <div class="rph-brand">
-            <img class="rph-logo" src="{% static 'logoHirgal.png' %}" alt="Hirgal Kiro">
-            <div>
-                <div class="rph-name">Hirgal Kiro</div>
-                <div class="rph-tag">Property &amp; Rent Management</div>
+        <div class="rph-brand">Hirgal Kiro</div>
+        <div class="rph-subtitle">{% block print_title %}{% endblock %}</div>
+        <div class="rph-meta-bar">
+            <div class="rph-meta-cell">
+                <span class="rph-meta-label">Report date</span>
+                <span class="rph-meta-value">{% now "F j, Y" %}</span>
             </div>
-        </div>
-        <div class="rph-titlebox">
-            <div class="rph-title">{% block print_title %}{% endblock %}</div>
-            <div class="rph-meta">Report date: {% now "d/m/Y" %} &middot; Prepared by {{ request.user.full_name|default:request.user.username }}</div>
+            <div class="rph-meta-cell">
+                <span class="rph-meta-label">Prepared for</span>
+                <span class="rph-meta-value">{{ request.user.full_name|default:request.user.username }}</span>
+            </div>
+            <div class="rph-meta-cell">
+                <span class="rph-meta-label">Report type</span>
+                <span class="rph-meta-value">{% block print_report_type %}Financial Report{% endblock %}</span>
+            </div>
         </div>
     </div>
     {% block report_content %}{% endblock %}
     <div class="report-print-footer">
-        <span><strong>Hirgal Kiro</strong> &middot; Property &amp; Rent Management</span>
-        <span>Generated {% now "d/m/Y H:i" %} &middot; {{ request.user.full_name|default:request.user.username }}</span>
+        <span><strong>Hirgal Kiro</strong> &middot; <span class="js-print-footer-title">Report</span> &middot; {% now "d M Y" %}</span>
     </div>
 </div>
 {% endblock %}

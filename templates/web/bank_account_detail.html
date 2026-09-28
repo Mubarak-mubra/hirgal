@@ -1,5 +1,4 @@
 {% extends "base.html" %}
-{% load static %}
 {% block title %}{{ bank_account.bank_name }} - Hirgal Kiro{% endblock %}
 {% block content %}
 <style>
@@ -17,16 +16,21 @@
 
 <div class="print-area">
   <div class="report-print-header">
-    <div class="rph-brand">
-      <img class="rph-logo" src="{% static 'logoHirgal.png' %}" alt="Hirgal Kiro">
-      <div>
-        <div class="rph-name">Hirgal Kiro</div>
-        <div class="rph-tag">Property &amp; Rent Management</div>
+    <div class="rph-brand">Hirgal Kiro</div>
+    <div class="rph-subtitle">Bank Account Report</div>
+    <div class="rph-meta-bar">
+      <div class="rph-meta-cell">
+        <span class="rph-meta-label">Report date</span>
+        <span class="rph-meta-value">{% now "F j, Y" %}</span>
       </div>
-    </div>
-    <div class="rph-titlebox">
-      <div class="rph-title">Bank Account Report</div>
-      <div class="rph-meta">{{ bank_account.bank_name }} &middot; {{ bank_account.account_number }} &middot; {% now "d/m/Y" %}</div>
+      <div class="rph-meta-cell">
+        <span class="rph-meta-label">Prepared for</span>
+        <span class="rph-meta-value">{{ request.user.full_name|default:request.user.username }}</span>
+      </div>
+      <div class="rph-meta-cell">
+        <span class="rph-meta-label">Account</span>
+        <span class="rph-meta-value">{{ bank_account.bank_name }} &middot; {{ bank_account.account_number }}</span>
+      </div>
     </div>
   </div>
 
@@ -118,8 +122,7 @@
   </section>
 
   <div class="report-print-footer">
-    <span><strong>Hirgal Kiro</strong> &middot; Property &amp; Rent Management</span>
-    <span>Generated {% now "d/m/Y H:i" %} &middot; {{ request.user.full_name|default:request.user.username }}</span>
+    <span><strong>Hirgal Kiro</strong> &middot; <span class="js-print-footer-title">Report</span> &middot; {% now "d M Y" %}</span>
   </div>
 </div>
 {% endblock %}
