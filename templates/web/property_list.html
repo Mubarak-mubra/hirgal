@@ -5,7 +5,7 @@
     <div>
         <a class="text-sm font-semibold text-indigo-700" href="{% url 'home' %}">← Home</a>
         <h1 class="mt-4 text-3xl font-bold">Properties</h1>
-        <p class="mt-2 text-slate-500">All your properties and their tenants.</p>
+        <p class="mt-2 text-slate-500">All your properties and their customers.</p>
     </div>
     <a class="rounded-lg bg-ink px-4 py-3 text-sm font-bold text-white" href="{% url 'web-property-create' %}">+ + Add Property</a>
 </section>
@@ -19,7 +19,7 @@
                 <th class="px-4 py-3 font-semibold">Name</th>
                 <th class="px-4 py-3 font-semibold">Location</th>
                 <th class="px-4 py-3 font-semibold">Type</th>
-                <th class="px-4 py-3 font-semibold">Tenants</th>
+                <th class="px-4 py-3 font-semibold">Customers</th>
                 <th class="px-4 py-3 font-semibold text-right">Actions</th>
             </tr>
         </thead>
@@ -43,7 +43,7 @@
                         </a>
                         {% if forloop.last %}</div>{% endif %}
                     {% empty %}
-                        <span class="text-xs text-slate-400">No tenants</span>
+                        <span class="text-xs text-slate-400">No customers</span>
                     {% endfor %}
                 </td>
                 <td class="px-4 py-3 text-right">

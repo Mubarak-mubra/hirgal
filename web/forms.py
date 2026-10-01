@@ -142,7 +142,7 @@ class TenantForm(forms.ModelForm):
         fields = ("full_name", "tenant_type", "phone_number", "notes")
         labels = {
             "full_name": "Full Name",
-            "tenant_type": "Tenant Type",
+            "tenant_type": "Customer Type",
             "phone_number": "Phone Number",
             "notes": "Notes",
         }
@@ -159,7 +159,7 @@ class RentalAgreementForm(forms.ModelForm):
         fields = ("tenant", "property", "unit", "room", "monthly_rent", "start_date", "end_date", "status",
                   "electricity_responsible", "water_responsible", "final_bills_settlement", "final_bills_notes", "notes")
         labels = {
-            "tenant": "Tenant", "property": "Property", "unit": "Unit", "room": "Room",
+            "tenant": "Customer", "property": "Property", "unit": "Unit", "room": "Room",
             "monthly_rent": "Monthly Rent ($)",
             "start_date": "Start Date", "end_date": "End Date",
             "status": "Status", "notes": "Notes",
@@ -237,7 +237,7 @@ class RentalAgreementForm(forms.ModelForm):
             if self.instance.pk:
                 existing = existing.exclude(pk=self.instance.pk)
             if existing.exists():
-                raise forms.ValidationError("This tenant already has an active agreement for this property.")
+                raise forms.ValidationError("This customer already has an active agreement for this property.")
 
         return cleaned_data
 
@@ -246,7 +246,7 @@ class PaymentForm(forms.ModelForm):
     tenant = forms.ModelChoiceField(
         queryset=Tenant.objects.none(),
         required=False,
-        label="Tenant",
+        label="Customer",
         widget=forms.Select(attrs={"id": "id_tenant_select"}),
     )
     invoice = forms.ModelChoiceField(
@@ -444,7 +444,7 @@ class JournalEntryForm(forms.ModelForm):
             "reference": "Reference",
             "description": "Description",
             "status": "Status",
-            "tenant": "Tenant (optional)",
+            "tenant": "Customer (optional)",
         }
         widgets = {
             "date": forms.DateInput(attrs={"type": "date"}),
@@ -483,7 +483,7 @@ class InvoiceForm(forms.ModelForm):
         model = Invoice
         fields = ("tenant", "rental_agreement", "property", "invoice_number", "date", "due_date", "status", "notes")
         labels = {
-            "tenant": "Tenant", "rental_agreement": "Rental Agreement", "property": "Property",
+            "tenant": "Customer", "rental_agreement": "Rental Agreement", "property": "Property",
             "invoice_number": "Invoice Number", "date": "Invoice Date", "due_date": "Due Date",
             "status": "Status", "notes": "Notes",
         }
