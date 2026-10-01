@@ -17,15 +17,15 @@ class PropertyExpenseView(generics.GenericAPIView):
         property_id = request.data.get("property_id")
         property_instance = request.user.properties.filter(id=property_id).first()
         if not property_instance:
-            return Response({"detail": "Hantida lama helin."}, status=status.HTTP_400_BAD_REQUEST)
-        title = request.data.get("title", "Dayactir")
+            return Response({"detail": "Property not found."}, status=status.HTTP_400_BAD_REQUEST)
+        title = request.data.get("title", "Repair")
         amount = request.data.get("amount")
         try:
             valid_amount = float(amount)
         except (TypeError, ValueError):
             valid_amount = 0
         if valid_amount <= 0:
-            return Response({"detail": "Geli kharash sax ah."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"detail": "Enter a valid amount."}, status=status.HTTP_400_BAD_REQUEST)
         expense = GeneralExpense.objects.create(property=property_instance, title=title, category="repair", amount=amount, expense_date=timezone.localdate(), notes=request.data.get("notes", ""))
         return Response({"id": expense.id, "property_id": expense.property_id, "amount": expense.amount}, status=status.HTTP_201_CREATED)
 

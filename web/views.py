@@ -254,7 +254,7 @@ class LoginView(View):
                 seed_default_chart_of_accounts(user)
             login(request, user)
             return redirect(request.GET.get("next", "home"))
-        return render(request, "web/login.html", {"error_message": "Xogta gelitaanka waa khalad ama akoonka wali lama ansixin."})
+        return render(request, "web/login.html", {"error_message": "Incorrect credentials or the account is not yet approved."})
 
 
 class LogoutView(View):
@@ -1008,22 +1008,22 @@ class AccountDeleteView(LoginRequiredMixin, View):
     def get(self, request, pk):
         account = get_object_or_404(Account, pk=pk, owner=request.user.get_data_owner())
         if account.is_system:
-            messages.error(request, "System account ma tirtiri karto.")
+            messages.error(request, "System accounts cannot be deleted.")
             return redirect("web-account-list")
         has_transactions = JournalEntryLine.objects.filter(account=account).exists()
         if has_transactions:
-            messages.error(request, f"Account '{account.name}' waxa leh transactions - marka bedel (deactivate) markii hore.")
+            messages.error(request, f"Account '{account.name}' has transactions — deactivate it instead.")
             return redirect("web-account-list")
         return render(request, "web/confirm_delete.html", {"object": account, "cancel_url": "web-account-list"})
 
     def post(self, request, pk):
         account = get_object_or_404(Account, pk=pk, owner=request.user.get_data_owner())
         if account.is_system:
-            messages.error(request, "System account ma tirtiri karto.")
+            messages.error(request, "System accounts cannot be deleted.")
             return redirect("web-account-list")
         has_transactions = JournalEntryLine.objects.filter(account=account).exists()
         if has_transactions:
-            messages.error(request, f"Account '{account.name}' waxa leh transactions - marka bedel (deactivate) markii hore.")
+            messages.error(request, f"Account '{account.name}' has transactions — deactivate it instead.")
             return redirect("web-account-list")
         account.delete()
         return redirect("web-account-list")
@@ -1257,7 +1257,7 @@ class BankAccountDetailView(LoginRequiredMixin, DetailView):
             all_txns.append({
                 "date": p.payment_date,
                 "type": "in",
-                "description": f"Lacag ka timid {tenant.full_name}",
+                "description": f"Payment from {tenant.full_name}",
                 "detail": f"{prop.name}" + (f" — REF: {p.reference_number}" if p.reference_number else ""),
                 "amount": amount,
                 "sort_date": p.payment_date,
@@ -1270,7 +1270,7 @@ class BankAccountDetailView(LoginRequiredMixin, DetailView):
             all_txns.append({
                 "date": e.expense_date,
                 "type": "out",
-                "description": f"Kharash: {e.title}",
+                "description": f"Expense: {e.title}",
                 "detail": f"{prop.name} — {e.category}",
                 "amount": amount,
                 "sort_date": e.expense_date,
@@ -1283,7 +1283,7 @@ class BankAccountDetailView(LoginRequiredMixin, DetailView):
             all_txns.append({
                 "date": r.reported_date,
                 "type": "out",
-                "description": f"Dayactir: {r.title}",
+                "description": f"Repair: {r.title}",
                 "detail": f"{prop.name} — {r.get_category_display()}",
                 "amount": amount,
                 "sort_date": r.reported_date,

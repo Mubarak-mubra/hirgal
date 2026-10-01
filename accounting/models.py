@@ -21,13 +21,13 @@ CODE_RANGES = {
 
 class Account(models.Model):
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='accounts')
-    code = models.CharField('Lambarka', max_length=20)
-    name = models.CharField('Magaca Xisaabta', max_length=150)
-    category = models.CharField('Qaybta', max_length=20, choices=AccountCategory.choices)
-    is_system = models.BooleanField('Xisaabta System', default=False, help_text="Haddii ay tahay system, ma tirtiri karto")
-    bank_account = models.ForeignKey('finance.BankAccount', on_delete=models.SET_NULL, null=True, blank=True, related_name='accounting_accounts', help_text="Xisoabta Bangiga ee la xiriirta (ikhtiyaari)")
-    description = models.TextField('Faahfaahin', blank=True)
-    is_active = models.BooleanField('Waa Shaqeyneysaa', default=True)
+    code = models.CharField('Code', max_length=20)
+    name = models.CharField('Account name', max_length=150)
+    category = models.CharField('Category', max_length=20, choices=AccountCategory.choices)
+    is_system = models.BooleanField('System account', default=False, help_text="System accounts cannot be deleted")
+    bank_account = models.ForeignKey('finance.BankAccount', on_delete=models.SET_NULL, null=True, blank=True, related_name='accounting_accounts', help_text="Linked bank account (optional)")
+    description = models.TextField('Description', blank=True)
+    is_active = models.BooleanField('Is active', default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -62,15 +62,15 @@ class Account(models.Model):
 
 class JournalEntry(models.Model):
     STATUS_CHOICES = [
-        ('draft', 'Qabyo'),
-        ('posted', 'La diiwaangeliyay'),
-        ('cancelled', 'La baajiyay'),
+        ('draft', 'Draft'),
+        ('posted', 'Posted'),
+        ('cancelled', 'Cancelled'),
     ]
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='journal_entries')
-    date = models.DateField('Taariikhda')
-    reference = models.CharField('Tixraac', max_length=100, blank=True)
-    description = models.TextField('Faahfaahin', blank=True)
-    status = models.CharField('Xaaladda', max_length=20, choices=STATUS_CHOICES, default='draft')
+    date = models.DateField('Date')
+    reference = models.CharField('Reference', max_length=100, blank=True)
+    description = models.TextField('Description', blank=True)
+    status = models.CharField('Status', max_length=20, choices=STATUS_CHOICES, default='draft')
     
     # Optional links for general transaction tagging
     tenant = models.ForeignKey(Tenant, on_delete=models.SET_NULL, null=True, blank=True, related_name='journal_entries')
@@ -87,7 +87,7 @@ class JournalEntry(models.Model):
 class JournalEntryLine(models.Model):
     journal_entry = models.ForeignKey(JournalEntry, on_delete=models.CASCADE, related_name='lines')
     account = models.ForeignKey(Account, on_delete=models.PROTECT, related_name='journal_lines')
-    description = models.CharField('Faahfaahin', max_length=255, blank=True)
+    description = models.CharField('Description', max_length=255, blank=True)
     debit = models.DecimalField('Debit', max_digits=12, decimal_places=2, default=0)
     credit = models.DecimalField('Credit', max_digits=12, decimal_places=2, default=0)
     
@@ -99,21 +99,21 @@ class JournalEntryLine(models.Model):
 
 class Invoice(models.Model):
     STATUS_CHOICES = [
-        ('draft', 'Qabyo'),
-        ('sent', 'La diray'),
-        ('paid', 'La bixiyay'),
-        ('cancelled', 'La baajiyay'),
+        ('draft', 'Draft'),
+        ('sent', 'Sent'),
+        ('paid', 'Paid'),
+        ('cancelled', 'Cancelled'),
     ]
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='invoices')
     tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name='invoices')
     rental_agreement = models.ForeignKey(RentalAgreement, on_delete=models.SET_NULL, null=True, blank=True, related_name='invoices')
     property = models.ForeignKey(Property, on_delete=models.SET_NULL, null=True, blank=True, related_name='invoices')
     
-    invoice_number = models.CharField('Numbarka Biilka', max_length=50, unique=True)
-    date = models.DateField('Taariikhda Biilka')
-    due_date = models.DateField('Taariikhda Kama Dambaysta ah')
-    status = models.CharField('Xaaladda', max_length=20, choices=STATUS_CHOICES, default='draft')
-    notes = models.TextField('Faahfaahin', blank=True)
+    invoice_number = models.CharField('Invoice number', max_length=50, unique=True)
+    date = models.DateField('Invoice date')
+    due_date = models.DateField('Due date')
+    status = models.CharField('Status', max_length=20, choices=STATUS_CHOICES, default='draft')
+    notes = models.TextField('Notes', blank=True)
     
     # The journal entry generated when this invoice is posted
     journal_entry = models.OneToOneField(JournalEntry, on_delete=models.SET_NULL, null=True, blank=True, related_name='invoice')
@@ -129,8 +129,8 @@ class Invoice(models.Model):
 
 class InvoiceLine(models.Model):
     invoice = models.ForeignKey(Invoice, on_delete=models.CASCADE, related_name='lines')
-    account = models.ForeignKey(Account, on_delete=models.PROTECT, related_name='invoice_lines', help_text="Xisaabta Dakhliga (Revenue Account)")
-    description = models.CharField('Faahfaahin', max_length=255)
+    account = models.ForeignKey(Account, on_delete=models.PROTECT, related_name='invoice_lines', help_text="Revenue account")
+    description = models.CharField('Description', max_length=255)
     amount = models.DecimalField('Lacagta', max_digits=10, decimal_places=2)
 
     def __str__(self):

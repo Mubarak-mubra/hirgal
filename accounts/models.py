@@ -6,9 +6,9 @@ from django.db import models
 class UserManager(BaseUserManager):
     def create_user(self, username, phone_number, password=None, **extra_fields):
         if not username:
-            raise ValueError("Magaca isticmaalaha waa loo baahan yahay")
+            raise ValueError("Username is required")
         if not phone_number:
-            raise ValueError("Lambarka telefoonka waa loo baahan yahay")
+            raise ValueError("Phone number is required")
         user = self.model(username=username, phone_number=phone_number, **extra_fields)
         user.set_password(password)
         user.save(using=self._db)
@@ -24,20 +24,20 @@ class UserManager(BaseUserManager):
 class User(AbstractBaseUser, PermissionsMixin):
     username = models.CharField(max_length=50, unique=True)
     phone_number = models.CharField(max_length=20, unique=True)
-    full_name = models.CharField("Magaca oo buuxa", max_length=150)
+    full_name = models.CharField("Full name", max_length=150)
     managed_account = models.ForeignKey(
         "self",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name="managed_users",
-        verbose_name="Sii gelitaanka akoonka (Managed Account)",
-        help_text="Dooro akoonka uu isticmaalahani maamulayo xogtiisa (Tusaale: Farxaan)."
+        verbose_name="Managed account",
+        help_text="Choose the account whose data this user manages (e.g. Farxaan)."
     )
     is_active = models.BooleanField(default=True)
-    is_approved = models.BooleanField("La ansixiyay", default=False)
+    is_approved = models.BooleanField("Approved", default=False)
     is_staff = models.BooleanField(default=False)
-    can_use_chatbot = models.BooleanField("AI Chatbot", default=False, help_text="Ikhtiyaari: Ogolow isticmaalahan inuu isticmaalo AI Chatbot")
+    can_use_chatbot = models.BooleanField("AI Chatbot", default=False, help_text="Optional: allow this user to use the AI Chatbot")
     date_joined = models.DateTimeField(auto_now_add=True)
 
     objects = UserManager()

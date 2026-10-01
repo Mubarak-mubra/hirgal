@@ -6,12 +6,12 @@ from rentals.models import RentalAgreement, Tenant
 
 class BankAccount(models.Model):
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="bank_accounts")
-    bank_name = models.CharField("Magaca Bangiga", max_length=100)
-    account_number = models.CharField("Lambarka Xisaabta", max_length=50)
-    account_name = models.CharField("Magaca Xisaabta", max_length=150)
-    linked_account = models.ForeignKey("accounting.Account", on_delete=models.SET_NULL, null=True, blank=True, related_name="linked_bank_accounts", help_text="Xisaabta Accounting-ka ee bangigan")
-    notes = models.TextField("Faahfaahin", blank=True)
-    is_active = models.BooleanField("Waa shaqeyneysaa", default=True)
+    bank_name = models.CharField("Bank name", max_length=100)
+    account_number = models.CharField("Account number", max_length=50)
+    account_name = models.CharField("Account name", max_length=150)
+    linked_account = models.ForeignKey("accounting.Account", on_delete=models.SET_NULL, null=True, blank=True, related_name="linked_bank_accounts", help_text="Linked accounting ledger account (optional)")
+    notes = models.TextField("Notes", blank=True)
+    is_active = models.BooleanField("Is active", default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -24,14 +24,14 @@ class BankAccount(models.Model):
 
 
 class Payment(models.Model):
-    PAYMENT_METHODS = [("cash", "Lacag caddaan ah"), ("mobile_money", "Mobile Money"), ("bank", "Bangiga"), ("other", "Kale")]
+    PAYMENT_METHODS = [("cash", "Cash"), ("mobile_money", "Mobile Money"), ("bank", "Bank"), ("other", "Other")]
 
     rental_agreement = models.ForeignKey(RentalAgreement, on_delete=models.PROTECT, related_name="payments")
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     payment_date = models.DateField()
     payment_method = models.CharField(max_length=20, choices=PAYMENT_METHODS, default="mobile_money")
     bank_account = models.ForeignKey(BankAccount, on_delete=models.SET_NULL, null=True, blank=True, related_name="payments")
-    destination_account = models.ForeignKey("accounting.Account", on_delete=models.SET_NULL, null=True, blank=True, related_name="payments_received", help_text="Xisaabta lacagta lagu shubay")
+    destination_account = models.ForeignKey("accounting.Account", on_delete=models.SET_NULL, null=True, blank=True, related_name="payments_received", help_text="Account the payment was deposited into")
     invoice = models.ForeignKey("accounting.Invoice", on_delete=models.SET_NULL, null=True, blank=True, related_name="payments")
     journal_entry = models.OneToOneField("accounting.JournalEntry", on_delete=models.SET_NULL, null=True, blank=True, related_name="payment_source")
     reference_number = models.CharField(max_length=100, blank=True)
@@ -43,9 +43,9 @@ class Payment(models.Model):
 
 
 class MaintenanceRepair(models.Model):
-    REPAIR_STATUSES = [("reported", "La soo sheegay"), ("in_progress", "Waa socotaa"), ("fixed", "La hagaajiyay"), ("cancelled", "La baajiyay")]
-    REPAIR_CATEGORIES = [("plumbing", "Tuubooyinka"), ("electricity", "Koronto"), ("structure", "Dhismaha"), ("appliance", "Qalab"), ("other", "Kale")]
-    PAYMENT_STATUSES = [("unpaid", "Aan la bixin"), ("paid", "La bixiyay")]
+    REPAIR_STATUSES = [("reported", "Reported"), ("in_progress", "In progress"), ("fixed", "Fixed"), ("cancelled", "Cancelled")]
+    REPAIR_CATEGORIES = [("plumbing", "Plumbing"), ("electricity", "Electricity"), ("structure", "Structure"), ("appliance", "Appliance"), ("other", "Other")]
+    PAYMENT_STATUSES = [("unpaid", "Unpaid"), ("paid", "Paid")]
 
     property = models.ForeignKey(Property, on_delete=models.CASCADE, related_name="maintenance_repairs")
     unit = models.ForeignKey(Unit, on_delete=models.SET_NULL, null=True, blank=True, related_name="maintenance_repairs")
@@ -69,7 +69,7 @@ class MaintenanceRepair(models.Model):
 
 
 class GeneralExpense(models.Model):
-    PAYMENT_STATUSES = [("unpaid", "Aan la bixin"), ("paid", "La bixiyay")]
+    PAYMENT_STATUSES = [("unpaid", "Unpaid"), ("paid", "Paid")]
 
     property = models.ForeignKey(Property, on_delete=models.CASCADE, related_name="general_expenses")
     title = models.CharField(max_length=150)

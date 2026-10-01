@@ -8,10 +8,10 @@ from properties.models import Property, Room, Unit
 
 
 class Tenant(models.Model):
-    TENANT_TYPES = [("person", "Qof ama qoys"), ("business", "Ganacsi")]
+    TENANT_TYPES = [("person", "Person or family"), ("business", "Business")]
 
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="tenants")
-    full_name = models.CharField("Magaca qofka ama qoyska", max_length=150)
+    full_name = models.CharField("Full name", max_length=150)
     tenant_type = models.CharField(max_length=20, choices=TENANT_TYPES, default="person")
     phone_number = models.CharField(max_length=20, blank=True, null=True)
     notes = models.TextField(blank=True)
@@ -26,8 +26,8 @@ class Tenant(models.Model):
 
 
 class RentalAgreement(models.Model):
-    AGREEMENT_STATUSES = [("active", "Socda"), ("ended", "Dhammaaday"), ("cancelled", "La baajiyay")]
-    RENTAL_SCOPES = [("whole_property", "Hantida oo dhan"), ("partial_property", "Qeyb ka mid ah")]
+    AGREEMENT_STATUSES = [("active", "Active"), ("ended", "Ended"), ("cancelled", "Cancelled")]
+    RENTAL_SCOPES = [("whole_property", "Whole property"), ("partial_property", "Part of property")]
     UTILITY_RESPONSIBILITY = [("customer", "Customer pays"), ("company", "Company pays")]
     BILL_SETTLEMENT = [("not_checked", "Not checked"), ("paid", "Paid before leaving"), ("unpaid", "Unpaid")]
 

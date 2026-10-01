@@ -16,7 +16,7 @@ class RegistrationView(APIView):
         user = serializer.save()
         response_data = {
             "user": UserSerializer(user).data,
-            "detail": "Diiwaangelinta waa la helay. Sug ansixinta maamulka.",
+            "detail": "Registration received. Wait for admin approval.",
         }
         return Response(response_data, status=status.HTTP_201_CREATED)
 

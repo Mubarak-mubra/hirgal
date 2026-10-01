@@ -6,20 +6,20 @@ def fix_account_descriptions(apps, schema_editor):
 
     # Fix Accounts Receivable (1200) descriptions
     Account.objects.filter(code='1200').update(
-        description='Lacagta aan kireystayaasha ku leenahay'
+        description='Money customers owe us'
     )
 
     # Fix Accounts Payable (2010) descriptions
     Account.objects.filter(code='2010').update(
-        description='Lacagaha cid kale lagu leeyahay'
+        description='Money we owe to others'
     )
 
     # Fix mismatched bank account descriptions
     Account.objects.filter(code='1021').update(
-        description='Bangiga auto-created: Dahabshiil Bank'
+        description='Auto-created bank: Dahabshiil Bank'
     )
     Account.objects.filter(code='1022').update(
-        description='Bangiga auto-created: EVC-PLUS'
+        description='Auto-created bank: EVC-PLUS'
     )
 
 

@@ -20,12 +20,12 @@ class RegistrationSerializer(serializers.Serializer):
 
     def validate_username(self, value):
         if User.objects.filter(username=value).exists():
-            raise serializers.ValidationError("Username-kan waa la isticmaalay.")
+            raise serializers.ValidationError("This username is already taken.")
         return value
 
     def validate_phone_number(self, value):
         if User.objects.filter(phone_number=value).exists():
-            raise serializers.ValidationError("Telefoonkan waa la isticmaalay.")
+            raise serializers.ValidationError("This phone number is already taken.")
         return value
 
     def create(self, validated_data):
@@ -47,13 +47,13 @@ class LoginSerializer(serializers.Serializer):
         password = attrs.get("password")
 
         if not identifier or not password:
-            raise serializers.ValidationError("Magaca/Telefoonka iyo furaha sirta ah waa loo baahan yahay.")
+            raise serializers.ValidationError("Username/phone and password are required.")
 
         user = User.objects.filter(Q(username=identifier) | Q(phone_number=identifier)).first()
         if not user or not user.check_password(password):
-            raise serializers.ValidationError("Magaca ama furaha sirta ah ma saxna.")
+            raise serializers.ValidationError("Invalid username or password.")
         if not user.is_approved:
-            raise serializers.ValidationError("Koontadaadu wali ma ansixin maamulaha.")
+            raise serializers.ValidationError("Your account is still pending admin approval.")
 
         attrs["user"] = user
         return attrs

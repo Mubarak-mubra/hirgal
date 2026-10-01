@@ -3,12 +3,12 @@ from django.contrib.auth.admin import UserAdmin
 from .models import User, SiteSettings
 
 
-@admin.action(description="Ancixi isticmaalayaasha la doortay (Approve selected users)")
+@admin.action(description="Approve selected users")
 def approve_users(modeladmin, request, queryset):
     queryset.update(is_approved=True)
 
 
-@admin.action(description="Ka noqo ansixinta (Unapprove selected users)")
+@admin.action(description="Unapprove selected users")
 def unapprove_users(modeladmin, request, queryset):
     queryset.update(is_approved=False)
 

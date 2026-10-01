@@ -8,7 +8,7 @@ class Command(BaseCommand):
     help = "Ku dar xisaabaha caadiga ah (Default Chart of Accounts)"
 
     def add_arguments(self, parser):
-        parser.add_argument("username", type=str, nargs="?", help="Magaca isticmaalaha (optional: leave blank for all users)")
+        parser.add_argument("username", type=str, nargs="?", help="Username (optional: leave blank for all users)")
 
     def handle(self, *args, **options):
         User = get_user_model()

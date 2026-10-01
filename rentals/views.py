@@ -26,7 +26,7 @@ class TenantDetailView(generics.RetrieveUpdateDestroyAPIView):
     def destroy(self, request, *args, **kwargs):
         tenant = self.get_object()
         if tenant.rental_agreements.exists():
-            return Response({"detail": "Marka hore jooji ama tirtir heshiiska kirada."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"detail": "Stop or delete the rental agreement first."}, status=status.HTTP_400_BAD_REQUEST)
         tenant.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -42,8 +42,8 @@ class EndTenantRentalView(generics.GenericAPIView):
             status="ended", end_date=timezone.localdate()
         )
         if not ended_count:
-            return Response({"detail": "Kiradu hore ayaa loo joojiyay."}, status=status.HTTP_400_BAD_REQUEST)
-        return Response({"detail": "Kirada waa la joojiyay."})
+            return Response({"detail": "This rental was already stopped."}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"detail": "Rental stopped successfully."})
 
 
 class TenantPaymentView(generics.GenericAPIView):
@@ -55,15 +55,15 @@ class TenantPaymentView(generics.GenericAPIView):
         tenant = self.get_object()
         agreement = tenant.rental_agreements.filter(status="active").first()
         if not agreement:
-            return Response({"detail": "Kiraystahan ma laha heshiis socda."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"detail": "This customer has no active agreement."}, status=status.HTTP_400_BAD_REQUEST)
         amount = request.data.get("amount")
         if amount is None:
-            return Response({"detail": "Geli lacagta la bixiyay."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"detail": "Enter the amount paid."}, status=status.HTTP_400_BAD_REQUEST)
         try:
             amount = float(amount)
             if amount <= 0 or amount > float(agreement.agreed_monthly_rent):
                 raise ValueError
         except (TypeError, ValueError):
-            return Response({"detail": "Lacagta la bixiyay ma saxna."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"detail": "The amount paid is invalid."}, status=status.HTTP_400_BAD_REQUEST)
         Payment.objects.create(rental_agreement=agreement, amount=amount, payment_date=timezone.localdate())
-        return Response({"detail": "Lacag bixinta waa la kaydiyay."}, status=status.HTTP_201_CREATED)
+        return Response({"detail": "Payment recorded successfully."}, status=status.HTTP_201_CREATED)

@@ -6,11 +6,11 @@ from django.db import models
 
 
 class Property(models.Model):
-    PROPERTY_TYPES = [("home", "Guri"), ("apartment", "Apartment"), ("commercial", "Ganacsi"), ("mixed", "Isku-dhafan")]
-    RESIDENTIAL_STRUCTURES = [("villa", "Filo"), ("multi_floor", "Guri dabaq")]
+    PROPERTY_TYPES = [("home", "Home"), ("apartment", "Apartment"), ("commercial", "Commercial"), ("mixed", "Mixed")]
+    RESIDENTIAL_STRUCTURES = [("villa", "Villa"), ("multi_floor", "Multi-floor building")]
 
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="properties")
-    name = models.CharField("Magaca hantida", max_length=150)
+    name = models.CharField("Property name", max_length=150)
     property_type = models.CharField(max_length=20, choices=PROPERTY_TYPES, default="home")
     residential_structure = models.CharField(max_length=20, choices=RESIDENTIAL_STRUCTURES, default="villa")
     location = models.CharField(max_length=200)
@@ -27,8 +27,8 @@ class Property(models.Model):
 
 
 class Unit(models.Model):
-    UNIT_TYPES = [("house", "Guri"), ("apartment", "Apartment"), ("room", "Qol"), ("shop", "Dukaan"), ("office", "Xafiis"), ("other", "Kale")]
-    RENTAL_MODES = [("whole_unit", "Guriga oo dhan"), ("individual_rooms", "Qolal gaar-gaar ah")]
+    UNIT_TYPES = [("house", "House"), ("apartment", "Apartment"), ("room", "Room"), ("shop", "Shop"), ("office", "Office"), ("other", "Other")]
+    RENTAL_MODES = [("whole_unit", "Whole unit"), ("individual_rooms", "Individual rooms")]
 
     property = models.ForeignKey(Property, on_delete=models.CASCADE, related_name="units")
     floor_number = models.PositiveIntegerField(default=1)
@@ -49,12 +49,12 @@ class Unit(models.Model):
 
 class Room(models.Model):
     ROOM_TYPES = [
-        ("living_room", "Qolka fadhiga"),
-        ("bedroom", "Qolka jiifka"),
-        ("bathroom", "Musqusha"),
-        ("kitchen", "Jikada"),
-        ("office", "Xafiiska"),
-        ("other", "Qol kale"),
+        ("living_room", "Living room"),
+        ("bedroom", "Bedroom"),
+        ("bathroom", "Bathroom"),
+        ("kitchen", "Kitchen"),
+        ("office", "Office"),
+        ("other", "Other room"),
     ]
 
     unit = models.ForeignKey(Unit, on_delete=models.CASCADE, related_name="rooms")
@@ -71,21 +71,21 @@ class Room(models.Model):
 
 class PropertyAsset(models.Model):
     ASSET_CONDITIONS = [
-        ("good", "Fiican"),
-        ("needs_repair", "Dayactir u baahan"),
-        ("damaged", "Waxyeelloobay"),
-        ("missing", "Maqan"),
+        ("good", "Good"),
+        ("needs_repair", "Needs repair"),
+        ("damaged", "Damaged"),
+        ("missing", "Missing"),
     ]
     RESPONSIBLE_PARTIES = [
-        ("owner", "Milkiilaha"),
-        ("tenant", "Kiraystaha"),
-        ("shared", "Labada dhinac"),
+        ("owner", "Owner"),
+        ("tenant", "Customer"),
+        ("shared", "Shared"),
     ]
 
     property = models.ForeignKey(
         Property, on_delete=models.CASCADE, related_name="assets"
     )
-    name = models.CharField("Magaca alaabta", max_length=150)
+    name = models.CharField("Item name", max_length=150)
     quantity = models.PositiveIntegerField(default=1)
     condition = models.CharField(
         max_length=20, choices=ASSET_CONDITIONS, default="good"

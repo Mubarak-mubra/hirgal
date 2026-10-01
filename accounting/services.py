@@ -10,8 +10,8 @@ from .models import Account, AccountCategory, JournalEntry, JournalEntryLine, In
 DEFAULT_COA = [
     {"code": "1010", "name": "Cash on Hand", "category": "asset", "description": "Petty cash and physical cash"},
     {"code": "1020", "name": "Bank / Mobile Money", "category": "asset", "description": "Bank accounts and mobile money wallets"},
-    {"code": "1200", "name": "Accounts Receivable", "category": "asset", "description": "Lacagta aan kireystayaasha ku leenahay"},
-    {"code": "2010", "name": "Accounts Payable", "category": "liability", "description": "Lacagaha cid kale lagu leeyahay"},
+    {"code": "1200", "name": "Accounts Receivable", "category": "asset", "description": "Money customers owe us"},
+    {"code": "2010", "name": "Accounts Payable", "category": "liability", "description": "Money we owe to others"},
     {"code": "2050", "name": "Security Deposits Held", "category": "liability", "description": "Tenant security deposits"},
     {"code": "3010", "name": "Owner's Equity", "category": "equity", "description": "Owner's capital investment"},
     {"code": "3020", "name": "Retained Earnings", "category": "equity", "description": "Accumulated net income"},
@@ -87,7 +87,7 @@ def link_bank_account_to_ledger(bank_account):
         code=new_code,
         name=f"{bank_account.bank_name} ({bank_account.account_number})",
         category="asset",
-        description=f"Bangiga auto-created: {bank_account.bank_name}",
+        description=f"Auto-created bank: {bank_account.bank_name}",
     )
     bank_account.linked_account = account
     bank_account.save(update_fields=["linked_account"])
@@ -247,14 +247,14 @@ def post_payment(payment):
     lines_data = [
         {
             "account": debit_account,
-            "description": f"Lacag ka timid {tenant.full_name}",
+            "description": f"Payment from {tenant.full_name}",
             "debit": amount,
             "credit": Decimal("0"),
             "property": prop,
         },
         {
             "account": credit_account,
-            "description": f"Lacag ka timid {tenant.full_name}",
+            "description": f"Payment from {tenant.full_name}",
             "debit": Decimal("0"),
             "credit": amount,
             "property": prop,
@@ -266,7 +266,7 @@ def post_payment(payment):
         owner=user,
         date=payment.payment_date,
         reference=ref,
-        description=f"Lacag kirada - {tenant.full_name} - {prop.name if prop else ''}",
+        description=f"Rent payment - {tenant.full_name} - {prop.name if prop else ''}",
         lines_data=lines_data,
         tenant=tenant,
         existing_entry=payment.journal_entry,
@@ -328,7 +328,7 @@ def post_expense(expense):
         owner=user,
         date=expense.expense_date,
         reference=ref,
-        description=f"Kharash - {expense.title} - {prop.name if prop else ''}",
+        description=f"Expense - {expense.title} - {prop.name if prop else ''}",
         lines_data=lines_data,
         existing_entry=expense.journal_entry,
     )
@@ -372,14 +372,14 @@ def post_repair(repair):
     lines_data = [
         {
             "account": debit_account,
-            "description": f"Dayactir - {repair.title}",
+            "description": f"Repair - {repair.title}",
             "debit": amount,
             "credit": Decimal("0"),
             "property": prop,
         },
         {
             "account": credit_account,
-            "description": f"Dayactir - {repair.title}",
+            "description": f"Repair - {repair.title}",
             "debit": Decimal("0"),
             "credit": amount,
             "property": prop,
@@ -391,7 +391,7 @@ def post_repair(repair):
         owner=user,
         date=repair.fixed_date or repair.reported_date,
         reference=ref,
-        description=f"Dayactir - {repair.title} - {prop.name if prop else ''}",
+        description=f"Repair - {repair.title} - {prop.name if prop else ''}",
         lines_data=lines_data,
         existing_entry=repair.journal_entry,
     )

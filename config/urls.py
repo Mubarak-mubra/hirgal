@@ -7,9 +7,9 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.urls import include, path
 
-admin.site.site_header = "Maamulka Hirgal Kiro"
+admin.site.site_header = "Hirgal Kiro Administration"
 admin.site.site_title = "Hirgal Kiro"
-admin.site.index_title = "Maamulka xogta"
+admin.site.index_title = "Manage data"
 
 urlpatterns = [
     path("", include("web.urls")),

@@ -18,7 +18,7 @@ class AuthenticationApiTests(APITestCase):
     def test_user_can_register(self):
         response = self.client.post(reverse("register"), self.registration_data)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertIn("Sug ansixinta", response.data["detail"])
+        self.assertIn("Wait for admin approval", response.data["detail"])
         self.assertFalse(User.objects.get(username="farhan").is_approved)
 
     def test_user_can_login_with_username_or_phone(self):
