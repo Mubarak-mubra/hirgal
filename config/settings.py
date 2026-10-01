@@ -12,6 +12,8 @@ DEBUG = True
 
 ALLOWED_HOSTS = ["*"]
 
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
 
 # Application definition
 
