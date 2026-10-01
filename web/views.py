@@ -1150,6 +1150,7 @@ class InvoiceCreateView(LoginRequiredMixin, View):
         if form.is_valid() and formset.is_valid():
             invoice = form.save(commit=False)
             invoice.owner = request.user.get_data_owner()
+            invoice.property = invoice.rental_agreement.property if invoice.rental_agreement else None
             # Save invoice first (so formset has an instance), then lines, then re-post
             invoice.save()
             formset.instance = invoice
@@ -1175,7 +1176,9 @@ class InvoiceUpdateView(LoginRequiredMixin, View):
         form = InvoiceForm(request.POST, instance=invoice, user=request.user.get_data_owner())
         formset = InvoiceLineFormSet(request.POST, instance=invoice, user=request.user.get_data_owner())
         if form.is_valid() and formset.is_valid():
-            form.save()
+            invoice = form.save(commit=False)
+            invoice.property = invoice.rental_agreement.property if invoice.rental_agreement else None
+            invoice.save()
             formset.save()
             # Re-post journal entry with updated lines
             from accounting.services import post_invoice

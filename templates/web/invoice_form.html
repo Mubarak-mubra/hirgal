@@ -29,23 +29,18 @@
 
       <div class="grid gap-4 sm:grid-cols-2">
         <div class="mb-4">
-          <label class="block text-sm font-medium text-slate-700">{{ form.property.label }}</label>
-          {{ form.property }}
-          {% if form.property.errors %}<p class="text-red-500 text-sm">{{ form.property.errors.0 }}</p>{% endif %}
-        </div>
-        <div class="mb-4">
           <label class="block text-sm font-medium text-slate-700">{{ form.invoice_number.label }}</label>
           {{ form.invoice_number }}
           {% if form.invoice_number.errors %}<p class="text-red-500 text-sm">{{ form.invoice_number.errors.0 }}</p>{% endif %}
         </div>
-      </div>
-
-      <div class="grid gap-4 sm:grid-cols-3">
         <div class="mb-4">
           <label class="block text-sm font-medium text-slate-700">{{ form.date.label }}</label>
           {{ form.date }}
           {% if form.date.errors %}<p class="text-red-500 text-sm">{{ form.date.errors.0 }}</p>{% endif %}
         </div>
+      </div>
+
+      <div class="grid gap-4 sm:grid-cols-2">
         <div class="mb-4">
           <label class="block text-sm font-medium text-slate-700">{{ form.due_date.label }}</label>
           {{ form.due_date }}
@@ -118,11 +113,9 @@
 document.getElementById('id_tenant').addEventListener('change', function() {
     const tenantId = this.value;
     const agreementSelect = document.getElementById('id_rental_agreement');
-    const propertySelect = document.getElementById('id_property');
 
-    // Reset agreement and property
-    agreementSelect.innerHTML = '<option value=""--- Select agreement ---</option>';
-    propertySelect.innerHTML = '<option value="">--- Select property ---</option>';
+    // Reset agreement
+    agreementSelect.innerHTML = '<option value="">--- Select agreement ---</option>';
 
     if (tenantId) {
         // Fetch agreements for this tenant
@@ -136,34 +129,9 @@ document.getElementById('id_tenant').addEventListener('change', function() {
                     agreementSelect.appendChild(opt);
                 });
 
-                // If only one agreement, auto-select it and its property
+                // If only one agreement, auto-select it
                 if (data.agreements.length === 1) {
                     agreementSelect.value = data.agreements[0].id;
-                    agreementSelect.dispatchEvent(new Event('change'));
-                }
-            });
-    }
-});
-
-document.getElementById('id_rental_agreement').addEventListener('change', function() {
-    const agreementId = this.value;
-    const propertySelect = document.getElementById('id_property');
-
-    if (agreementId) {
-        // Fetch the agreement details to get the property
-        const tenantId = document.getElementById('id_tenant').value;
-        fetch('/api/agreements-by-tenant/?tenant_id=' + tenantId)
-            .then(r => r.json())
-            .then(data => {
-                const agreement = data.agreements.find(a => a.id == agreementId);
-                if (agreement) {
-                    // Find and select the matching property
-                    for (let i = 0; i < propertySelect.options.length; i++) {
-                        if (propertySelect.options[i].text === agreement.property__name) {
-                            propertySelect.selectedIndex = i;
-                            break;
-                        }
-                    }
                 }
             });
     }

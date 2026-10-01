@@ -481,9 +481,9 @@ class JournalEntryLineForm(forms.ModelForm):
 class InvoiceForm(forms.ModelForm):
     class Meta:
         model = Invoice
-        fields = ("tenant", "rental_agreement", "property", "invoice_number", "date", "due_date", "status", "notes")
+        fields = ("tenant", "rental_agreement", "invoice_number", "date", "due_date", "status", "notes")
         labels = {
-            "tenant": "Customer", "rental_agreement": "Rental Agreement", "property": "Property",
+            "tenant": "Customer", "rental_agreement": "Rental Agreement",
             "invoice_number": "Invoice Number", "date": "Invoice Date", "due_date": "Due Date",
             "status": "Status", "notes": "Notes",
         }
@@ -497,7 +497,6 @@ class InvoiceForm(forms.ModelForm):
         if user:
             self.fields["tenant"].queryset = Tenant.objects.filter(owner=user)
             self.fields["rental_agreement"].queryset = RentalAgreement.objects.filter(tenant__owner=user, status="active")
-            self.fields["property"].queryset = Property.objects.filter(owner=user)
         _style_fields(self)
         self.fields["notes"].widget.attrs["rows"] = 3
 
