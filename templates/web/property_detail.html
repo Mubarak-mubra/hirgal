@@ -6,15 +6,15 @@
 <section class="mb-7 mt-4 flex flex-wrap items-end justify-between gap-5">
     <div>
         <h1 class="text-3xl font-bold text-ink">{{ property.name }}</h1>
-        <p class="mt-2 text-slate-500">{{ property.location }} · {{ property.get_property_type_display }}</p>
+        <p class="mt-2 text-slate-500">{{ property.location }} · {{ property.property_type.name|default:"—" }}</p>
     </div>
     <div class="flex items-center gap-3">
         <span class="rounded-full bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-800">
-            {{ space_count }} {% if property.property_type == 'home' %}rooms{% elif property.property_type == 'apartment' %}apartments{% else %}units{% endif %}
+            {{ space_badge }}
         </span>
         <a class="rounded-xl bg-slate-200 px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-300" href="{% url 'web-property-edit' property.pk %}">Edit</a>
         <a class="rounded-xl bg-red-100 px-4 py-3 text-sm font-bold text-red-700 hover:bg-red-200" href="{% url 'web-property-delete' property.pk %}">Delete</a>
-        {% if property.property_type == 'home' %}
+        {% if not property.has_units %}
             <a class="rounded-xl bg-ink px-4 py-3 text-sm font-bold text-white shadow-lg shadow-indigo-900/20 hover:bg-indigo-900" href="{% url 'web-villa-details' property.pk %}">Edit Details</a>
         {% else %}
             <a class="rounded-xl bg-ink px-4 py-3 text-sm font-bold text-white shadow-lg shadow-indigo-900/20 hover:bg-indigo-900" href="{% url 'web-unit-create' property.pk %}">+ Add Unit</a>
@@ -121,7 +121,7 @@
 </div>
 
 <!-- Units -->
-{% if property.units.all %}
+{% if property.has_units and property.units.all %}
 <section class="mt-6 rounded-2xl border bg-white p-5 shadow-sm">
     <h2 class="text-lg font-bold">Units / Apartments</h2>
     <div class="mt-4 grid gap-3 sm:grid-cols-2">
@@ -156,7 +156,7 @@
 <section class="mt-6 rounded-2xl border bg-white p-5 shadow-sm">
     <h2 class="text-lg font-bold">Recent Payments</h2>
     <div class="mt-4 divide-y">
-        {% for payment in property.payments.all|slice:":5" %}
+        {% for payment in recent_payments %}
         <div class="flex justify-between py-3">
             <div>
                 <a href="{% url 'web-tenant-detail' payment.rental_agreement.tenant.pk %}" class="text-indigo-600 hover:underline text-sm font-semibold">

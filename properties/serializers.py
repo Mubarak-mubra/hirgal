@@ -13,7 +13,7 @@ class PropertySerializer(serializers.ModelSerializer):
             "id",
             "name",
             "property_type",
-            "residential_structure",
+            "has_units",
             "location",
             "total_rentable_spaces",
             "cover_image",

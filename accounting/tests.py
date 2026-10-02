@@ -2,7 +2,7 @@ from decimal import Decimal
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.utils import timezone
-from properties.models import Property, Unit
+from properties.models import Property, PropertyType, Unit
 from rentals.models import Tenant, RentalAgreement
 from finance.models import BankAccount, Payment, GeneralExpense, MaintenanceRepair
 from accounting.models import Account, JournalEntry, JournalEntryLine, Invoice, InvoiceLine
@@ -24,7 +24,7 @@ class DoubleEntryAccountingTests(TestCase):
         self.property = Property.objects.create(
             owner=self.user,
             name="Test Villa",
-            property_type="home",
+            property_type=PropertyType.objects.create(owner=self.user, name="Home"),
             location="Hodan",
         )
         self.tenant = Tenant.objects.create(

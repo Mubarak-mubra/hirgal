@@ -6,15 +6,17 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from accounts.models import User
+from properties.models import PropertyType
 
 
 class PropertyApiTests(APITestCase):
     def setUp(self):
         self.user = User.objects.create_user("farhan", "+252612345678", "SafePassword123!", full_name="Farhan Xasan")
         self.client.force_authenticate(self.user)
+        self.apartment_type = PropertyType.objects.create(owner=self.user, name="Apartment")
 
     def test_user_can_create_and_list_property(self):
-        property_data = {"name": "Sunrise Apartments", "property_type": "apartment", "location": "Hodan"}
+        property_data = {"name": "Sunrise Apartments", "property_type": self.apartment_type.pk, "location": "Hodan"}
         create_response = self.client.post(reverse("property-list"), property_data)
         self.assertEqual(create_response.status_code, status.HTTP_201_CREATED)
         list_response = self.client.get(reverse("property-list"))

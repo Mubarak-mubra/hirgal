@@ -1,14 +1,19 @@
 from django.contrib import admin
 
 # Register your models here.
-from django.contrib import admin
-from .models import Property, PropertyAsset, Room, Unit
+from .models import Property, PropertyAsset, PropertyType, Room, Unit
+
+
+@admin.register(PropertyType)
+class PropertyTypeAdmin(admin.ModelAdmin):
+    list_display = ("name", "owner", "created_at")
+    search_fields = ("name", "owner__phone_number")
 
 
 @admin.register(Property)
 class PropertyAdmin(admin.ModelAdmin):
-    list_display = ("name", "owner", "property_type", "residential_structure", "location", "cover_image")
-    list_filter = ("property_type", "residential_structure")
+    list_display = ("name", "owner", "property_type", "has_units", "location", "cover_image")
+    list_filter = ("property_type", "has_units")
     search_fields = ("name", "location", "owner__phone_number")
 
 

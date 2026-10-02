@@ -3,7 +3,7 @@ from django.contrib.auth import get_user_model
 
 from accounting.models import Account, Invoice, InvoiceLine, JournalEntry, JournalEntryLine
 from finance.models import BankAccount, GeneralExpense, MaintenanceRepair, Payment
-from properties.models import Property, PropertyAsset, Room, Unit
+from properties.models import Property, PropertyAsset, PropertyType, Room, Unit, ensure_default_property_types
 from rentals.models import RentalAgreement, Tenant
 
 User = get_user_model()
@@ -58,21 +58,51 @@ class UserProfileForm(forms.ModelForm):
 class PropertyForm(forms.ModelForm):
     class Meta:
         model = Property
-        fields = ("name", "property_type", "residential_structure", "location", "electricity_account_no", "water_account_no", "description")
+        fields = ("name", "property_type", "has_units", "location", "electricity_account_no", "water_account_no", "description")
         labels = {
             "name": "Property Name",
             "property_type": "Property Type",
-            "residential_structure": "Structure Type",
+            "has_units": "Has units / apartments",
             "location": "Location",
             "description": "Description",
             "electricity_account_no": "Electricity Account No.",
             "water_account_no": "Water Account No.",
         }
+        widgets = {
+            "has_units": forms.CheckboxInput(attrs={"class": "h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"}),
+        }
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)
+        if user:
+            ensure_default_property_types(user)
+            self.fields["property_type"].queryset = PropertyType.objects.filter(owner=user)
+        else:
+            self.fields["property_type"].queryset = PropertyType.objects.none()
+        self.fields["property_type"].required = True
         _style_fields(self)
         self.fields["description"].widget.attrs["rows"] = 4
+
+
+class PropertyTypeForm(forms.ModelForm):
+    class Meta:
+        model = PropertyType
+        fields = ("name",)
+        labels = {"name": "Type Name"}
+
+    def __init__(self, *args, user=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._user = user
+        _style_fields(self)
+
+    def clean_name(self):
+        name = self.cleaned_data["name"]
+        existing = PropertyType.objects.filter(owner=self._user, name__iexact=name)
+        if self.instance.pk:
+            existing = existing.exclude(pk=self.instance.pk)
+        if existing.exists():
+            raise forms.ValidationError("You already have a property type with this name.")
+        return name
 
 
 class PropertyAssetForm(forms.ModelForm):
@@ -179,31 +209,17 @@ class RentalAgreementForm(forms.ModelForm):
             from django.db.models import Q
             active_agreements = RentalAgreement.objects.filter(status="active")
 
-            # Properties that are fully rented (whole property agreement)
-            fully_rented_property_ids = active_agreements.filter(
-                rental_scope="whole_property"
-            ).values_list("property_id", flat=True)
-
-            # Get available properties (not fully rented)
-            available_properties = Property.objects.filter(owner=user).exclude(
-                id__in=fully_rented_property_ids
-            )
-
-            # For each property, check if it has units
-            # If property has units, check if all units are rented
             final_property_ids = []
-            for prop in available_properties:
-                units = prop.units.all()
-                if not units.exists():
-                    # No units = whole property rental, include if not fully rented
-                    final_property_ids.append(prop.pk)
+            for prop in Property.objects.filter(owner=user):
+                active_for_prop = active_agreements.filter(property=prop)
+                if prop.has_units and prop.units.exists():
+                    # Unit-based property: available if any unit is still free
+                    rented_unit_ids = active_for_prop.values_list("unit_id", flat=True)
+                    if prop.units.exclude(id__in=rented_unit_ids).exists():
+                        final_property_ids.append(prop.pk)
                 else:
-                    # Has units - check if any unit is available
-                    rented_unit_ids = active_agreements.filter(
-                        property=prop
-                    ).values_list("unit_id", flat=True)
-                    available_units = units.exclude(id__in=rented_unit_ids)
-                    if available_units.exists():
+                    # Complete-unit (whole property) rental: available if no active agreement
+                    if not active_for_prop.exists():
                         final_property_ids.append(prop.pk)
 
             self.fields["tenant"].queryset = Tenant.objects.filter(owner=user)

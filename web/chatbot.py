@@ -47,7 +47,7 @@ def explore_properties(user):
             results.append({
                 "name": p.name,
                 "location": p.location,
-                "type": p.get_property_type_display(),
+                "type": p.property_type.name if p.property_type else None,
                 "units": p.units.count(),
             })
         return json.dumps(results, default=str)

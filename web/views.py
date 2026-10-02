@@ -7,19 +7,20 @@ from django.views import View
 from django.views.generic import DetailView, TemplateView, ListView
 
 from django.db import transaction
+from django.db.models import Count, Q
 from accounting.models import Account, Invoice, InvoiceLine, JournalEntry, JournalEntryLine
 from accounting.services import (
     link_bank_account_to_ledger, post_expense, post_payment, post_repair,
     seed_default_chart_of_accounts,
 )
 from finance.models import BankAccount, GeneralExpense, MaintenanceRepair, Payment
-from properties.models import Property, PropertyAsset, Room, Unit
+from properties.models import Property, PropertyAsset, PropertyType, Room, Unit, ensure_default_property_types
 from rentals.models import RentalAgreement, Tenant
 
 from .forms import (
     AccountForm, BankAccountForm, GeneralExpenseForm, InvoiceForm, InvoiceLineFormSet,
     JournalEntryForm, JournalEntryLineFormSet, MaintenanceRepairForm,
-    PaymentForm, PropertyAssetForm, PropertyForm, RegistrationForm,
+    PaymentForm, PropertyAssetForm, PropertyForm, PropertyTypeForm, RegistrationForm,
     RentalAgreementForm, RoomForm, TenantForm, UnitForm, UserProfileForm,
     VillaDetailsForm,
 )
@@ -147,6 +148,10 @@ class UnitsByPropertyView(LoginRequiredMixin, View):
     def get(self, request):
         property_id = request.GET.get("property_id")
         if not property_id:
+            return JsonResponse({"units": []})
+
+        property_instance = Property.objects.filter(pk=property_id).first()
+        if not property_instance or not property_instance.has_units:
             return JsonResponse({"units": []})
 
         # Get all units for this property
@@ -293,7 +298,7 @@ class PropertyListView(HomeView):
         return context
 
     def post(self, request):
-        form = PropertyForm(request.POST)
+        form = PropertyForm(request.POST, user=request.user.get_data_owner())
         if form.is_valid():
             property_instance = form.save(commit=False)
             property_instance.owner = request.user.get_data_owner()
@@ -307,11 +312,11 @@ class PropertyCreateView(HomeView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["form"] = PropertyForm()
+        context["form"] = PropertyForm(user=self.request.user.get_data_owner())
         return context
 
     def post(self, request):
-        form = PropertyForm(request.POST)
+        form = PropertyForm(request.POST, user=request.user.get_data_owner())
         if form.is_valid():
             property_instance = form.save(commit=False)
             property_instance.owner = request.user.get_data_owner()
@@ -337,7 +342,12 @@ class PropertyDetailView(LoginRequiredMixin, DetailView):
         context["active_agreements"] = agreements
         context["expected_rent"] = sum(item.agreed_monthly_rent for item in agreements)
         context["monthly_expenses"] = sum(item.amount for item in self.object.general_expenses.all())
-        context["space_count"] = sum(unit.rooms.count() for unit in self.object.units.all()) if self.object.property_type == "home" else self.object.units.count()
+        if self.object.has_units:
+            unit_count = self.object.units.count()
+            context["space_badge"] = "%d unit%s" % (unit_count, "" if unit_count == 1 else "s")
+        else:
+            single_unit = self.object.units.first()
+            context["space_badge"] = "%d rooms" % single_unit.rooms.count() if single_unit else "Whole property"
 
         total_spaces = self.object.total_rentable_spaces or 1
         rented_spaces = min(sum(item.rented_space_count for item in agreements), total_spaces)
@@ -354,6 +364,13 @@ class PropertyDetailView(LoginRequiredMixin, DetailView):
         else:
             context["occupancy_label"] = "Vacant"
             context["occupancy_color"] = "red"
+        context["recent_payments"] = (
+            Payment.objects.filter(
+                Q(rental_agreement__property=self.object) | Q(invoice__property=self.object)
+            )
+            .select_related("rental_agreement__tenant", "bank_account")
+            .order_by("-payment_date", "-pk")[:5]
+        )
         return context
 
 
@@ -362,12 +379,12 @@ class PropertyUpdateView(LoginRequiredMixin, View):
 
     def get(self, request, pk):
         property_instance = get_object_or_404(Property, pk=pk, owner=request.user.get_data_owner())
-        form = PropertyForm(instance=property_instance)
+        form = PropertyForm(instance=property_instance, user=request.user.get_data_owner())
         return render(request, "web/property_form.html", {"form": form, "editing": True})
 
     def post(self, request, pk):
         property_instance = get_object_or_404(Property, pk=pk, owner=request.user.get_data_owner())
-        form = PropertyForm(request.POST, instance=property_instance)
+        form = PropertyForm(request.POST, instance=property_instance, user=request.user.get_data_owner())
         if form.is_valid():
             form.save()
             return redirect("web-property-detail", pk)
@@ -385,6 +402,70 @@ class PropertyDeleteView(LoginRequiredMixin, View):
         property_instance = get_object_or_404(Property, pk=pk, owner=request.user.get_data_owner())
         property_instance.delete()
         return redirect("web-properties")
+
+
+# ── Property Types ────────────────────────────────────────────────────────────
+
+class PropertyTypeListView(HomeView):
+    template_name = "web/property_type_list.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        owner = self.request.user.get_data_owner()
+        ensure_default_property_types(owner)
+        context["property_types"] = PropertyType.objects.filter(owner=owner).annotate(
+            num_properties=Count("properties")
+        )
+        return context
+
+
+class PropertyTypeCreateView(HomeView):
+    template_name = "web/property_type_form.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["form"] = PropertyTypeForm(user=self.request.user.get_data_owner())
+        context["title"] = "Add Property Type"
+        return context
+
+    def post(self, request):
+        form = PropertyTypeForm(request.POST, user=request.user.get_data_owner())
+        if form.is_valid():
+            property_type = form.save(commit=False)
+            property_type.owner = request.user.get_data_owner()
+            property_type.save()
+            return redirect("web-property-type-list")
+        return render(request, self.template_name, {"form": form, "title": "Add Property Type"})
+
+
+class PropertyTypeUpdateView(LoginRequiredMixin, View):
+    login_url = "/login/"
+
+    def get(self, request, pk):
+        property_type = get_object_or_404(PropertyType, pk=pk, owner=request.user.get_data_owner())
+        form = PropertyTypeForm(instance=property_type, user=request.user.get_data_owner())
+        return render(request, "web/property_type_form.html", {"form": form, "title": "Edit Property Type", "editing": True, "property_type": property_type})
+
+    def post(self, request, pk):
+        property_type = get_object_or_404(PropertyType, pk=pk, owner=request.user.get_data_owner())
+        form = PropertyTypeForm(request.POST, instance=property_type, user=request.user.get_data_owner())
+        if form.is_valid():
+            form.save()
+            return redirect("web-property-type-list")
+        return render(request, "web/property_type_form.html", {"form": form, "title": "Edit Property Type", "editing": True, "property_type": property_type})
+
+
+class PropertyTypeDeleteView(LoginRequiredMixin, View):
+    login_url = "/login/"
+
+    def get(self, request, pk):
+        property_type = get_object_or_404(PropertyType, pk=pk, owner=request.user.get_data_owner())
+        return render(request, "web/confirm_delete.html", {"object": property_type, "cancel_url": "web-property-type-list"})
+
+    def post(self, request, pk):
+        property_type = get_object_or_404(PropertyType, pk=pk, owner=request.user.get_data_owner())
+        property_type.delete()
+        return redirect("web-property-type-list")
 
 
 # ── Assets ────────────────────────────────────────────────────────────────────

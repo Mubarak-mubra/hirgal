@@ -31,7 +31,7 @@
                 </td>
                 <td class="px-4 py-3 text-slate-500">{{ property.location }}</td>
                 <td class="px-4 py-3">
-                    <span class="inline-flex items-center rounded-full bg-sky-100 px-2.5 py-0.5 text-xs font-semibold text-sky-700">{{ property.get_property_type_display }}</span>
+                    <span class="inline-flex items-center rounded-full bg-sky-100 px-2.5 py-0.5 text-xs font-semibold text-sky-700">{{ property.property_type.name|default:"—" }}</span>
                 </td>
                 <td class="px-4 py-3">
                     {% for agreement in property.active_agreements %}

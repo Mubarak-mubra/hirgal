@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} - Hirgal Kiro{% endblock %}
+{% block content %}
+<section class="mx-auto max-w-3xl">
+  <a class="text-sm font-semibold text-indigo-700" href="{% url 'web-property-type-list' %}">← Property Types</a>
+  <div class="mb-6 mt-5">
+    <p class="text-xs font-bold tracking-widest text-indigo-700">PROPERTY TYPE</p>
+    <h1 class="mt-2 text-3xl font-bold text-ink">{{ title }}</h1>
+    <p class="mt-2 text-slate-500">Give your property a category you can pick everywhere.</p>
+  </div>
+  <form method="post" class="rounded-2xl border bg-white p-6 shadow-xl shadow-slate-200/60 md:p-8">
+    {% csrf_token %}
+    <div class="mb-4">
+      <label class="block text-sm font-semibold text-slate-700" for="{{ form.name.id_for_label }}">{{ form.name.label }}</label>
+      {{ form.name }}
+      {% for error in form.name.errors %}<small class="mt-1 block text-rose-600">{{ error }}</small>{% endfor %}
+    </div>
+    <div class="mt-4 flex justify-end border-t pt-5">
+      <button class="rounded-xl bg-ink px-6 py-3 font-bold text-white shadow-lg shadow-indigo-900/20 transition hover:bg-indigo-900" type="submit">Save type</button>
+    </div>
+  </form>
+</section>
+{% endblock %}
