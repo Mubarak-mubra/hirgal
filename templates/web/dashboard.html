@@ -2,21 +2,6 @@
 {% block title %}Dashboard - Hirgal Kiro{% endblock %}
 {% block content %}
 
-{# ── Overdue Rent Alert Banner ─────────────────────────────────────────────── #}
-{% if rent_not_paid %}
-<div class="mb-6 rounded-2xl border-2 border-rose-300 bg-rose-50 px-5 py-4 flex items-start gap-3">
-    <span class="text-2xl mt-0.5">🚨</span>
-    <div>
-        <p class="font-bold text-rose-700">{{ rent_not_paid|length }} customer{{ rent_not_paid|length|pluralize }} haven't paid rent this month!</p>
-        <p class="text-sm text-rose-600 mt-0.5">
-            {% for item in rent_not_paid %}
-            <a href="{% url 'web-tenant-detail' item.agreement.tenant.pk %}" class="underline font-semibold">{{ item.agreement.tenant.full_name }}</a> (${{ item.monthly_rent|floatformat:0 }}){% if not forloop.last %}, {% endif %}
-            {% endfor %}
-        </p>
-    </div>
-</div>
-{% endif %}
-
 <section class="mb-8">
     <p class="text-xs font-bold tracking-widest text-indigo-700">DASHBOARD</p>
     <h1 class="mt-3 text-3xl font-bold text-ink">Welcome back, {{ request.user.full_name|default:request.user.username }}!</h1>

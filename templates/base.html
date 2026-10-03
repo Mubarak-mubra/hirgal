@@ -455,6 +455,29 @@
                     </button>
                 </div>
                 <div class="topbar-right">
+                    {% if rent_notification.unpaid %}
+                    <div class="relative">
+                        <button type="button" id="rentNotifBtn" onclick="toggleRentNotif(event)" class="relative rounded-lg p-2 text-slate-500 hover:bg-slate-100" title="Rent notifications">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-5 w-5"><path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" /></svg>
+                            <span class="absolute -right-1 -top-1 min-w-[18px] rounded-full bg-rose-500 px-1 text-center text-[10px] font-bold leading-[18px] text-white">{{ rent_notification.unpaid|length }}</span>
+                        </button>
+                        <div id="rentNotifMenu" class="hidden absolute right-0 mt-2 w-80 overflow-hidden rounded-xl border bg-white shadow-2xl" style="z-index: 50;">
+                            <div class="border-b bg-slate-50 px-4 py-3">
+                                <p class="text-sm font-bold text-ink">{{ rent_notification.unpaid|length }}/{{ rent_notification.total }} customers haven't paid rent this month</p>
+                                <p class="mt-0.5 text-xs text-slate-500">{{ rent_notification.month_label }}</p>
+                            </div>
+                            <div class="max-h-72 overflow-y-auto">
+                                {% for c in rent_notification.unpaid %}
+                                <a href="{% url 'web-tenant-detail' c.tenant_id %}" class="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-2.5 last:border-0 hover:bg-slate-50">
+                                    <span class="text-sm font-semibold text-slate-700">{{ c.name }}</span>
+                                    <span class="shrink-0 text-sm font-bold text-rose-600">${{ c.remaining|floatformat:0 }}</span>
+                                </a>
+                                {% endfor %}
+                            </div>
+                            <a href="{% url 'web-payments' %}" class="block border-t bg-slate-50 px-4 py-2.5 text-center text-xs font-bold text-indigo-700 hover:bg-slate-100">View All Payments →</a>
+                        </div>
+                    </div>
+                    {% endif %}
                     <span class="topbar-user">{{ request.user.full_name|default:request.user.username }}</span>
                     <a href="{% url 'web-chatbot' %}" class="rounded-lg bg-indigo-50 p-2 text-indigo-600 hover:bg-indigo-100" title="AI Assistant">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-5 w-5"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" /></svg>
@@ -507,6 +530,17 @@
             const parentGroup = nested.closest('.sidebar-group');
             if (parentGroup) parentGroup.classList.add('open');
         }
+    });
+
+    // Topbar rent-notification bell
+    function toggleRentNotif(e) {
+        e.stopPropagation();
+        var menu = document.getElementById('rentNotifMenu');
+        if (menu) menu.classList.toggle('hidden');
+    }
+    document.addEventListener('click', function (e) {
+        var menu = document.getElementById('rentNotifMenu');
+        if (menu && !menu.contains(e.target)) menu.classList.add('hidden');
     });
     </script>
 </body>
