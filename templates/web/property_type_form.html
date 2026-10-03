@@ -15,6 +15,16 @@
       {{ form.name }}
       {% for error in form.name.errors %}<small class="mt-1 block text-rose-600">{{ error }}</small>{% endfor %}
     </div>
+    <div class="mb-4 rounded-xl bg-slate-50 p-4">
+      <label class="flex items-start gap-3 cursor-pointer">
+        {{ form.has_units }}
+        <span>
+          <span class="block text-sm font-semibold text-slate-700">Has units / apartments?</span>
+          <span class="mt-1 block text-xs text-slate-500">Turn this on for properties that are split into units or apartments (e.g. an apartment building). Properties with this type will show the units section. Leave it off for single buildings like villas or standalone houses.</span>
+        </span>
+      </label>
+      {% for error in form.has_units.errors %}<small class="mt-1 block text-rose-600">{{ error }}</small>{% endfor %}
+    </div>
     <div class="mt-4 flex justify-end border-t pt-5">
       <button class="rounded-xl bg-ink px-6 py-3 font-bold text-white shadow-lg shadow-indigo-900/20 transition hover:bg-indigo-900" type="submit">Save type</button>
     </div>

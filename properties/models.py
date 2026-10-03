@@ -8,6 +8,7 @@ from django.db import models
 class PropertyType(models.Model):
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="property_types")
     name = models.CharField("Type name", max_length=100)
+    has_units = models.BooleanField("Has units / apartments", default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -18,14 +19,19 @@ class PropertyType(models.Model):
         return self.name
 
 
-DEFAULT_PROPERTY_TYPES = ["Home", "Apartment", "Commercial", "Mixed"]
+DEFAULT_PROPERTY_TYPES = [
+    ("Home", False),
+    ("Apartment", True),
+    ("Commercial", False),
+    ("Mixed", True),
+]
 
 
 def ensure_default_property_types(owner):
     """Create the starter property types for an owner that has none yet."""
     if owner and not PropertyType.objects.filter(owner=owner).exists():
         PropertyType.objects.bulk_create(
-            [PropertyType(owner=owner, name=name) for name in DEFAULT_PROPERTY_TYPES]
+            [PropertyType(owner=owner, name=name, has_units=has_units) for name, has_units in DEFAULT_PROPERTY_TYPES]
         )
 
 
@@ -35,7 +41,6 @@ class Property(models.Model):
     property_type = models.ForeignKey(
         PropertyType, on_delete=models.SET_NULL, null=True, blank=True, related_name="properties"
     )
-    has_units = models.BooleanField("Has units / apartments", default=False)
     location = models.CharField(max_length=200)
     total_rentable_spaces = models.PositiveIntegerField(default=1)
     electricity_account_no = models.CharField("Electricity account no.", max_length=50, blank=True)
@@ -47,6 +52,12 @@ class Property(models.Model):
 
     def __str__(self):
         return self.name
+
+    @property
+    def has_units(self):
+        if self.property_type_id:
+            return self.property_type.has_units
+        return self.units.exists()
 
 
 class Unit(models.Model):

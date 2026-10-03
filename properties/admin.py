@@ -6,14 +6,15 @@ from .models import Property, PropertyAsset, PropertyType, Room, Unit
 
 @admin.register(PropertyType)
 class PropertyTypeAdmin(admin.ModelAdmin):
-    list_display = ("name", "owner", "created_at")
+    list_display = ("name", "owner", "has_units", "created_at")
+    list_filter = ("has_units",)
     search_fields = ("name", "owner__phone_number")
 
 
 @admin.register(Property)
 class PropertyAdmin(admin.ModelAdmin):
-    list_display = ("name", "owner", "property_type", "has_units", "location", "cover_image")
-    list_filter = ("property_type", "has_units")
+    list_display = ("name", "owner", "property_type", "location", "cover_image")
+    list_filter = ("property_type",)
     search_fields = ("name", "location", "owner__phone_number")
 
 

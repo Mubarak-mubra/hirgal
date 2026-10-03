@@ -458,12 +458,23 @@ class PropertyTypeUpdateView(LoginRequiredMixin, View):
 class PropertyTypeDeleteView(LoginRequiredMixin, View):
     login_url = "/login/"
 
+    def _error(self, property_type):
+        count = property_type.properties.count()
+        if count:
+            return "%d propert%s currently use this type — reassign or delete those properties first." % (
+                count, "y" if count == 1 else "ies",
+            )
+        return None
+
     def get(self, request, pk):
         property_type = get_object_or_404(PropertyType, pk=pk, owner=request.user.get_data_owner())
-        return render(request, "web/confirm_delete.html", {"object": property_type, "cancel_url": "web-property-type-list"})
+        return render(request, "web/confirm_delete.html", {"object": property_type, "cancel_url": "web-property-type-list", "error": self._error(property_type)})
 
     def post(self, request, pk):
         property_type = get_object_or_404(PropertyType, pk=pk, owner=request.user.get_data_owner())
+        error = self._error(property_type)
+        if error:
+            return render(request, "web/confirm_delete.html", {"object": property_type, "cancel_url": "web-property-type-list", "error": error})
         property_type.delete()
         return redirect("web-property-type-list")
 

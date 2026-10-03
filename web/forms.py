@@ -58,18 +58,14 @@ class UserProfileForm(forms.ModelForm):
 class PropertyForm(forms.ModelForm):
     class Meta:
         model = Property
-        fields = ("name", "property_type", "has_units", "location", "electricity_account_no", "water_account_no", "description")
+        fields = ("name", "property_type", "location", "electricity_account_no", "water_account_no", "description")
         labels = {
             "name": "Property Name",
             "property_type": "Property Type",
-            "has_units": "Has units / apartments",
             "location": "Location",
             "description": "Description",
             "electricity_account_no": "Electricity Account No.",
             "water_account_no": "Water Account No.",
-        }
-        widgets = {
-            "has_units": forms.CheckboxInput(attrs={"class": "h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"}),
         }
 
     def __init__(self, *args, user=None, **kwargs):
@@ -87,13 +83,17 @@ class PropertyForm(forms.ModelForm):
 class PropertyTypeForm(forms.ModelForm):
     class Meta:
         model = PropertyType
-        fields = ("name",)
-        labels = {"name": "Type Name"}
+        fields = ("name", "has_units")
+        labels = {"name": "Type Name", "has_units": "Has units / apartments"}
+        widgets = {
+            "has_units": forms.CheckboxInput(attrs={"class": "h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"}),
+        }
 
     def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)
         self._user = user
         _style_fields(self)
+        self.fields["has_units"].widget.attrs["class"] = "h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
 
     def clean_name(self):
         name = self.cleaned_data["name"]
@@ -212,7 +212,7 @@ class RentalAgreementForm(forms.ModelForm):
             final_property_ids = []
             for prop in Property.objects.filter(owner=user):
                 active_for_prop = active_agreements.filter(property=prop)
-                if prop.has_units and prop.units.exists():
+                if prop.has_units:
                     # Unit-based property: available if any unit is still free
                     rented_unit_ids = active_for_prop.values_list("unit_id", flat=True)
                     if prop.units.exclude(id__in=rented_unit_ids).exists():

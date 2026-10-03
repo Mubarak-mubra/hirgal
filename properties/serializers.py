@@ -6,6 +6,7 @@ class PropertySerializer(serializers.ModelSerializer):
     total_units = serializers.IntegerField(read_only=True, default=0)
     rented_units = serializers.IntegerField(read_only=True, default=0)
     expected_monthly_rent = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True, default=0)
+    has_units = serializers.SerializerMethodField()
 
     class Meta:
         model = Property
@@ -24,7 +25,10 @@ class PropertySerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "created_at", "updated_at"]
+        read_only_fields = ["id", "created_at", "updated_at", "has_units"]
+
+    def get_has_units(self, obj):
+        return obj.has_units
 
 
 class UnitSerializer(serializers.ModelSerializer):
