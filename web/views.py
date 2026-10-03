@@ -1225,7 +1225,43 @@ class InvoiceDetailView(LoginRequiredMixin, DetailView):
         context = super().get_context_data(**kwargs)
         context["lines"] = self.object.lines.select_related("account")
         context["total"] = self.object.get_total_amount()
+        paid = sum(p.amount for p in self.object.payments.all())
+        context["paid_total"] = paid
+        context["balance"] = context["total"] - paid
+        context["payments"] = self.object.payments.select_related("bank_account").order_by("-payment_date")[:10]
         return context
+
+
+class InvoiceSendView(LoginRequiredMixin, View):
+    """Mark a draft invoice as sent and open WhatsApp with the invoice message."""
+
+    login_url = "/login/"
+
+    def get(self, request, pk):
+        import re as _re
+        from urllib.parse import urlencode
+
+        invoice = get_object_or_404(Invoice, pk=pk, owner=request.user.get_data_owner())
+        if invoice.status == "draft":
+            invoice.status = "sent"
+            invoice.save(update_fields=["status"])
+
+        phone = _re.sub(r"\D", "", invoice.tenant.phone_number or "")
+        if phone.startswith("0"):
+            phone = "252" + phone[1:]
+        message = (
+            f"Hello {invoice.tenant.full_name},\n\n"
+            f"Invoice {invoice.invoice_number} from Hirgal Kiro\n"
+            f"Amount: ${invoice.get_total_amount()}\n"
+            f"Date: {invoice.date}\n"
+            f"Due: {invoice.due_date}\n\n"
+            f"Thank you."
+        )
+        if phone:
+            url = f"https://wa.me/{phone}?{urlencode({'text': message})}"
+        else:
+            url = f"https://wa.me/?{urlencode({'text': message})}"
+        return redirect(url)
 
 
 class InvoiceCreateView(LoginRequiredMixin, View):

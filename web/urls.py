@@ -8,7 +8,7 @@ from .views import (
     DashboardView, GeneralExpenseCreateView, GeneralExpenseDeleteView,
     GeneralExpenseDetailView, GeneralExpenseListView, GeneralExpenseUpdateView,
     HomeView, InvoiceCreateView, InvoiceDeleteView, InvoiceDetailView,
-    InvoiceListView, InvoiceUpdateView, InventoryItemCreateView, JournalEntryCreateView,
+    InvoiceListView, InvoiceSendView, InvoiceUpdateView, InventoryItemCreateView, JournalEntryCreateView,
     JournalEntryDeleteView, JournalEntryDetailView, JournalEntryListView,
     JournalEntryUpdateView, LoginView, LogoutView, MaintenanceRepairCreateView,
     MaintenanceRepairDeleteView, MaintenanceRepairDetailView,
@@ -129,6 +129,7 @@ urlpatterns = [
     path("xisaabiyadda/biilasha/", InvoiceListView.as_view(), name="web-invoice-list"),
     path("xisaabiyadda/biilasha/new/", InvoiceCreateView.as_view(), name="web-invoice-create"),
     path("xisaabiyadda/biilasha/<int:pk>/", InvoiceDetailView.as_view(), name="web-invoice-detail"),
+    path("xisaabiyadda/biilasha/<int:pk>/send/", InvoiceSendView.as_view(), name="web-invoice-send"),
     path("xisaabiyadda/biilasha/<int:pk>/edit/", InvoiceUpdateView.as_view(), name="web-invoice-edit"),
     path("xisaabiyadda/biilasha/<int:pk>/delete/", InvoiceDeleteView.as_view(), name="web-invoice-delete"),
 
