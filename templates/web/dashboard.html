@@ -39,17 +39,17 @@
 {# ── Property & Occupancy Stats ───────────────────────────────────────────── #}
 <section class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-8">
     <a href="{% url 'web-properties' %}" class="rounded-2xl border bg-white p-5 shadow-sm hover:border-indigo-300 hover:shadow-md transition">
-        <p class="text-slate-500 text-sm">🏠 Properties</p>
+        <p class="flex items-center gap-1.5 text-slate-500 text-sm"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" /></svg> Properties</p>
         <strong class="mt-2 block text-3xl text-ink">{{ property_count }}</strong>
         <p class="mt-1 text-xs text-slate-400">Total owned</p>
     </a>
     <a href="{% url 'web-tenants' %}" class="rounded-2xl border bg-white p-5 shadow-sm hover:border-indigo-300 hover:shadow-md transition">
-        <p class="text-slate-500 text-sm">👥 Customers</p>
+        <p class="flex items-center gap-1.5 text-slate-500 text-sm"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" /></svg> Customers</p>
         <strong class="mt-2 block text-3xl text-ink">{{ tenant_count }}</strong>
         <p class="mt-1 text-xs text-slate-400">{{ agreement_count }} active agreement{{ agreement_count|pluralize }}</p>
     </a>
     <div class="rounded-2xl border bg-white p-5">
-        <p class="text-slate-500 text-sm">📊 Occupancy Rate</p>
+        <p class="flex items-center gap-1.5 text-slate-500 text-sm"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4"><path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" /></svg> Occupancy Rate</p>
         <strong class="mt-2 block text-3xl {% if occupancy_rate >= 80 %}text-green-600{% elif occupancy_rate >= 50 %}text-amber-600{% else %}text-rose-600{% endif %}">{{ occupancy_rate }}%</strong>
         <div class="mt-2 w-full bg-slate-200 rounded-full h-2">
             <div class="h-2 rounded-full {% if occupancy_rate >= 80 %}bg-green-500{% elif occupancy_rate >= 50 %}bg-amber-500{% else %}bg-rose-500{% endif %}" style="width: {{ occupancy_rate }}%"></div>
@@ -57,7 +57,7 @@
         <p class="mt-1 text-xs text-slate-400">{{ rented_units }} of {{ total_units }} units rented</p>
     </div>
     <a href="{% url 'web-invoice-list' %}" class="rounded-2xl border bg-white p-5 shadow-sm hover:border-indigo-300 hover:shadow-md transition">
-        <p class="text-slate-500 text-sm">📄 Outstanding Invoices</p>
+        <p class="flex items-center gap-1.5 text-slate-500 text-sm"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg> Outstanding Invoices</p>
         <strong class="mt-2 block text-3xl {% if invoice_count > 0 %}text-amber-600{% else %}text-green-600{% endif %}">{{ invoice_count }}</strong>
         <p class="mt-1 text-xs text-slate-400">Receivable: ${{ ar_balance|floatformat:0 }}</p>
     </a>
@@ -65,22 +65,22 @@
 
 {# ── Quick Actions ────────────────────────────────────────────────────────── #}
 <section class="mb-8">
-    <h2 class="mb-3 text-lg font-bold text-ink">⚡ Quick Actions</h2>
+    <h2 class="mb-3 flex items-center gap-2 text-lg font-bold text-ink"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-5 w-5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" /></svg> Quick Actions</h2>
     <div class="flex flex-wrap gap-3">
-        <a href="{% url 'web-payment-create' %}" class="rounded-xl bg-green-600 px-4 py-2 text-sm font-bold text-white hover:bg-green-700 transition">💰 Record Payment</a>
-        <a href="{% url 'web-tenant-create' %}" class="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700 transition">👤 Add Customer</a>
-        <a href="{% url 'web-property-create' %}" class="rounded-xl bg-sky-600 px-4 py-2 text-sm font-bold text-white hover:bg-sky-700 transition">🏠 Add Property</a>
-        <a href="{% url 'web-expense-create' %}" class="rounded-xl bg-rose-600 px-4 py-2 text-sm font-bold text-white hover:bg-rose-700 transition">📋 Add Expense</a>
-        <a href="{% url 'web-maintenance-create' %}" class="rounded-xl bg-amber-600 px-4 py-2 text-sm font-bold text-white hover:bg-amber-700 transition">🔧 Report Repair</a>
-        <a href="{% url 'web-invoice-create' %}" class="rounded-xl bg-purple-600 px-4 py-2 text-sm font-bold text-white hover:bg-purple-700 transition">🧾 Create Invoice</a>
-        <a href="{% url 'web-profit-loss' %}" class="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700 transition">📊 Profit & Loss</a>
+        <a href="{% url 'web-payment-create' %}" class="inline-flex items-center gap-1.5 rounded-xl bg-green-600 px-4 py-2 text-sm font-bold text-white hover:bg-green-700 transition"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v7.5m0 0v7.5m0-7.5h7.5m-7.5 0H3.375c-.621 0-1.125-.504-1.125-1.125V4.5c0-.621.504-1.125 1.125-1.125H9.75m0 0H18.375c.621 0 1.125.504 1.125 1.125v9.375m-8.25-3l1.5 1.5 3-3.75" /></svg> Record Payment</a>
+        <a href="{% url 'web-tenant-create' %}" class="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700 transition"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4"><path stroke-linecap="round" stroke-linejoin="round" d="M18 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zM3 19.235v-.11a6.375 6.375 0 0112.75 0v.109A12.318 12.318 0 019.374 21c-2.331 0-4.512-.645-6.374-1.766z" /></svg> Add Customer</a>
+        <a href="{% url 'web-property-create' %}" class="inline-flex items-center gap-1.5 rounded-xl bg-sky-600 px-4 py-2 text-sm font-bold text-white hover:bg-sky-700 transition"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" /></svg> Add Property</a>
+        <a href="{% url 'web-expense-create' %}" class="inline-flex items-center gap-1.5 rounded-xl bg-rose-600 px-4 py-2 text-sm font-bold text-white hover:bg-rose-700 transition"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4"><path stroke-linecap="round" stroke-linejoin="round" d="M11.35 3.836c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m8.9-4.414c.376.023.75.05 1.124.08 1.131.094 1.976 1.057 1.976 2.192V16.5A2.25 2.25 0 0118 18.75h-2.25m-7.5-10.5H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V18.75m-7.5-10.5h6.375c.621 0 1.125.504 1.125 1.125v9.375m-8.25-3l1.5 1.5 3-3.75" /></svg> Add Expense</a>
+        <a href="{% url 'web-maintenance-create' %}" class="inline-flex items-center gap-1.5 rounded-xl bg-amber-600 px-4 py-2 text-sm font-bold text-white hover:bg-amber-700 transition"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4"><path stroke-linecap="round" stroke-linejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z" /></svg> Report Repair</a>
+        <a href="{% url 'web-invoice-create' %}" class="inline-flex items-center gap-1.5 rounded-xl bg-purple-600 px-4 py-2 text-sm font-bold text-white hover:bg-purple-700 transition"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 6v.75m0 3v.75m0 3v.75m0 3V18m-9-5.25h5.25M7.5 15h3M3.375 5.25c-.621 0-1.125.504-1.125 1.125v3.026a2.999 2.999 0 010 5.198v3.026c0 .621.504 1.125 1.125 1.125h17.25c.621 0 1.125-.504 1.125-1.125v-3.026a2.999 2.999 0 010-5.198V6.375c0-.621-.504-1.125-1.125-1.125H3.375z" /></svg> Create Invoice</a>
+        <a href="{% url 'web-profit-loss' %}" class="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700 transition"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4"><path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" /></svg> Profit &amp; Loss</a>
     </div>
 </section>
 
 {# ── Rent Status This Month ───────────────────────────────────────────────── #}
 <section class="mb-8">
     <div class="flex items-center justify-between mb-4">
-        <h2 class="text-lg font-bold text-ink">🗓️ Rent Status — This Month</h2>
+        <h2 class="flex items-center gap-2 text-lg font-bold text-ink"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-5 w-5"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" /></svg> Rent Status — This Month</h2>
         <div class="flex gap-4 text-sm">
             <span class="text-green-600 font-semibold">${{ rent_total_collected|floatformat:0 }} collected</span>
             <span class="text-slate-400">of</span>
@@ -172,7 +172,7 @@
                     <a href="{% url 'web-payment-create' %}" class="text-xs bg-green-100 text-green-700 font-bold px-2 py-1 rounded-lg hover:bg-green-200 transition whitespace-nowrap">+ Pay</a>
                 </div>
                 {% empty %}
-                <p class="py-4 text-green-600 text-xs text-center font-semibold">✅ All customers have paid!</p>
+                <p class="flex items-center justify-center gap-1.5 py-4 text-green-600 text-xs font-semibold"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> All customers have paid!</p>
                 {% endfor %}
             </div>
         </section>
@@ -185,7 +185,7 @@
     {# Recent Payments #}
     <section class="rounded-2xl border bg-white p-5 shadow-sm">
         <div class="flex items-center justify-between mb-4">
-            <h2 class="text-lg font-bold">💰 Recent Payments</h2>
+            <h2 class="flex items-center gap-2 text-lg font-bold"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-5 w-5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" /></svg> Recent Payments</h2>
             <a href="{% url 'web-payments' %}" class="text-sm text-indigo-600 hover:underline">View All →</a>
         </div>
         <div class="divide-y">
@@ -206,7 +206,7 @@
     {# Recent Expenses #}
     <section class="rounded-2xl border bg-white p-5 shadow-sm">
         <div class="flex items-center justify-between mb-4">
-            <h2 class="text-lg font-bold">📋 Recent Expenses</h2>
+            <h2 class="flex items-center gap-2 text-lg font-bold"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-5 w-5"><path stroke-linecap="round" stroke-linejoin="round" d="M11.35 3.836c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m8.9-4.414c.376.023.75.05 1.124.08 1.131.094 1.976 1.057 1.976 2.192V16.5A2.25 2.25 0 0118 18.75h-2.25m-7.5-10.5H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V18.75m-7.5-10.5h6.375c.621 0 1.125.504 1.125 1.125v9.375m-8.25-3l1.5 1.5 3-3.75" /></svg> Recent Expenses</h2>
             <a href="{% url 'web-expense-list' %}" class="text-sm text-indigo-600 hover:underline">View All →</a>
         </div>
         <div class="divide-y">
@@ -227,7 +227,7 @@
     {# Recent Repairs #}
     <section class="rounded-2xl border bg-white p-5 shadow-sm">
         <div class="flex items-center justify-between mb-4">
-            <h2 class="text-lg font-bold">🔧 Recent Repairs</h2>
+            <h2 class="flex items-center gap-2 text-lg font-bold"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-5 w-5"><path stroke-linecap="round" stroke-linejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z" /></svg> Recent Repairs</h2>
             <a href="{% url 'web-maintenance-list' %}" class="text-sm text-indigo-600 hover:underline">View All →</a>
         </div>
         <div class="divide-y">
@@ -237,9 +237,9 @@
                     <a href="{% url 'web-maintenance-detail' repair.pk %}" class="font-semibold text-indigo-600 hover:underline text-sm">{{ repair.title }}</a>
                     <p class="text-xs text-slate-400">{{ repair.property.name }} · {{ repair.reported_date }}</p>
                     {% if repair.status == 'reported' %}
-                    <span class="inline-block mt-1 text-xs bg-rose-100 text-rose-700 font-bold px-2 py-0.5 rounded-full">⚠️ Open</span>
+                    <span class="inline-flex items-center gap-1 mt-1 text-xs bg-rose-100 text-rose-700 font-bold px-2 py-0.5 rounded-full"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-3.5 w-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" /></svg> Open</span>
                     {% else %}
-                    <span class="inline-block mt-1 text-xs bg-green-100 text-green-700 font-bold px-2 py-0.5 rounded-full">✅ Fixed</span>
+                    <span class="inline-flex items-center gap-1 mt-1 text-xs bg-green-100 text-green-700 font-bold px-2 py-0.5 rounded-full"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-3.5 w-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg> Fixed</span>
                     {% endif %}
                 </div>
                 <strong class="text-rose-600">${{ repair.repair_cost }}</strong>
@@ -253,36 +253,32 @@
     {# Accounting Quick Links #}
     <section class="rounded-2xl border bg-white p-5 shadow-sm">
         <div class="flex items-center justify-between mb-4">
-            <h2 class="text-lg font-bold">📑 Accounting Reports</h2>
+            <h2 class="flex items-center gap-2 text-lg font-bold"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-5 w-5"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg> Accounting Reports</h2>
             <a href="{% url 'web-accounting-dashboard' %}" class="text-sm text-indigo-600 hover:underline">All Reports →</a>
         </div>
         <div class="space-y-2">
             <a href="{% url 'web-profit-loss' %}" class="flex items-center justify-between p-3 rounded-lg bg-emerald-50 hover:bg-emerald-100 transition border border-emerald-200">
-                <span class="text-sm font-semibold text-emerald-800">📊 Profit & Loss</span>
+                <span class="flex items-center gap-2 text-sm font-semibold text-emerald-800"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4"><path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" /></svg> Profit &amp; Loss</span>
                 <span class="text-emerald-500 font-bold">→</span>
             </a>
             <a href="{% url 'web-balance-sheet' %}" class="flex items-center justify-between p-3 rounded-lg bg-slate-50 hover:bg-indigo-50 transition">
-                <span class="text-sm font-semibold text-slate-700">⚖️ Balance Sheet</span>
-                <span class="text-slate-400">→</span>
-            </a>
-            <a href="{% url 'web-balance-sheet' %}" class="flex items-center justify-between p-3 rounded-lg bg-slate-50 hover:bg-indigo-50 transition">
-                <span class="text-sm font-semibold text-slate-700">⚖️ Balance Sheet</span>
+                <span class="flex items-center gap-2 text-sm font-semibold text-slate-700"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg> Balance Sheet</span>
                 <span class="text-slate-400">→</span>
             </a>
             <a href="{% url 'web-trial-balance' %}" class="flex items-center justify-between p-3 rounded-lg bg-slate-50 hover:bg-indigo-50 transition">
-                <span class="text-sm font-semibold text-slate-700">🧮 Trial Balance</span>
+                <span class="flex items-center gap-2 text-sm font-semibold text-slate-700"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" /></svg> Trial Balance</span>
                 <span class="text-slate-400">→</span>
             </a>
             <a href="{% url 'web-general-ledger' %}" class="flex items-center justify-between p-3 rounded-lg bg-slate-50 hover:bg-indigo-50 transition">
-                <span class="text-sm font-semibold text-slate-700">📒 General Ledger</span>
+                <span class="flex items-center gap-2 text-sm font-semibold text-slate-700"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" /></svg> General Ledger</span>
                 <span class="text-slate-400">→</span>
             </a>
             <a href="{% url 'web-cash-flow' %}" class="flex items-center justify-between p-3 rounded-lg bg-slate-50 hover:bg-indigo-50 transition">
-                <span class="text-sm font-semibold text-slate-700">💵 Cash Flow</span>
+                <span class="flex items-center gap-2 text-sm font-semibold text-slate-700"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> Cash Flow</span>
                 <span class="text-slate-400">→</span>
             </a>
             <a href="{% url 'web-sales-report' %}" class="flex items-center justify-between p-3 rounded-lg bg-slate-50 hover:bg-indigo-50 transition">
-                <span class="text-sm font-semibold text-slate-700">🏆 Sales Report</span>
+                <span class="flex items-center gap-2 text-sm font-semibold text-slate-700"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4"><path stroke-linecap="round" stroke-linejoin="round" d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.563.563 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" /></svg> Sales Report</span>
                 <span class="text-slate-400">→</span>
             </a>
         </div>
