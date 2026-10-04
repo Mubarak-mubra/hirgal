@@ -205,6 +205,7 @@ class CheckTenantPaidView(LoginRequiredMixin, View):
         now = timezone.now()
         existing = Payment.objects.filter(
             rental_agreement__tenant_id=tenant_id,
+            rental_agreement__tenant__owner=request.user.get_data_owner(),
             payment_date__year=now.year,
             payment_date__month=now.month,
         ).select_related("rental_agreement__tenant")
