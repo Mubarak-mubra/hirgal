@@ -179,6 +179,7 @@ class AgreementsByTenantView(LoginRequiredMixin, View):
             return JsonResponse({"agreements": []})
         agreements = RentalAgreement.objects.filter(
             tenant_id=tenant_id,
+            tenant__owner=request.user.get_data_owner(),
             status="active",
         ).select_related("unit", "property").values(
             "id", "unit__unit_number", "property__name", "monthly_rent"

@@ -62,3 +62,48 @@ class CheckTenantPaidViewOwnershipTests(TestCase):
         self.client.login(username="alice", password="Password123!")
         response = self.client.get(self.url)
         self.assertEqual(response.json(), {"paid": False})
+
+
+class AgreementsByTenantViewOwnershipTests(TestCase):
+    def setUp(self):
+        self.alice = User.objects.create_user(
+            username="alice2", phone_number="+252611000011",
+            password="Password123!", full_name="Alice Cabdiraxmaan", is_approved=True,
+        )
+        self.bob = User.objects.create_user(
+            username="bob2", phone_number="+252611000012",
+            password="Password123!", full_name="Bile Cabdilaahi", is_approved=True,
+        )
+        self.alice_tenant = Tenant.objects.create(owner=self.alice, full_name="Customer Alice")
+        self.bob_tenant = Tenant.objects.create(owner=self.bob, full_name="Customer Bob")
+        alice_property = Property.objects.create(owner=self.alice, name="Alice Villa", location="Mogadishu")
+        bob_property = Property.objects.create(owner=self.bob, name="Bob Villa", location="Mogadishu")
+        self.alice_agreement = RentalAgreement.objects.create(
+            tenant=self.alice_tenant, property=alice_property, start_date=date(2026, 1, 1),
+            monthly_rent=Decimal("500.00"), status="active",
+        )
+        self.bob_agreement = RentalAgreement.objects.create(
+            tenant=self.bob_tenant, property=bob_property, start_date=date(2026, 1, 1),
+            monthly_rent=Decimal("700.00"), status="active",
+        )
+        self.url = reverse("web-agreements-by-tenant")
+
+    def test_returns_own_tenants_active_agreements(self):
+        self.client.login(username="alice2", password="Password123!")
+        response = self.client.get(self.url, {"tenant_id": self.alice_tenant.pk})
+        self.assertEqual(response.status_code, 200)
+        agreements = response.json()["agreements"]
+        self.assertEqual(len(agreements), 1)
+        self.assertEqual(agreements[0]["id"], self.alice_agreement.pk)
+        self.assertIn("Alice Villa", agreements[0]["label"])
+
+    def test_does_not_leak_other_users_agreements(self):
+        self.client.login(username="alice2", password="Password123!")
+        response = self.client.get(self.url, {"tenant_id": self.bob_tenant.pk})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"agreements": []})
+
+    def test_missing_tenant_id_returns_empty_agreements(self):
+        self.client.login(username="alice2", password="Password123!")
+        response = self.client.get(self.url)
+        self.assertEqual(response.json(), {"agreements": []})
