@@ -150,7 +150,9 @@ class UnitsByPropertyView(LoginRequiredMixin, View):
         if not property_id:
             return JsonResponse({"units": []})
 
-        property_instance = Property.objects.filter(pk=property_id).first()
+        property_instance = Property.objects.filter(
+            pk=property_id, owner=request.user.get_data_owner()
+        ).first()
         if not property_instance or not property_instance.has_units:
             return JsonResponse({"units": []})
 

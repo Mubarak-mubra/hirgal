@@ -6,7 +6,7 @@ from django.urls import reverse
 
 from accounts.models import User
 from finance.models import Payment
-from properties.models import Property
+from properties.models import Property, PropertyType, Unit
 from rentals.models import RentalAgreement, Tenant
 
 
@@ -107,3 +107,59 @@ class AgreementsByTenantViewOwnershipTests(TestCase):
         self.client.login(username="alice2", password="Password123!")
         response = self.client.get(self.url)
         self.assertEqual(response.json(), {"agreements": []})
+
+
+class UnitsByPropertyViewOwnershipTests(TestCase):
+    def setUp(self):
+        self.alice = User.objects.create_user(
+            username="alice3", phone_number="+252611000021",
+            password="Password123!", full_name="Alice Cabdiraxmaan", is_approved=True,
+        )
+        self.bob = User.objects.create_user(
+            username="bob3", phone_number="+252611000022",
+            password="Password123!", full_name="Bile Cabdilaahi", is_approved=True,
+        )
+        alice_type = PropertyType.objects.create(owner=self.alice, name="Apartment", has_units=True)
+        bob_type = PropertyType.objects.create(owner=self.bob, name="Apartment", has_units=True)
+        self.alice_property = Property.objects.create(
+            owner=self.alice, name="Alice Towers", location="Mogadishu", property_type=alice_type,
+        )
+        self.bob_property = Property.objects.create(
+            owner=self.bob, name="Bob Towers", location="Mogadishu", property_type=bob_type,
+        )
+        self.alice_unit_free = Unit.objects.create(property=self.alice_property, unit_number="A1")
+        self.alice_unit_rented = Unit.objects.create(property=self.alice_property, unit_number="A2")
+        self.bob_unit = Unit.objects.create(property=self.bob_property, unit_number="B1")
+        alice_tenant = Tenant.objects.create(owner=self.alice, full_name="Customer Alice")
+        RentalAgreement.objects.create(
+            tenant=alice_tenant, property=self.alice_property, unit=self.alice_unit_rented,
+            start_date=date(2026, 1, 1), monthly_rent=Decimal("500.00"), status="active",
+        )
+        self.url = reverse("web-units-by-property")
+
+    def test_returns_own_property_units(self):
+        self.client.login(username="alice3", password="Password123!")
+        response = self.client.get(self.url, {"property_id": self.alice_property.pk})
+        self.assertEqual(response.status_code, 200)
+        units = response.json()["units"]
+        unit_numbers = [u["unit_number"] for u in units]
+        self.assertIn("A1", unit_numbers)
+        self.assertIn(self.alice_unit_free.pk, [u["id"] for u in units])
+
+    def test_does_not_leak_other_users_property_units(self):
+        self.client.login(username="alice3", password="Password123!")
+        response = self.client.get(self.url, {"property_id": self.bob_property.pk})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"units": []})
+
+    def test_missing_property_id_returns_empty_units(self):
+        self.client.login(username="alice3", password="Password123!")
+        response = self.client.get(self.url)
+        self.assertEqual(response.json(), {"units": []})
+
+    def test_active_rented_unit_is_not_listed(self):
+        self.client.login(username="alice3", password="Password123!")
+        response = self.client.get(self.url, {"property_id": self.alice_property.pk})
+        unit_numbers = [u["unit_number"] for u in response.json()["units"]]
+        self.assertIn("A1", unit_numbers)
+        self.assertNotIn("A2", unit_numbers)
