@@ -7,7 +7,10 @@ from rentals.models import Tenant, RentalAgreement
 from finance.models import BankAccount, Payment, GeneralExpense, MaintenanceRepair
 from accounting.models import Account, JournalEntry, JournalEntryLine, Invoice, InvoiceLine
 from accounting.services import (
+    DEFAULT_COA,
     seed_default_chart_of_accounts,
+    get_ar_account,
+    get_default_cash_account,
     post_payment,
     post_expense,
     post_repair,
@@ -147,3 +150,39 @@ class DoubleEntryAccountingTests(TestCase):
         )
         invoice.refresh_from_db()
         self.assertEqual(invoice.status, "paid")
+
+
+class ChartOfAccountsOwnershipTests(TestCase):
+    def setUp(self):
+        self.owner = User.objects.create_user(username="coa_owner", phone_number="252615000101", password="password123", full_name="Owner")
+        self.manager = User.objects.create_user(username="coa_manager", phone_number="252615000102", password="password123", full_name="Manager")
+        self.manager.managed_account = self.owner
+        self.manager.save()
+
+    def test_owner_seeding_creates_accounts_under_owner(self):
+        created = seed_default_chart_of_accounts(self.owner)
+        self.assertEqual(created, len(DEFAULT_COA))
+        self.assertEqual(Account.objects.filter(owner=self.owner).count(), len(DEFAULT_COA))
+        self.assertEqual(Account.objects.filter(owner=self.manager).count(), 0)
+
+    def test_manager_seeding_does_not_create_second_chart(self):
+        seed_default_chart_of_accounts(self.owner)
+        created = seed_default_chart_of_accounts(self.manager)
+        self.assertEqual(created, 0)
+        self.assertEqual(Account.objects.filter(owner=self.manager).count(), 0)
+        self.assertEqual(Account.objects.filter(owner=self.owner).count(), len(DEFAULT_COA))
+
+    def test_manager_account_lookup_resolves_owner_account(self):
+        owner_cash = get_default_cash_account(self.owner)
+        owner_ar = get_ar_account(self.owner)
+        self.assertEqual(get_default_cash_account(self.manager).pk, owner_cash.pk)
+        self.assertEqual(get_ar_account(self.manager).pk, owner_ar.pk)
+        self.assertEqual(Account.objects.filter(owner=self.manager).count(), 0)
+
+    def test_owner_lookup_behavior_unchanged(self):
+        seed_default_chart_of_accounts(self.owner)
+        cash = get_default_cash_account(self.owner)
+        self.assertEqual(cash.owner, self.owner)
+        self.assertEqual(get_default_cash_account(self.owner).pk, cash.pk)
+        self.assertEqual(seed_default_chart_of_accounts(self.owner), 0)
+        self.assertEqual(Account.objects.filter(owner=self.owner).count(), len(DEFAULT_COA))

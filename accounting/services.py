@@ -24,11 +24,17 @@ DEFAULT_COA = [
 
 
 def seed_default_chart_of_accounts(user):
-    """Auto-create standard COA for a new user. Returns count of created accounts."""
+    """Auto-create standard COA under the user's effective data owner.
+
+    Returns count of created accounts. Resolving the data owner here means a
+    Manager/Staff login seeds (or reuses) the Owner's Chart of Accounts
+    instead of creating a second one under the Manager.
+    """
+    owner = user.get_data_owner()
     created = 0
     for acc_data in DEFAULT_COA:
         _, was_created = Account.objects.get_or_create(
-            owner=user,
+            owner=owner,
             code=acc_data["code"],
             defaults={
                 "name": acc_data["name"],
@@ -42,9 +48,15 @@ def seed_default_chart_of_accounts(user):
 
 
 def get_or_create_account(user, code, category, name=None):
-    """Get or create an account by code. Creates with default name if missing."""
+    """Get or create an account by code under the user's effective data owner.
+
+    Creates with default name if missing. Resolving the data owner ensures a
+    Manager/Staff lookup resolves the Owner's existing account rather than
+    creating a separate one.
+    """
+    owner = user.get_data_owner()
     try:
-        return Account.objects.get(owner=user, code=code)
+        return Account.objects.get(owner=owner, code=code)
     except Account.DoesNotExist:
         defaults = {}
         for item in DEFAULT_COA:
@@ -53,7 +65,7 @@ def get_or_create_account(user, code, category, name=None):
                 break
         if name:
             defaults["name"] = name
-        acc = Account.objects.create(owner=user, code=code, category=category, **defaults)
+        acc = Account.objects.create(owner=owner, code=code, category=category, **defaults)
         return acc
 
 
