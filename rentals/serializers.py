@@ -51,9 +51,9 @@ class TenantRegistrationSerializer(serializers.Serializer):
     start_date = serializers.DateField()
 
     def create(self, validated_data):
-        user = self.context["request"].user
+        owner = self.context["request"].user.get_data_owner()
         tenant = Tenant.objects.create(
-            owner=user,
+            owner=owner,
             full_name=validated_data["full_name"],
             phone_number=validated_data["phone_number"],
         )
