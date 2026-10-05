@@ -1,10 +1,13 @@
 from datetime import date
 from decimal import Decimal
+from unittest.mock import patch
 
 from django.test import TestCase
 from django.urls import reverse
 
 from accounts.models import User
+from accounting.models import Account
+from accounting.services import DEFAULT_COA, seed_default_chart_of_accounts
 from finance.models import Payment
 from properties.models import Property, PropertyType, Unit
 from rentals.models import RentalAgreement, Tenant
@@ -163,3 +166,48 @@ class UnitsByPropertyViewOwnershipTests(TestCase):
         unit_numbers = [u["unit_number"] for u in response.json()["units"]]
         self.assertIn("A1", unit_numbers)
         self.assertNotIn("A2", unit_numbers)
+
+
+class LoginChartOfAccountsOwnershipTests(TestCase):
+    def setUp(self):
+        self.owner = User.objects.create_user(
+            username="login_owner", phone_number="+252615000201", password="SafePassword123!",
+            full_name="Owner", is_approved=True,
+        )
+        self.manager = User.objects.create_user(
+            username="login_manager", phone_number="+252615000202", password="SafePassword123!",
+            full_name="Manager", is_approved=True,
+        )
+        self.manager.managed_account = self.owner
+        self.manager.save()
+
+    def login(self, user):
+        return self.client.post(
+            reverse("web-login"),
+            {"username_or_phone": user.username, "password": "SafePassword123!"},
+        )
+
+    def test_owner_login_without_chart_seeds_under_owner(self):
+        response = self.login(self.owner)
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(Account.objects.filter(owner=self.owner).count(), len(DEFAULT_COA))
+
+    def test_owner_login_with_existing_chart_continues_normally(self):
+        seed_default_chart_of_accounts(self.owner)
+        response = self.login(self.owner)
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(Account.objects.filter(owner=self.owner).count(), len(DEFAULT_COA))
+
+    def test_manager_login_does_not_create_manager_owned_chart(self):
+        seed_default_chart_of_accounts(self.owner)
+        response = self.login(self.manager)
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(Account.objects.filter(owner=self.manager).count(), 0)
+        self.assertEqual(Account.objects.filter(owner=self.owner).count(), len(DEFAULT_COA))
+
+    def test_manager_login_gate_uses_effective_data_owner(self):
+        seed_default_chart_of_accounts(self.owner)
+        with patch("web.views.seed_default_chart_of_accounts") as mock_seed:
+            response = self.login(self.manager)
+        self.assertEqual(response.status_code, 302)
+        mock_seed.assert_not_called()

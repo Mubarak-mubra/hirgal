@@ -259,7 +259,7 @@ class LoginView(View):
         if user is None:
             user = user_model.objects.filter(phone_number=identifier).first()
         if user and user.check_password(password) and user.is_active and user.is_approved:
-            if not Account.objects.filter(owner=user).exists():
+            if not Account.objects.filter(owner=user.get_data_owner()).exists():
                 seed_default_chart_of_accounts(user)
             login(request, user)
             return redirect(request.GET.get("next", "home"))
