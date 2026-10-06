@@ -14,6 +14,7 @@ from properties.models import Property, PropertyType, Unit
 from rentals.models import RentalAgreement, Tenant
 
 from .chatbot import explore_financial_summary
+from .forms import InvoiceForm, InvoiceLineFormSet
 
 
 class CheckTenantPaidViewOwnershipTests(TestCase):
@@ -423,3 +424,85 @@ class ReportSourceLookupOwnershipTests(TestCase):
         items = response.context["items"]
         self.assertEqual(len(items), 1)
         self.assertIsNone(items[0]["source_url"])
+
+
+class InvoiceNumberGenerationTests(TestCase):
+    """Invoice numbering runs per effective data owner, year by year."""
+
+    password = "SafePassword123!"
+
+    def setUp(self):
+        self.year = date.today().year
+        self.today = date.today()
+        self.owner_a = User.objects.create_user(
+            "inv_owner_a", "+252619000011", self.password, full_name="Owner A", is_approved=True,
+        )
+        self.manager_a = User.objects.create_user(
+            "inv_manager_a", "+252619000012", self.password, full_name="Manager A",
+            is_approved=True, managed_account=self.owner_a,
+        )
+        self.owner_b = User.objects.create_user(
+            "inv_owner_b", "+252619000013", self.password, full_name="Owner B", is_approved=True,
+        )
+        self.tenant_a = Tenant.objects.create(owner=self.owner_a, full_name="Tenant A", phone_number="+252619000041")
+        self.tenant_b = Tenant.objects.create(owner=self.owner_b, full_name="Tenant B", phone_number="+252619000042")
+
+    def make_invoice(self, owner, tenant, number):
+        return Invoice.objects.create(
+            owner=owner, tenant=tenant, invoice_number=number,
+            date=self.today, due_date=self.today,
+        )
+
+    def test_invoice_number_sequences_are_independent_per_owner(self):
+        first_a = InvoiceForm(user=self.owner_a).fields["invoice_number"].initial
+        self.assertEqual(first_a, "INV-%d-0001" % self.year)
+        self.make_invoice(self.owner_a, self.tenant_a, first_a)
+
+        first_b = InvoiceForm(user=self.owner_b).fields["invoice_number"].initial
+        self.assertEqual(first_b, "INV-%d-0001" % self.year)
+        self.make_invoice(self.owner_b, self.tenant_b, first_b)
+
+        second_a = InvoiceForm(user=self.owner_a).fields["invoice_number"].initial
+        self.assertEqual(second_a, "INV-%d-0002" % self.year)
+
+    def test_manager_uses_effective_owners_sequence_and_ownership(self):
+        self.make_invoice(self.owner_a, self.tenant_a, "INV-%d-0001" % self.year)
+        self.client.login(username="inv_manager_a", password=self.password)
+
+        page = self.client.get(reverse("web-invoice-create"))
+        self.assertEqual(page.status_code, 200)
+        initial = page.context["form"].fields["invoice_number"].initial
+        self.assertEqual(initial, "INV-%d-0002" % self.year)
+
+        response = self.client.post(reverse("web-invoice-create"), {
+            "tenant": self.tenant_a.pk,
+            "invoice_number": initial,
+            "date": self.today.isoformat(),
+            "due_date": self.today.isoformat(),
+            "status": "draft",
+            "notes": "",
+            f"{InvoiceLineFormSet().prefix}-TOTAL_FORMS": "0",
+            f"{InvoiceLineFormSet().prefix}-INITIAL_FORMS": "0",
+            f"{InvoiceLineFormSet().prefix}-MIN_NUM_FORMS": "0",
+            f"{InvoiceLineFormSet().prefix}-MAX_NUM_FORMS": "1000",
+        })
+        self.assertEqual(response.status_code, 302)
+        invoice = Invoice.objects.get(invoice_number=initial)
+        self.assertEqual(invoice.owner, self.owner_a)
+
+    def test_ar_report_lookup_resolves_own_invoice_despite_cross_owner_duplicates(self):
+        number = "INV-%d-0002" % self.year
+        inv_a = self.make_invoice(self.owner_a, self.tenant_a, number)
+        self.make_invoice(self.owner_b, self.tenant_b, number)
+
+        ar_a = Account.objects.create(owner=self.owner_a, code="1200", name="Accounts Receivable", category="asset")
+        je = JournalEntry.objects.create(
+            owner=self.owner_a, date=self.today, reference=number, status="posted",
+        )
+        JournalEntryLine.objects.create(journal_entry=je, account=ar_a, debit=Decimal("100"))
+
+        self.client.login(username="inv_owner_a", password=self.password)
+        response = self.client.get(reverse("web-ar"))
+        items = response.context["items"]
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0]["source_url"], "/xisaabiyadda/biilasha/%d/" % inv_a.pk)

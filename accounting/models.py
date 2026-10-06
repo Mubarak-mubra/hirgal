@@ -109,17 +109,22 @@ class Invoice(models.Model):
     rental_agreement = models.ForeignKey(RentalAgreement, on_delete=models.SET_NULL, null=True, blank=True, related_name='invoices')
     property = models.ForeignKey(Property, on_delete=models.SET_NULL, null=True, blank=True, related_name='invoices')
     
-    invoice_number = models.CharField('Invoice number', max_length=50, unique=True)
+    invoice_number = models.CharField('Invoice number', max_length=50)
     date = models.DateField('Invoice date')
     due_date = models.DateField('Due date')
     status = models.CharField('Status', max_length=20, choices=STATUS_CHOICES, default='draft')
     notes = models.TextField('Notes', blank=True)
-    
+
     # The journal entry generated when this invoice is posted
     journal_entry = models.OneToOneField(JournalEntry, on_delete=models.SET_NULL, null=True, blank=True, related_name='invoice')
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["owner", "invoice_number"], name="unique_invoice_number_per_owner"),
+        ]
 
     def get_total_amount(self):
         return sum(line.amount for line in self.lines.all())

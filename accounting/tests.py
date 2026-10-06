@@ -1,5 +1,6 @@
 from decimal import Decimal
 from django.contrib.auth import get_user_model
+from django.db import IntegrityError, transaction
 from django.test import TestCase
 from django.utils import timezone
 from properties.models import Property, PropertyType, Unit
@@ -186,3 +187,35 @@ class ChartOfAccountsOwnershipTests(TestCase):
         self.assertEqual(get_default_cash_account(self.owner).pk, cash.pk)
         self.assertEqual(seed_default_chart_of_accounts(self.owner), 0)
         self.assertEqual(Account.objects.filter(owner=self.owner).count(), len(DEFAULT_COA))
+
+
+class InvoiceNumberUniquenessTests(TestCase):
+    """Invoice numbers are unique within an owner's scope, not globally."""
+
+    def setUp(self):
+        self.owner_a = User.objects.create_user(
+            "inv_owner_a", "+252619000001", "SafePassword123!", full_name="Owner A", is_approved=True,
+        )
+        self.owner_b = User.objects.create_user(
+            "inv_owner_b", "+252619000002", "SafePassword123!", full_name="Owner B", is_approved=True,
+        )
+        self.tenant_a = Tenant.objects.create(owner=self.owner_a, full_name="Tenant A", phone_number="+252619000031")
+        self.tenant_b = Tenant.objects.create(owner=self.owner_b, full_name="Tenant B", phone_number="+252619000032")
+        self.today = timezone.now().date()
+
+    def make_invoice(self, owner, tenant, number):
+        return Invoice.objects.create(
+            owner=owner, tenant=tenant, invoice_number=number,
+            date=self.today, due_date=self.today,
+        )
+
+    def test_same_owner_cannot_duplicate_invoice_number(self):
+        self.make_invoice(self.owner_a, self.tenant_a, "INV-2026-0001")
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                self.make_invoice(self.owner_a, self.tenant_a, "INV-2026-0001")
+
+    def test_different_owners_can_share_invoice_number(self):
+        self.make_invoice(self.owner_a, self.tenant_a, "INV-2026-0001")
+        self.make_invoice(self.owner_b, self.tenant_b, "INV-2026-0001")
+        self.assertEqual(Invoice.objects.filter(invoice_number="INV-2026-0001").count(), 2)
