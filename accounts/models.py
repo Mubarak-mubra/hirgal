@@ -1,5 +1,6 @@
 from django.contrib.auth.base_user import BaseUserManager
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
+from django.core.exceptions import ValidationError
 from django.db import models
 
 
@@ -47,6 +48,23 @@ class User(AbstractBaseUser, PermissionsMixin):
     def get_data_owner(self):
         """Return the effective owner of data (parent account if delegated, else self)."""
         return self.managed_account if self.managed_account_id else self
+
+    def clean(self):
+        """Enforce one-level delegation (Owner <- Manager).
+
+        Prevents self-referencing links and delegation chains such as
+        Owner -> Manager A -> Manager B, which would silently change
+        Manager B's effective data owner away from the Hirgal Owner.
+        """
+        super().clean()
+        if not self.managed_account_id:
+            return
+        if self.managed_account_id == self.pk:
+            raise ValidationError({"managed_account": "A user cannot be their own managed account."})
+        if self.managed_account.managed_account_id:
+            raise ValidationError(
+                {"managed_account": "A managed user cannot be a managed account. Delegated access must point directly to the owner."}
+            )
 
     def __str__(self):
         return f"{self.full_name} ({self.username})"
