@@ -644,10 +644,14 @@ class PaymentSourceLinkOwnershipTests(TestCase):
         self.client.login(username="pay_owner_a", password=self.password)
         response = self.client.get(reverse("web-sales-report-detail", args=[self.prop_a.pk]))
         self.assertEqual(response.status_code, 200)
-        crafted_url = "/lacagaha/%d/" % self.payment_b.pk
         source_urls = [i["source_url"] for i in response.context["items"]]
-        self.assertIn(crafted_url, source_urls)
-        self.assertEqual(self.client.get(crafted_url).status_code, 404)
+        # A PAY-prefixed reference with no backing Payment emits no link at all.
+        crafted = [i for i in response.context["items"] if i["reference"] == "PAY-%d" % self.payment_b.pk]
+        self.assertEqual(len(crafted), 1)
+        self.assertIsNone(crafted[0]["source_url"])
+        self.assertNotIn("/lacagaha/%d/" % self.payment_b.pk, source_urls)
+        self.assertNotIn(reverse("web-payment-detail", args=[self.payment_b.pk]), source_urls)
+        self.assertFalse([u for u in source_urls if u and u.startswith("/lacagaha/")])
         self.assertEqual(
             self.client.get(reverse("web-payment-detail", args=[self.payment_b.pk])).status_code, 404,
         )
@@ -670,3 +674,134 @@ class PaymentSourceLinkOwnershipTests(TestCase):
         self.client.login(username="pay_manager_a", password=self.password)
         self.assertEqual(self.client.get(own_url).status_code, 200)
         self.assertEqual(self.client.get(ar_url).status_code, 200)
+
+
+class SalesReportPaymentLinkTests(TestCase):
+    """Sales Report PAY rows must emit real, effective-owner payment detail links."""
+
+    password = "SafePassword123!"
+
+    def setUp(self):
+        self.owner_a = User.objects.create_user(
+            "srl_owner_a", "+252617000051", self.password, full_name="Owner A", is_approved=True,
+        )
+        self.manager_a = User.objects.create_user(
+            "srl_manager_a", "+252617000052", self.password, full_name="Manager A",
+            is_approved=True, managed_account=self.owner_a,
+        )
+        self.owner_b = User.objects.create_user(
+            "srl_owner_b", "+252617000053", self.password, full_name="Owner B", is_approved=True,
+        )
+
+        self.tenant_a = Tenant.objects.create(owner=self.owner_a, full_name="Customer A")
+        self.tenant_b = Tenant.objects.create(owner=self.owner_b, full_name="Customer B")
+        self.prop_a = Property.objects.create(owner=self.owner_a, name="Alpha Court", location="Mogadishu")
+        self.prop_b = Property.objects.create(owner=self.owner_b, name="Beta Court", location="Mogadishu")
+        self.agreement_a = RentalAgreement.objects.create(
+            tenant=self.tenant_a, property=self.prop_a, start_date=date(2026, 1, 1),
+            monthly_rent=Decimal("500.00"),
+        )
+        self.agreement_b = RentalAgreement.objects.create(
+            tenant=self.tenant_b, property=self.prop_b, start_date=date(2026, 1, 1),
+            monthly_rent=Decimal("700.00"),
+        )
+
+        # Real posting path: post_payment signal -> owner-scoped journal entry.
+        # Form-style payment: reference PAY-YYYY-NNNN (yearly sequence, NOT the pk).
+        self.payment_a = Payment.objects.create(
+            rental_agreement=self.agreement_a, amount=Decimal("400.00"),
+            payment_date=date(2026, 6, 15), reference_number="PAY-2026-0042",
+        )
+        # Fallback path: payment saved without a reference -> journal reference PAY-<pk>.
+        self.payment_a2 = Payment.objects.create(
+            rental_agreement=self.agreement_a, amount=Decimal("60.00"),
+            payment_date=date(2026, 6, 20),
+        )
+        self.payment_b = Payment.objects.create(
+            rental_agreement=self.agreement_b, amount=Decimal("650.00"),
+            payment_date=date(2026, 6, 15), reference_number="PAY-2026-0042",
+        )
+
+        self.report_url = reverse("web-sales-report-detail", args=[self.prop_a.pk])
+        self.range_qs = "?start_date=2026-01-01&end_date=2026-12-31"
+
+    @staticmethod
+    def _source_urls(response):
+        return [i["source_url"] for i in response.context["items"]]
+
+    @staticmethod
+    def _payment_pks(urls):
+        return {
+            int(u.rstrip("/").rsplit("/", 1)[-1])
+            for u in urls if u and "/lacag-bixinta/" in u
+        }
+
+    def test_owner_report_emits_real_payment_detail_url(self):
+        self.client.login(username="srl_owner_a", password=self.password)
+        response = self.client.get(self.report_url + self.range_qs)
+        self.assertEqual(response.status_code, 200)
+        urls = self._source_urls(response)
+        expected = "/lacag-bixinta/%d/" % self.payment_a.pk
+        self.assertIn("PAY-2026-0042", [i["reference"] for i in response.context["items"]])
+        self.assertIn(expected, urls)
+        self.assertFalse([u for u in urls if u and u.startswith("/lacagaha/")])
+        self.assertNotIn("0042", expected)
+
+    def test_generated_link_resolves_for_owner(self):
+        self.client.login(username="srl_owner_a", password=self.password)
+        expected = "/lacag-bixinta/%d/" % self.payment_a.pk
+        self.assertIn(expected, self._source_urls(self.client.get(self.report_url + self.range_qs)))
+        detail = self.client.get(expected)
+        self.assertEqual(detail.status_code, 200)
+        self.assertEqual(detail.context["payment"].pk, self.payment_a.pk)
+
+    def test_manager_resolves_owner_a_generated_payment_link(self):
+        self.client.login(username="srl_manager_a", password=self.password)
+        response = self.client.get(self.report_url + self.range_qs)
+        self.assertEqual(response.status_code, 200)
+        expected = "/lacag-bixinta/%d/" % self.payment_a.pk
+        self.assertIn(expected, self._source_urls(response))
+        detail = self.client.get(expected)
+        self.assertEqual(detail.status_code, 200)
+        self.assertEqual(detail.context["payment"].pk, self.payment_a.pk)
+
+    def test_owner_cannot_resolve_owner_b_payment(self):
+        self.client.login(username="srl_owner_a", password=self.password)
+        foreign = reverse("web-payment-detail", args=[self.payment_b.pk])
+        self.assertEqual(self.client.get(foreign).status_code, 404)
+
+    def test_owner_report_never_produces_owner_b_payment_link(self):
+        self.client.login(username="srl_owner_a", password=self.password)
+        urls = self._source_urls(self.client.get(self.report_url + self.range_qs))
+        self.assertNotIn(reverse("web-payment-detail", args=[self.payment_b.pk]), urls)
+        self.assertFalse([u for u in urls if u and u.startswith("/lacagaha/")])
+        own = {self.payment_a.pk, self.payment_a2.pk}
+        pks = self._payment_pks(urls)
+        self.assertTrue(pks)
+        self.assertTrue(pks.issubset(own))
+
+        self.client.logout()
+        self.client.login(username="srl_owner_b", password=self.password)
+        b_urls = self._source_urls(
+            self.client.get(reverse("web-sales-report-detail", args=[self.prop_b.pk]) + self.range_qs)
+        )
+        self.assertIn(reverse("web-payment-detail", args=[self.payment_b.pk]), b_urls)
+
+    def test_report_link_not_derived_from_pay_sequence(self):
+        self.client.login(username="srl_owner_a", password=self.password)
+        response = self.client.get(self.report_url + self.range_qs)
+        items = [i for i in response.context["items"] if i["reference"] == "PAY-2026-0042"]
+        self.assertEqual(len(items), 1)
+        url = items[0]["source_url"]
+        self.assertEqual(url, reverse("web-payment-detail", args=[self.payment_a.pk]))
+        self.assertFalse(url.rstrip("/").endswith("0042"))
+        self.assertNotEqual(self.payment_a.pk, 42)
+        self.assertEqual(self.client.get("/lacag-bixinta/42/").status_code, 404)
+
+    def test_fallback_reference_payment_link_resolves(self):
+        self.client.login(username="srl_owner_a", password=self.password)
+        expected = "/lacag-bixinta/%d/" % self.payment_a2.pk
+        self.assertIn(expected, self._source_urls(self.client.get(self.report_url + self.range_qs)))
+        detail = self.client.get(expected)
+        self.assertEqual(detail.status_code, 200)
+        self.assertEqual(detail.context["payment"].pk, self.payment_a2.pk)

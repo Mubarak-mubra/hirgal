@@ -685,8 +685,8 @@ class SalesReportDetailView(AccountingReportMixin, View):
                 except Invoice.DoesNotExist:
                     pass
             elif ref.startswith("PAY-"):
-                pk = ref.split("-")[-1]
-                source_url = "/lacagaha/%s/" % pk
+                if hasattr(line.journal_entry, "payment_source"):
+                    source_url = "/lacag-bixinta/%d/" % line.journal_entry.payment_source.pk
 
             items.append({
                 "date": line.journal_entry.date,
