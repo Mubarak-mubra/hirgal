@@ -506,3 +506,167 @@ class InvoiceNumberGenerationTests(TestCase):
         items = response.context["items"]
         self.assertEqual(len(items), 1)
         self.assertEqual(items[0]["source_url"], "/xisaabiyadda/biilasha/%d/" % inv_a.pk)
+
+
+class PaymentSourceLinkOwnershipTests(TestCase):
+    """Payment detail endpoints and report payment source links stay within the effective data owner."""
+
+    password = "SafePassword123!"
+
+    def setUp(self):
+        self.owner_a = User.objects.create_user(
+            "pay_owner_a", "+252617000041", self.password, full_name="Owner A", is_approved=True,
+        )
+        self.manager_a = User.objects.create_user(
+            "pay_manager_a", "+252617000042", self.password, full_name="Manager A",
+            is_approved=True, managed_account=self.owner_a,
+        )
+        self.owner_b = User.objects.create_user(
+            "pay_owner_b", "+252617000043", self.password, full_name="Owner B", is_approved=True,
+        )
+
+        self.tenant_a = Tenant.objects.create(owner=self.owner_a, full_name="Customer A")
+        self.tenant_b = Tenant.objects.create(owner=self.owner_b, full_name="Customer B")
+        self.prop_a = Property.objects.create(owner=self.owner_a, name="Alpha Court", location="Mogadishu")
+        self.prop_b = Property.objects.create(owner=self.owner_b, name="Beta Court", location="Mogadishu")
+        self.agreement_a = RentalAgreement.objects.create(
+            tenant=self.tenant_a, property=self.prop_a, start_date=date(2026, 1, 1),
+            monthly_rent=Decimal("500.00"),
+        )
+        self.agreement_b = RentalAgreement.objects.create(
+            tenant=self.tenant_b, property=self.prop_b, start_date=date(2026, 1, 1),
+            monthly_rent=Decimal("700.00"),
+        )
+        # post_payment signal creates owner-scoped journal entries and ledger accounts.
+        self.payment_a = Payment.objects.create(
+            rental_agreement=self.agreement_a, amount=Decimal("400.00"), payment_date=date.today(),
+        )
+        self.payment_b = Payment.objects.create(
+            rental_agreement=self.agreement_b, amount=Decimal("650.00"), payment_date=date.today(),
+        )
+        self.invoice_a = Invoice.objects.create(
+            owner=self.owner_a, tenant=self.tenant_a, invoice_number="INV-2026-9001",
+            date=date.today(), due_date=date.today(),
+        )
+        self.invoice_b = Invoice.objects.create(
+            owner=self.owner_b, tenant=self.tenant_b, invoice_number="INV-2026-9001",
+            date=date.today(), due_date=date.today(),
+        )
+        self.ar_payment_a = Payment.objects.create(
+            rental_agreement=self.agreement_a, amount=Decimal("100.00"),
+            payment_date=date.today(), invoice=self.invoice_a,
+        )
+        self.ar_payment_b = Payment.objects.create(
+            rental_agreement=self.agreement_b, amount=Decimal("150.00"),
+            payment_date=date.today(), invoice=self.invoice_b,
+        )
+
+    @staticmethod
+    def _payment_link_pks(urls):
+        pks = set()
+        for url in urls:
+            if url and "/lacag-bixinta/" in url:
+                pks.add(int(url.rstrip("/").rsplit("/", 1)[-1]))
+        return pks
+
+    @staticmethod
+    def _gl_payment_urls(response):
+        return [
+            t["source_url"]
+            for acc in response.context["ledger"]
+            for t in acc["transactions"]
+            if t["source_url"]
+        ]
+
+    def test_owner_cannot_resolve_other_owners_payment(self):
+        self.client.login(username="pay_owner_a", password=self.password)
+        self.assertEqual(self.client.get(reverse("web-payment-detail", args=[self.payment_b.pk])).status_code, 404)
+        self.assertEqual(self.client.get(reverse("web-payment-edit", args=[self.payment_b.pk])).status_code, 404)
+        self.assertEqual(self.client.post(reverse("web-payment-delete", args=[self.payment_b.pk])).status_code, 404)
+        self.assertTrue(Payment.objects.filter(pk=self.payment_b.pk).exists())
+        self.assertEqual(self.client.get(reverse("web-payment-detail", args=[self.payment_a.pk])).status_code, 200)
+
+    def test_manager_resolves_managed_owners_payment(self):
+        self.client.login(username="pay_manager_a", password=self.password)
+        response = self.client.get(reverse("web-payment-detail", args=[self.payment_a.pk]))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["payment"].pk, self.payment_a.pk)
+
+    def test_manager_cannot_resolve_other_owners_payment(self):
+        self.client.login(username="pay_manager_a", password=self.password)
+        self.assertEqual(self.client.get(reverse("web-payment-detail", args=[self.payment_b.pk])).status_code, 404)
+        self.assertEqual(self.client.get(reverse("web-payment-edit", args=[self.payment_b.pk])).status_code, 404)
+        self.assertEqual(self.client.post(reverse("web-payment-delete", args=[self.payment_b.pk])).status_code, 404)
+        self.assertTrue(Payment.objects.filter(pk=self.payment_b.pk).exists())
+
+    def test_report_payment_source_links_stay_within_effective_owner(self):
+        own_a = {self.payment_a.pk, self.ar_payment_a.pk}
+        own_b = {self.payment_b.pk, self.ar_payment_b.pk}
+
+        self.client.login(username="pay_owner_a", password=self.password)
+        gl_pks = self._payment_link_pks(self._gl_payment_urls(self.client.get(reverse("web-general-ledger"))))
+        self.assertTrue(gl_pks)
+        self.assertTrue(gl_pks.issubset(own_a))
+
+        ar = self.client.get(reverse("web-ar"))
+        ar_pks = self._payment_link_pks([i["source_url"] for i in ar.context["items"]])
+        self.assertIn(self.ar_payment_a.pk, ar_pks)
+        self.assertNotIn(self.ar_payment_b.pk, ar_pks)
+
+        bank_a = Account.objects.get(owner=self.owner_a, code="1020")
+        ledger = self.client.get(reverse("web-account-ledger", args=[bank_a.pk]))
+        ledger_pks = self._payment_link_pks([t["source_url"] for t in ledger.context["transactions"]])
+        self.assertTrue(ledger_pks)
+        self.assertTrue(ledger_pks.issubset(own_a))
+
+        self.client.logout()
+        self.client.login(username="pay_manager_a", password=self.password)
+        manager_pks = self._payment_link_pks(self._gl_payment_urls(self.client.get(reverse("web-general-ledger"))))
+        self.assertTrue(manager_pks)
+        self.assertTrue(manager_pks.issubset(own_a))
+
+        self.client.logout()
+        self.client.login(username="pay_owner_b", password=self.password)
+        b_pks = self._payment_link_pks(self._gl_payment_urls(self.client.get(reverse("web-general-ledger"))))
+        self.assertTrue(b_pks)
+        self.assertTrue(b_pks.issubset(own_b))
+        self.assertFalse(b_pks & own_a)
+
+    def test_sales_report_payment_link_cannot_resolve_foreign_payment(self):
+        rev_a = Account.objects.get(owner=self.owner_a, code="4010")
+        je = JournalEntry.objects.create(
+            owner=self.owner_a, date=date.today(),
+            reference="PAY-%d" % self.payment_b.pk, status="posted",
+        )
+        JournalEntryLine.objects.create(
+            journal_entry=je, account=rev_a, credit=Decimal("50"), property=self.prop_a,
+        )
+        self.client.login(username="pay_owner_a", password=self.password)
+        response = self.client.get(reverse("web-sales-report-detail", args=[self.prop_a.pk]))
+        self.assertEqual(response.status_code, 200)
+        crafted_url = "/lacagaha/%d/" % self.payment_b.pk
+        source_urls = [i["source_url"] for i in response.context["items"]]
+        self.assertIn(crafted_url, source_urls)
+        self.assertEqual(self.client.get(crafted_url).status_code, 404)
+        self.assertEqual(
+            self.client.get(reverse("web-payment-detail", args=[self.payment_b.pk])).status_code, 404,
+        )
+
+    def test_existing_payment_source_links_still_resolve(self):
+        self.client.login(username="pay_owner_a", password=self.password)
+        gl_urls = self._gl_payment_urls(self.client.get(reverse("web-general-ledger")))
+        own_url = "/lacag-bixinta/%d/" % self.payment_a.pk
+        self.assertIn(own_url, gl_urls)
+        detail = self.client.get(own_url)
+        self.assertEqual(detail.status_code, 200)
+        self.assertEqual(detail.context["payment"].pk, self.payment_a.pk)
+
+        ar = self.client.get(reverse("web-ar"))
+        ar_url = "/lacag-bixinta/%d/" % self.ar_payment_a.pk
+        self.assertIn(ar_url, [i["source_url"] for i in ar.context["items"]])
+        self.assertEqual(self.client.get(ar_url).status_code, 200)
+
+        self.client.logout()
+        self.client.login(username="pay_manager_a", password=self.password)
+        self.assertEqual(self.client.get(own_url).status_code, 200)
+        self.assertEqual(self.client.get(ar_url).status_code, 200)
