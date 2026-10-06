@@ -422,7 +422,7 @@ class AccountsReceivableView(AccountingReportMixin, View):
             if ref.startswith("INV-"):
                 from accounting.models import Invoice
                 try:
-                    inv = Invoice.objects.get(invoice_number=ref)
+                    inv = Invoice.objects.get(invoice_number=ref, owner=request.user.get_data_owner())
                     source_url = "/xisaabiyadda/biilasha/%d/" % inv.pk
                     source_label = inv.invoice_number
                 except Invoice.DoesNotExist:
@@ -519,7 +519,7 @@ class AccountsPayableView(AccountingReportMixin, View):
                 pk = ref.split("-")[1]
                 try:
                     from finance.models import GeneralExpense
-                    GeneralExpense.objects.get(pk=pk)
+                    GeneralExpense.objects.get(pk=pk, property__owner=request.user.get_data_owner())
                     source_url = "/kharashka/%s/" % pk
                 except GeneralExpense.DoesNotExist:
                     pass
@@ -527,7 +527,7 @@ class AccountsPayableView(AccountingReportMixin, View):
                 pk = ref.split("-")[1]
                 try:
                     from finance.models import MaintenanceRepair
-                    MaintenanceRepair.objects.get(pk=pk)
+                    MaintenanceRepair.objects.get(pk=pk, property__owner=request.user.get_data_owner())
                     source_url = "/dayactirka/%s/" % pk
                 except MaintenanceRepair.DoesNotExist:
                     pass
@@ -680,7 +680,7 @@ class SalesReportDetailView(AccountingReportMixin, View):
             if ref.startswith("INV-"):
                 from accounting.models import Invoice
                 try:
-                    inv = Invoice.objects.get(invoice_number=ref)
+                    inv = Invoice.objects.get(invoice_number=ref, owner=request.user.get_data_owner())
                     source_url = "/xisaabiyadda/biilasha/%d/" % inv.pk
                 except Invoice.DoesNotExist:
                     pass

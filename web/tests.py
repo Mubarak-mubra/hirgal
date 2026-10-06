@@ -1,3 +1,4 @@
+import json
 from datetime import date
 from decimal import Decimal
 from unittest.mock import patch
@@ -6,11 +7,13 @@ from django.test import TestCase
 from django.urls import reverse
 
 from accounts.models import User
-from accounting.models import Account
+from accounting.models import Account, Invoice, JournalEntry, JournalEntryLine
 from accounting.services import DEFAULT_COA, seed_default_chart_of_accounts
-from finance.models import Payment
+from finance.models import Payment, GeneralExpense, MaintenanceRepair
 from properties.models import Property, PropertyType, Unit
 from rentals.models import RentalAgreement, Tenant
+
+from .chatbot import explore_financial_summary
 
 
 class CheckTenantPaidViewOwnershipTests(TestCase):
@@ -211,3 +214,212 @@ class LoginChartOfAccountsOwnershipTests(TestCase):
             response = self.login(self.manager)
         self.assertEqual(response.status_code, 302)
         mock_seed.assert_not_called()
+
+
+class EffectiveDataOwnerIsolationTests(TestCase):
+    """Owner/Manager data access must go through the effective data owner."""
+
+    password = "SafePassword123!"
+
+    def setUp(self):
+        self.owner_a = User.objects.create_user(
+            "owner_a", "+252617000001", self.password, full_name="Owner A", is_approved=True,
+        )
+        self.manager_a = User.objects.create_user(
+            "manager_a", "+252617000002", self.password, full_name="Manager A",
+            is_approved=True, managed_account=self.owner_a,
+        )
+        self.owner_b = User.objects.create_user(
+            "owner_b", "+252617000003", self.password, full_name="Owner B", is_approved=True,
+        )
+        self.prop_a = Property.objects.create(owner=self.owner_a, name="Alpha Tower", location="Mogadishu")
+        self.prop_b = Property.objects.create(owner=self.owner_b, name="Beta Tower", location="Mogadishu")
+
+    def test_owner_can_access_own_data(self):
+        self.client.login(username="owner_a", password=self.password)
+        detail = self.client.get(reverse("web-property-detail", args=[self.prop_a.pk]))
+        self.assertEqual(detail.status_code, 200)
+        self.assertIn("Alpha Tower", detail.content.decode())
+        listing = self.client.get(reverse("web-properties"))
+        self.assertIn("Alpha Tower", listing.content.decode())
+        self.assertNotIn("Beta Tower", listing.content.decode())
+
+    def test_manager_can_access_owners_data(self):
+        self.client.login(username="manager_a", password=self.password)
+        detail = self.client.get(reverse("web-property-detail", args=[self.prop_a.pk]))
+        self.assertEqual(detail.status_code, 200)
+        self.assertIn("Alpha Tower", detail.content.decode())
+        listing = self.client.get(reverse("web-properties"))
+        self.assertIn("Alpha Tower", listing.content.decode())
+
+    def test_manager_creates_data_under_owner(self):
+        prop_type = PropertyType.objects.create(owner=self.owner_a, name="Tower Block")
+        self.client.login(username="manager_a", password=self.password)
+        response = self.client.post(reverse("web-property-create"), {
+            "name": "Gamma Place",
+            "location": "Mogadishu",
+            "property_type": prop_type.pk,
+        })
+        self.assertEqual(response.status_code, 302)
+        created = Property.objects.get(name="Gamma Place")
+        self.assertEqual(created.owner, self.owner_a)
+
+    def test_manager_cannot_access_other_owners_data(self):
+        self.client.login(username="manager_a", password=self.password)
+        detail = self.client.get(reverse("web-property-detail", args=[self.prop_b.pk]))
+        self.assertEqual(detail.status_code, 404)
+        listing = self.client.get(reverse("web-properties"))
+        self.assertNotIn("Beta Tower", listing.content.decode())
+        units = self.client.get(reverse("web-units-by-property"), {"property_id": self.prop_b.pk})
+        self.assertEqual(units.json(), {"units": []})
+
+    def test_owner_a_and_owner_b_are_isolated(self):
+        self.client.login(username="owner_a", password=self.password)
+        self.assertEqual(self.client.get(reverse("web-property-detail", args=[self.prop_b.pk])).status_code, 404)
+        listing_a = self.client.get(reverse("web-properties"))
+        self.assertIn("Alpha Tower", listing_a.content.decode())
+        self.assertNotIn("Beta Tower", listing_a.content.decode())
+
+        self.client.logout()
+        self.client.login(username="owner_b", password=self.password)
+        self.assertEqual(self.client.get(reverse("web-property-detail", args=[self.prop_a.pk])).status_code, 404)
+        listing_b = self.client.get(reverse("web-properties"))
+        self.assertIn("Beta Tower", listing_b.content.decode())
+        self.assertNotIn("Alpha Tower", listing_b.content.decode())
+
+    def test_owner_behavior_remains_unchanged(self):
+        self.assertEqual(self.owner_a.get_data_owner(), self.owner_a)
+        self.client.login(username="owner_a", password=self.password)
+        edit = self.client.get(reverse("web-property-edit", args=[self.prop_a.pk]))
+        self.assertEqual(edit.status_code, 200)
+        prop_type = PropertyType.objects.create(owner=self.owner_a, name="Owner Type")
+        response = self.client.post(reverse("web-property-create"), {
+            "name": "Owner Made",
+            "location": "Mogadishu",
+            "property_type": prop_type.pk,
+        })
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(Property.objects.get(name="Owner Made").owner, self.owner_a)
+
+
+class ChatbotAccountsPayableOwnershipTests(TestCase):
+    """Chatbot financial summary must only count the caller's payables."""
+
+    def setUp(self):
+        self.owner_a = User.objects.create_user(
+            "owner_a", "+252617000011", "SafePassword123!", full_name="Owner A", is_approved=True,
+        )
+        self.owner_b = User.objects.create_user(
+            "owner_b", "+252617000012", "SafePassword123!", full_name="Owner B", is_approved=True,
+        )
+        acc_a = Account.objects.create(owner=self.owner_a, code="2010", name="Accounts Payable", category="liability")
+        acc_b = Account.objects.create(owner=self.owner_b, code="2010", name="Accounts Payable", category="liability")
+        je_a = JournalEntry.objects.create(owner=self.owner_a, date=date.today(), status="posted")
+        JournalEntryLine.objects.create(journal_entry=je_a, account=acc_a, credit=Decimal("500"))
+        je_b = JournalEntry.objects.create(owner=self.owner_b, date=date.today(), status="posted")
+        JournalEntryLine.objects.create(journal_entry=je_b, account=acc_b, credit=Decimal("300"))
+
+    def test_accounts_payable_scoped_to_callers_owner(self):
+        result = json.loads(explore_financial_summary(self.owner_b))
+        self.assertEqual(result["accounts_payable"], 300.0)
+
+    def test_owner_a_summary_only_counts_own_payables(self):
+        result = json.loads(explore_financial_summary(self.owner_a))
+        self.assertEqual(result["accounts_payable"], 500.0)
+
+
+class ReportSourceLookupOwnershipTests(TestCase):
+    """Report source-link lookups must not resolve another owner's records."""
+
+    password = "SafePassword123!"
+
+    def setUp(self):
+        self.owner_a = User.objects.create_user(
+            "owner_a", "+252617000021", self.password, full_name="Owner A", is_approved=True,
+        )
+        self.owner_b = User.objects.create_user(
+            "owner_b", "+252617000022", self.password, full_name="Owner B", is_approved=True,
+        )
+        self.prop_b = Property.objects.create(owner=self.owner_b, name="Beta Tower", location="Mogadishu")
+        tenant_b = Tenant.objects.create(owner=self.owner_b, full_name="Tenant B", phone_number="+252618000001")
+        self.invoice_b = Invoice.objects.create(
+            owner=self.owner_b, tenant=tenant_b, invoice_number="INV-2026-0001",
+            date=date.today(), due_date=date.today(),
+        )
+        self.expense_b = GeneralExpense.objects.create(
+            property=self.prop_b, title="B expense", category="repair",
+            amount=Decimal("100"), expense_date=date.today(),
+        )
+        self.repair_b = MaintenanceRepair.objects.create(
+            property=self.prop_b, title="B repair", repair_cost=Decimal("50"),
+            reported_date=date.today(),
+        )
+
+    def test_ar_report_does_not_resolve_other_owners_invoice(self):
+        ar_a = Account.objects.create(owner=self.owner_a, code="1200", name="Accounts Receivable", category="asset")
+        je = JournalEntry.objects.create(
+            owner=self.owner_a, date=date.today(),
+            reference=self.invoice_b.invoice_number, status="posted",
+        )
+        JournalEntryLine.objects.create(journal_entry=je, account=ar_a, debit=Decimal("100"))
+        self.client.login(username="owner_a", password=self.password)
+        response = self.client.get(reverse("web-ar"))
+        items = response.context["items"]
+        self.assertEqual(len(items), 1)
+        self.assertIsNone(items[0]["source_url"])
+
+    def test_ar_report_still_links_own_invoice(self):
+        ar_b = Account.objects.create(owner=self.owner_b, code="1200", name="Accounts Receivable", category="asset")
+        je = JournalEntry.objects.create(
+            owner=self.owner_b, date=date.today(),
+            reference=self.invoice_b.invoice_number, status="posted",
+        )
+        JournalEntryLine.objects.create(journal_entry=je, account=ar_b, debit=Decimal("100"))
+        self.client.login(username="owner_b", password=self.password)
+        response = self.client.get(reverse("web-ar"))
+        items = response.context["items"]
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0]["source_url"], "/xisaabiyadda/biilasha/%d/" % self.invoice_b.pk)
+
+    def test_sales_report_detail_does_not_resolve_other_owners_invoice(self):
+        prop_a = Property.objects.create(owner=self.owner_a, name="Alpha Sales", location="Mogadishu")
+        rev_a = Account.objects.create(owner=self.owner_a, code="4010", name="Rental Income", category="revenue")
+        je = JournalEntry.objects.create(
+            owner=self.owner_a, date=date.today(),
+            reference=self.invoice_b.invoice_number, status="posted",
+        )
+        JournalEntryLine.objects.create(
+            journal_entry=je, account=rev_a, credit=Decimal("100"), property=prop_a,
+        )
+        self.client.login(username="owner_a", password=self.password)
+        response = self.client.get(reverse("web-sales-report-detail", args=[prop_a.pk]))
+        self.assertEqual(response.status_code, 200)
+        items = response.context["items"]
+        self.assertEqual(len(items), 1)
+        self.assertIsNone(items[0]["source_url"])
+
+    def test_ap_report_does_not_resolve_other_owners_expense(self):
+        ap_a = Account.objects.create(owner=self.owner_a, code="2010", name="Accounts Payable", category="liability")
+        je = JournalEntry.objects.create(
+            owner=self.owner_a, date=date.today(),
+            reference="EXP-%d" % self.expense_b.pk, status="posted",
+        )
+        JournalEntryLine.objects.create(journal_entry=je, account=ap_a, credit=Decimal("75"))
+        self.client.login(username="owner_a", password=self.password)
+        response = self.client.get(reverse("web-ap"))
+        items = response.context["items"]
+        self.assertEqual(len(items), 1)
+        self.assertIsNone(items[0]["source_url"])
+
+    def test_ap_report_does_not_resolve_other_owners_repair(self):
+        ap_a = Account.objects.create(owner=self.owner_a, code="2010", name="Accounts Payable", category="liability")
+        je = JournalEntry.objects.create(
+            owner=self.owner_a, date=date.today(),
+            reference="REP-%d" % self.repair_b.pk, status="posted",
+        )
+        JournalEntryLine.objects.create(journal_entry=je, account=ap_a, credit=Decimal("60"))
+        self.client.login(username="owner_a", password=self.password)
+        response = self.client.get(reverse("web-ap"))
+        items = response.context["items"]
+        self.assertEqual(len(items), 1)
+        self.assertIsNone(items[0]["source_url"])

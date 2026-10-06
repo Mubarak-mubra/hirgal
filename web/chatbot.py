@@ -183,7 +183,9 @@ def explore_financial_summary(user):
         ar_total = sum(inv.get_total_amount() for inv in unpaid_ar)
 
         from accounting.models import JournalEntryLine
-        ap_lines = JournalEntryLine.objects.filter(account__code="2010", journal_entry__status="posted")
+        ap_lines = JournalEntryLine.objects.filter(
+            account__code="2010", journal_entry__status="posted", journal_entry__owner=user
+        )
         ap_total = ap_lines.aggregate(t=Sum("credit") - Sum("debit"))["t"] or 0
 
         return json.dumps({
