@@ -727,11 +727,11 @@ class ExpenseReportDetailView(AccountingReportMixin, View):
             ref = line.journal_entry.reference or ""
             source_url = None
             if ref.startswith("EXP-"):
-                pk = ref.split("-")[1]
-                source_url = "/kharashka/%s/" % pk
+                if hasattr(line.journal_entry, "general_expense_source"):
+                    source_url = "/kharashka/%d/" % line.journal_entry.general_expense_source.pk
             elif ref.startswith("REP-"):
-                pk = ref.split("-")[1]
-                source_url = "/dayactirka/%s/" % pk
+                if hasattr(line.journal_entry, "repair_source"):
+                    source_url = "/dayactirka/%d/" % line.journal_entry.repair_source.pk
 
             items.append({
                 "date": line.journal_entry.date,

@@ -805,3 +805,211 @@ class SalesReportPaymentLinkTests(TestCase):
         detail = self.client.get(expected)
         self.assertEqual(detail.status_code, 200)
         self.assertEqual(detail.context["payment"].pk, self.payment_a2.pk)
+
+
+class ExpenseReportSourceLinkTests(TestCase):
+    """Expense Report EXP/REP rows must emit real, effective-owner detail links."""
+
+    password = "SafePassword123!"
+
+    def setUp(self):
+        self.owner_a = User.objects.create_user(
+            "exr_owner_a", "+252617000061", self.password, full_name="Owner A", is_approved=True,
+        )
+        self.manager_a = User.objects.create_user(
+            "exr_manager_a", "+252617000062", self.password, full_name="Manager A",
+            is_approved=True, managed_account=self.owner_a,
+        )
+        self.owner_b = User.objects.create_user(
+            "exr_owner_b", "+252617000063", self.password, full_name="Owner B", is_approved=True,
+        )
+
+        self.prop_a = Property.objects.create(owner=self.owner_a, name="Alpha Court", location="Mogadishu")
+        self.prop_b = Property.objects.create(owner=self.owner_b, name="Beta Court", location="Mogadishu")
+
+        # Real posting path: GeneralExpense -> post_expense signal -> owner-scoped JournalEntry.
+        self.expense_a = GeneralExpense.objects.create(
+            property=self.prop_a, title="Office supplies", category="office",
+            amount=Decimal("120.00"), expense_date=date(2026, 6, 10),
+        )
+        self.expense_b = GeneralExpense.objects.create(
+            property=self.prop_b, title="Office supplies", category="office",
+            amount=Decimal("130.00"), expense_date=date(2026, 6, 10),
+        )
+        # Real posting path: MaintenanceRepair -> post_repair (repair_cost > 0 posts a JE).
+        self.repair_a = MaintenanceRepair.objects.create(
+            property=self.prop_a, title="Leaking pipe", category="plumbing",
+            repair_cost=Decimal("250.00"), reported_date=date(2026, 6, 12),
+        )
+        self.repair_b = MaintenanceRepair.objects.create(
+            property=self.prop_b, title="Leaking pipe", category="plumbing",
+            repair_cost=Decimal("260.00"), reported_date=date(2026, 6, 12),
+        )
+
+        self.exp_report_url = reverse(
+            "web-expense-report-detail", args=[self.expense_a.expense_account_id]
+        )
+        self.rep_report_url = reverse(
+            "web-expense-report-detail", args=[self.repair_a.expense_account_id]
+        )
+        self.range_qs = "?start_date=2026-01-01&end_date=2026-12-31"
+
+    @staticmethod
+    def _source_urls(response):
+        return [i["source_url"] for i in response.context["items"]]
+
+    @staticmethod
+    def _link_pks(urls, prefix):
+        return {
+            int(u.rstrip("/").rsplit("/", 1)[-1])
+            for u in urls if u and prefix in u
+        }
+
+    def test_expense_report_emits_real_expense_url(self):
+        self.client.login(username="exr_owner_a", password=self.password)
+        response = self.client.get(self.exp_report_url + self.range_qs)
+        self.assertEqual(response.status_code, 200)
+        expected = "/kharashka/%d/" % self.expense_a.pk
+        self.assertIn("EXP-%d" % self.expense_a.pk, [i["reference"] for i in response.context["items"]])
+        self.assertIn(expected, self._source_urls(response))
+
+    def test_owner_resolves_expense_link(self):
+        self.client.login(username="exr_owner_a", password=self.password)
+        expected = "/kharashka/%d/" % self.expense_a.pk
+        self.assertIn(expected, self._source_urls(self.client.get(self.exp_report_url + self.range_qs)))
+        detail = self.client.get(expected)
+        self.assertEqual(detail.status_code, 200)
+        self.assertEqual(detail.context["expense"].pk, self.expense_a.pk)
+
+    def test_manager_resolves_owner_a_expense_link(self):
+        self.client.login(username="exr_manager_a", password=self.password)
+        response = self.client.get(self.exp_report_url + self.range_qs)
+        self.assertEqual(response.status_code, 200)
+        expected = "/kharashka/%d/" % self.expense_a.pk
+        self.assertIn(expected, self._source_urls(response))
+        detail = self.client.get(expected)
+        self.assertEqual(detail.status_code, 200)
+        self.assertEqual(detail.context["expense"].pk, self.expense_a.pk)
+
+    def test_owner_cannot_resolve_owner_b_expense(self):
+        self.client.login(username="exr_owner_a", password=self.password)
+        foreign = reverse("web-expense-detail", args=[self.expense_b.pk])
+        self.assertEqual(self.client.get(foreign).status_code, 404)
+
+    def test_expense_report_never_generates_owner_b_expense_link(self):
+        self.client.login(username="exr_owner_a", password=self.password)
+        urls = self._source_urls(self.client.get(self.exp_report_url + self.range_qs))
+        self.assertNotIn(reverse("web-expense-detail", args=[self.expense_b.pk]), urls)
+        pks = self._link_pks(urls, "/kharashka/")
+        self.assertTrue(pks)
+        self.assertTrue(pks.issubset({self.expense_a.pk}))
+
+        self.client.logout()
+        self.client.login(username="exr_owner_b", password=self.password)
+        b_report = reverse("web-expense-report-detail", args=[self.expense_b.expense_account_id])
+        b_urls = self._source_urls(self.client.get(b_report + self.range_qs))
+        self.assertIn(reverse("web-expense-detail", args=[self.expense_b.pk]), b_urls)
+
+    def test_repair_report_emits_real_repair_url(self):
+        self.client.login(username="exr_owner_a", password=self.password)
+        response = self.client.get(self.rep_report_url + self.range_qs)
+        self.assertEqual(response.status_code, 200)
+        expected = "/dayactirka/%d/" % self.repair_a.pk
+        self.assertIn("REP-%d" % self.repair_a.pk, [i["reference"] for i in response.context["items"]])
+        self.assertIn(expected, self._source_urls(response))
+
+    def test_owner_resolves_repair_link(self):
+        self.client.login(username="exr_owner_a", password=self.password)
+        expected = "/dayactirka/%d/" % self.repair_a.pk
+        self.assertIn(expected, self._source_urls(self.client.get(self.rep_report_url + self.range_qs)))
+        detail = self.client.get(expected)
+        self.assertEqual(detail.status_code, 200)
+        self.assertEqual(detail.context["repair"].pk, self.repair_a.pk)
+
+    def test_manager_resolves_owner_a_repair_link(self):
+        self.client.login(username="exr_manager_a", password=self.password)
+        response = self.client.get(self.rep_report_url + self.range_qs)
+        self.assertEqual(response.status_code, 200)
+        expected = "/dayactirka/%d/" % self.repair_a.pk
+        self.assertIn(expected, self._source_urls(response))
+        detail = self.client.get(expected)
+        self.assertEqual(detail.status_code, 200)
+        self.assertEqual(detail.context["repair"].pk, self.repair_a.pk)
+
+    def test_owner_cannot_resolve_owner_b_repair(self):
+        self.client.login(username="exr_owner_a", password=self.password)
+        foreign = reverse("web-maintenance-detail", args=[self.repair_b.pk])
+        self.assertEqual(self.client.get(foreign).status_code, 404)
+
+    def test_repair_report_never_generates_owner_b_repair_link(self):
+        self.client.login(username="exr_owner_a", password=self.password)
+        urls = self._source_urls(self.client.get(self.rep_report_url + self.range_qs))
+        self.assertNotIn(reverse("web-maintenance-detail", args=[self.repair_b.pk]), urls)
+        pks = self._link_pks(urls, "/dayactirka/")
+        self.assertTrue(pks)
+        self.assertTrue(pks.issubset({self.repair_a.pk}))
+
+        self.client.logout()
+        self.client.login(username="exr_owner_b", password=self.password)
+        b_report = reverse("web-expense-report-detail", args=[self.repair_b.expense_account_id])
+        b_urls = self._source_urls(self.client.get(b_report + self.range_qs))
+        self.assertIn(reverse("web-maintenance-detail", args=[self.repair_b.pk]), b_urls)
+
+    def test_reference_identifier_is_model_pk_not_sequence(self):
+        """EXP/REP references embed the model pk itself, and links carry the full pk."""
+        self.client.login(username="exr_owner_a", password=self.password)
+        exp_items = self.client.get(self.exp_report_url + self.range_qs).context["items"]
+        exp = [i for i in exp_items if i["reference"] == "EXP-%d" % self.expense_a.pk]
+        self.assertEqual(len(exp), 1)
+        self.assertEqual(exp[0]["source_url"], reverse("web-expense-detail", args=[self.expense_a.pk]))
+        self.assertEqual(self.client.get(exp[0]["source_url"]).context["expense"].pk, self.expense_a.pk)
+
+        rep_items = self.client.get(self.rep_report_url + self.range_qs).context["items"]
+        rep = [i for i in rep_items if i["reference"] == "REP-%d" % self.repair_a.pk]
+        self.assertEqual(len(rep), 1)
+        self.assertEqual(rep[0]["source_url"], reverse("web-maintenance-detail", args=[self.repair_a.pk]))
+        self.assertEqual(self.client.get(rep[0]["source_url"]).context["repair"].pk, self.repair_a.pk)
+
+    def test_sequence_like_reference_emits_no_link(self):
+        """A PAY-style sequence reference must not be parsed into an EXP/REP pk URL."""
+        acct_5030 = Account.objects.get(owner=self.owner_a, code="5030")
+        acct_5010 = Account.objects.get(owner=self.owner_a, code="5010")
+        for ref, account in (("EXP-2026-0001", acct_5030), ("REP-2026-0001", acct_5010)):
+            je = JournalEntry.objects.create(
+                owner=self.owner_a, date=date(2026, 6, 10), reference=ref, status="posted",
+            )
+            JournalEntryLine.objects.create(journal_entry=je, account=account, debit=Decimal("50"))
+        self.client.login(username="exr_owner_a", password=self.password)
+        for report_url in (self.exp_report_url, self.rep_report_url):
+            urls = self._source_urls(self.client.get(report_url + self.range_qs))
+            self.assertFalse([u for u in urls if u and ("2026" in u)])
+            self.assertFalse([u for u in urls if u and u.startswith("/kharashka/2026")])
+            self.assertFalse([u for u in urls if u and u.startswith("/dayactirka/2026")])
+
+    def test_crafted_foreign_reference_emits_no_link(self):
+        """A reference naming another Customer's object emits no link (mirrors AP view)."""
+        acct_5030 = Account.objects.get(owner=self.owner_a, code="5030")
+        acct_5010 = Account.objects.get(owner=self.owner_a, code="5010")
+        crafted = (
+            ("EXP-%d" % self.expense_b.pk, acct_5030, self.exp_report_url),
+            ("REP-%d" % self.repair_b.pk, acct_5010, self.rep_report_url),
+        )
+        for ref, account, report_url in crafted:
+            je = JournalEntry.objects.create(
+                owner=self.owner_a, date=date(2026, 6, 10), reference=ref, status="posted",
+            )
+            JournalEntryLine.objects.create(journal_entry=je, account=account, debit=Decimal("50"))
+        self.client.login(username="exr_owner_a", password=self.password)
+        for ref, account, report_url in crafted:
+            items = self.client.get(report_url + self.range_qs).context["items"]
+            target = [i for i in items if i["reference"] == ref]
+            self.assertEqual(len(target), 1)
+            self.assertIsNone(target[0]["source_url"])
+        self.assertNotIn(
+            reverse("web-expense-detail", args=[self.expense_b.pk]),
+            self._source_urls(self.client.get(self.exp_report_url + self.range_qs)),
+        )
+        self.assertNotIn(
+            reverse("web-maintenance-detail", args=[self.repair_b.pk]),
+            self._source_urls(self.client.get(self.rep_report_url + self.range_qs)),
+        )
