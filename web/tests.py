@@ -1701,3 +1701,132 @@ class TenantDetailNullablePropertyTests(TestCase):
         self.assertEqual(
             self.client.get(reverse("web-tenant-detail", args=[self.tenant_b.pk])).status_code, 404,
         )
+
+
+class TenantDetailPaymentHistoryTests(TestCase):
+    """Tenant detail Payment History renders payments through RentalAgreement -> Tenant, safely."""
+
+    password = "SafePassword123!"
+
+    def setUp(self):
+        self.owner_a = User.objects.create_user(
+            "tdh_owner_a", "+252617000141", self.password, full_name="Owner A", is_approved=True,
+        )
+        self.manager_a = User.objects.create_user(
+            "tdh_manager_a", "+252617000142", self.password, full_name="Manager A",
+            is_approved=True, managed_account=self.owner_a,
+        )
+        self.owner_b = User.objects.create_user(
+            "tdh_owner_b", "+252617000143", self.password, full_name="Owner B", is_approved=True,
+        )
+        self.prop_a = Property.objects.create(owner=self.owner_a, name="Alpha Court", location="Mogadishu")
+        self.prop_b = Property.objects.create(owner=self.owner_b, name="Beta Court", location="Mogadishu")
+        self.unit_a = Unit.objects.create(property=self.prop_a, unit_number="1A")
+        self.unit_b = Unit.objects.create(property=self.prop_b, unit_number="1B")
+        self.tenant_a = Tenant.objects.create(owner=self.owner_a, full_name="Customer A")
+        self.tenant_single = Tenant.objects.create(owner=self.owner_a, full_name="Single Payor")
+        self.tenant_empty = Tenant.objects.create(owner=self.owner_a, full_name="Empty Tenant")
+        self.tenant_b = Tenant.objects.create(owner=self.owner_b, full_name="Customer B")
+
+        self.agreement_a_prop = RentalAgreement.objects.create(
+            tenant=self.tenant_a, property=self.prop_a, start_date=date(2026, 1, 1),
+            monthly_rent=Decimal("500.00"),
+        )
+        self.agreement_a_unit = RentalAgreement.objects.create(
+            tenant=self.tenant_a, property=None, unit=self.unit_a, start_date=date(2026, 2, 1),
+            monthly_rent=Decimal("300.00"),
+        )
+        self.agreement_single = RentalAgreement.objects.create(
+            tenant=self.tenant_single, property=self.prop_a, start_date=date(2026, 1, 1),
+            monthly_rent=Decimal("500.00"),
+        )
+        self.agreement_b = RentalAgreement.objects.create(
+            tenant=self.tenant_b, property=self.prop_b, start_date=date(2026, 1, 1),
+            monthly_rent=Decimal("500.00"),
+        )
+
+        self.payment_a_prop = Payment.objects.create(
+            rental_agreement=self.agreement_a_prop, amount=Decimal("100.00"),
+            payment_date=date(2026, 6, 1), reference_number="REF-A1",
+        )
+        self.payment_a_unit = Payment.objects.create(
+            rental_agreement=self.agreement_a_unit, amount=Decimal("200.00"),
+            payment_date=date(2026, 6, 2), reference_number="REF-A2",
+        )
+        self.payment_single = Payment.objects.create(
+            rental_agreement=self.agreement_single, amount=Decimal("50.00"),
+            payment_date=date(2026, 5, 15), reference_number="REF-S1",
+        )
+        self.payment_b = Payment.objects.create(
+            rental_agreement=self.agreement_b, amount=Decimal("999.00"),
+            payment_date=date(2026, 6, 3), reference_number="REF-B9",
+        )
+
+    def test_payment_history_shows_single_payment(self):
+        self.client.login(username="tdh_owner_a", password=self.password)
+        response = self.client.get(reverse("web-tenant-detail", args=[self.tenant_single.pk]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "50.00")
+        self.assertContains(response, "REF-S1")
+        self.assertEqual(len(response.context["payments"]), 1)
+
+    def test_payment_history_shows_multiple_payments(self):
+        self.client.login(username="tdh_owner_a", password=self.password)
+        response = self.client.get(reverse("web-tenant-detail", args=[self.tenant_a.pk]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "100.00")
+        self.assertContains(response, "200.00")
+        self.assertContains(response, "REF-A1")
+        self.assertContains(response, "REF-A2")
+        self.assertEqual(len(response.context["payments"]), 2)
+
+    def test_payment_history_shows_empty_state(self):
+        self.client.login(username="tdh_owner_a", password=self.password)
+        response = self.client.get(reverse("web-tenant-detail", args=[self.tenant_empty.pk]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "No payments yet.")
+
+    def test_property_payment_shows_property_link(self):
+        self.client.login(username="tdh_owner_a", password=self.password)
+        response = self.client.get(reverse("web-tenant-detail", args=[self.tenant_single.pk]))
+        # Agreement row + payment row each link the same property.
+        self.assertContains(response, f"/guryaha/{self.prop_a.pk}/", count=2)
+        self.assertContains(response, "Alpha Court")
+
+    def test_propertyless_payment_renders_safely(self):
+        self.client.login(username="tdh_owner_a", password=self.password)
+        response = self.client.get(reverse("web-tenant-detail", args=[self.tenant_a.pk]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "200.00")
+        self.assertContains(response, "REF-A2")
+        self.assertContains(response, "-")
+        self.assertEqual(len(response.context["payments"]), 2)
+
+    def test_owner_sees_only_own_payment_history(self):
+        self.client.login(username="tdh_owner_a", password=self.password)
+        response = self.client.get(reverse("web-tenant-detail", args=[self.tenant_a.pk]))
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "999.00")
+        self.assertNotContains(response, "REF-B9")
+        self.assertNotContains(response, "Customer B")
+        payment_ids = [p.pk for p in response.context["payments"]]
+        self.assertNotIn(self.payment_b.pk, payment_ids)
+
+    def test_manager_sees_owner_a_payment_history(self):
+        self.client.login(username="tdh_manager_a", password=self.password)
+        response = self.client.get(reverse("web-tenant-detail", args=[self.tenant_a.pk]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "100.00")
+        self.assertContains(response, "REF-A1")
+
+    def test_owner_cannot_open_owner_b_tenant_detail(self):
+        self.client.login(username="tdh_owner_a", password=self.password)
+        self.assertEqual(
+            self.client.get(reverse("web-tenant-detail", args=[self.tenant_b.pk])).status_code, 404,
+        )
+
+    def test_manager_cannot_open_owner_b_tenant_detail(self):
+        self.client.login(username="tdh_manager_a", password=self.password)
+        self.assertEqual(
+            self.client.get(reverse("web-tenant-detail", args=[self.tenant_b.pk])).status_code, 404,
+        )

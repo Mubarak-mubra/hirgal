@@ -713,7 +713,11 @@ class TenantDetailView(HomeView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["tenant"] = get_object_or_404(Tenant, pk=self.kwargs["pk"], owner=self.request.user.get_data_owner())
+        tenant = get_object_or_404(Tenant, pk=self.kwargs["pk"], owner=self.request.user.get_data_owner())
+        context["tenant"] = tenant
+        context["payments"] = Payment.objects.filter(
+            rental_agreement__tenant=tenant
+        ).select_related("rental_agreement__property").order_by("-payment_date", "-id")
         return context
 
 

@@ -59,12 +59,16 @@
 <section class="mt-7 rounded-2xl border bg-white p-5 shadow-sm">
     <h2 class="text-lg font-bold">Payment History</h2>
     <div class="mt-4 divide-y">
-        {% for payment in tenant.payments.all %}
+        {% for payment in payments %}
         <div class="flex justify-between py-3">
             <div>
+                {% if payment.rental_agreement.property %}
                 <a href="{% url 'web-property-detail' payment.rental_agreement.property.pk %}" class="text-indigo-600 hover:underline text-sm">
                     {{ payment.rental_agreement.property.name }}
                 </a>
+                {% else %}
+                -
+                {% endif %}
                 <p class="text-xs text-slate-400">{{ payment.payment_date }} · {{ payment.get_payment_method_display }}</p>
                 {% if payment.reference_number %}
                 <p class="text-xs text-slate-400">Ref: {{ payment.reference_number }}</p>
