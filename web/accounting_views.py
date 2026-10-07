@@ -516,21 +516,11 @@ class AccountsPayableView(AccountingReportMixin, View):
             je = line.journal_entry
 
             if ref.startswith("EXP-"):
-                pk = ref.split("-")[1]
-                try:
-                    from finance.models import GeneralExpense
-                    GeneralExpense.objects.get(pk=pk, property__owner=request.user.get_data_owner())
-                    source_url = "/kharashka/%s/" % pk
-                except GeneralExpense.DoesNotExist:
-                    pass
+                if hasattr(je, "general_expense_source"):
+                    source_url = "/kharashka/%d/" % je.general_expense_source.pk
             elif ref.startswith("REP-"):
-                pk = ref.split("-")[1]
-                try:
-                    from finance.models import MaintenanceRepair
-                    MaintenanceRepair.objects.get(pk=pk, property__owner=request.user.get_data_owner())
-                    source_url = "/dayactirka/%s/" % pk
-                except MaintenanceRepair.DoesNotExist:
-                    pass
+                if hasattr(je, "repair_source"):
+                    source_url = "/dayactirka/%d/" % je.repair_source.pk
 
             items.append({
                 "date": je.date,
