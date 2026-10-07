@@ -32,7 +32,11 @@
                     <a href="{% url 'web-tenant-detail' payment.rental_agreement.tenant.pk %}" class="font-semibold text-indigo-600 hover:underline">{{ payment.rental_agreement.tenant.full_name }}</a>
                 </td>
                 <td class="px-4 py-3">
+                    {% if payment.rental_agreement.property %}
                     <a href="{% url 'web-property-detail' payment.rental_agreement.property.pk %}" class="text-indigo-500 hover:underline">{{ payment.rental_agreement.property.name }}</a>
+                    {% else %}
+                    -
+                    {% endif %}
                 </td>
                 <td class="px-4 py-3 text-slate-500">{{ payment.payment_date }}</td>
                 <td class="px-4 py-3">
