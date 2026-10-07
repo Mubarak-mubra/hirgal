@@ -12,7 +12,7 @@
     </div>
     <div>
       <p class="text-sm font-semibold text-slate-500">Property</p>
-      <p class="mt-1 font-semibold text-ink"><a href="{% url 'web-property-detail' payment.rental_agreement.property.pk %}" class="text-indigo-600 hover:underline">{{ payment.rental_agreement.property.name }}</a></p>
+      <p class="mt-1 font-semibold text-ink">{% if payment.rental_agreement.property %}<a href="{% url 'web-property-detail' payment.rental_agreement.property.pk %}" class="text-indigo-600 hover:underline">{{ payment.rental_agreement.property.name }}</a>{% else %}-{% endif %}</p>
     </div>
     <div>
       <p class="text-sm font-semibold text-slate-500">Amount</p>
