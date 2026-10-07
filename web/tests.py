@@ -1305,3 +1305,133 @@ class CrossReportSourceLinkCoverageTests(TestCase):
                 self.client.get(reverse("web-maintenance-detail", args=[self.repair_b.pk])).status_code, 404,
             )
             self.client.logout()
+
+
+class InvoiceDetailNullableAgreementTests(TestCase):
+    """Invoice detail renders for every legitimate property/rental-agreement combination."""
+
+    password = "SafePassword123!"
+
+    def setUp(self):
+        self.owner_a = User.objects.create_user(
+            "invd_owner_a", "+252617000091", self.password, full_name="Owner A", is_approved=True,
+        )
+        self.manager_a = User.objects.create_user(
+            "invd_manager_a", "+252617000092", self.password, full_name="Manager A",
+            is_approved=True, managed_account=self.owner_a,
+        )
+        self.owner_b = User.objects.create_user(
+            "invd_owner_b", "+252617000093", self.password, full_name="Owner B", is_approved=True,
+        )
+        self.prop_a = Property.objects.create(owner=self.owner_a, name="Alpha Court", location="Mogadishu")
+        self.prop_b = Property.objects.create(owner=self.owner_b, name="Beta Court", location="Mogadishu")
+        self.tenant_a = Tenant.objects.create(owner=self.owner_a, full_name="Customer A")
+        self.tenant_b = Tenant.objects.create(owner=self.owner_b, full_name="Customer B")
+        self.agreement_a = RentalAgreement.objects.create(
+            tenant=self.tenant_a, property=self.prop_a, start_date=date(2026, 1, 1),
+            monthly_rent=Decimal("500.00"),
+        )
+        self.agreement_b = RentalAgreement.objects.create(
+            tenant=self.tenant_b, property=self.prop_b, start_date=date(2026, 1, 1),
+            monthly_rent=Decimal("700.00"),
+        )
+
+        # All four combinations are legal: both fields are null=True/blank=True.
+        self.invoice = Invoice.objects.create(
+            owner=self.owner_a, tenant=self.tenant_a, property=self.prop_a,
+            rental_agreement=self.agreement_a, invoice_number="INV-2026-9801",
+            date=date(2026, 6, 1), due_date=date(2026, 6, 30),
+        )
+        self.invoice_no_agreement = Invoice.objects.create(
+            owner=self.owner_a, tenant=self.tenant_a, property=self.prop_a,
+            rental_agreement=None, invoice_number="INV-2026-9802",
+            date=date(2026, 6, 1), due_date=date(2026, 6, 30),
+        )
+        self.invoice_no_property = Invoice.objects.create(
+            owner=self.owner_a, tenant=self.tenant_a, property=None,
+            rental_agreement=self.agreement_a, invoice_number="INV-2026-9803",
+            date=date(2026, 6, 1), due_date=date(2026, 6, 30),
+        )
+        self.invoice_bare = Invoice.objects.create(
+            owner=self.owner_a, tenant=self.tenant_a, property=None,
+            rental_agreement=None, invoice_number="INV-2026-9804",
+            date=date(2026, 6, 1), due_date=date(2026, 6, 30),
+        )
+        self.invoice_b = Invoice.objects.create(
+            owner=self.owner_b, tenant=self.tenant_b, property=self.prop_b,
+            rental_agreement=self.agreement_b, invoice_number="INV-2026-9805",
+            date=date(2026, 6, 1), due_date=date(2026, 6, 30),
+        )
+
+    def _get_detail(self, invoice):
+        self.client.login(username="invd_owner_a", password=self.password)
+        return self.client.get(reverse("web-invoice-detail", args=[invoice.pk]))
+
+    def test_detail_renders_with_property_and_null_agreement(self):
+        response = self._get_detail(self.invoice_no_agreement)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Alpha Court")
+
+    def test_detail_renders_with_property_and_agreement(self):
+        response = self._get_detail(self.invoice)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Alpha Court")
+
+    def test_detail_renders_with_agreement_and_null_property(self):
+        response = self._get_detail(self.invoice_no_property)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Alpha Court")
+
+    def test_detail_renders_with_neither_property_nor_agreement(self):
+        response = self._get_detail(self.invoice_bare)
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Alpha Court")
+
+    def test_ui_created_invoice_without_agreement_renders(self):
+        """Full production path: InvoiceCreateView with no agreement -> detail page."""
+        self.client.login(username="invd_owner_a", password=self.password)
+        response = self.client.post(reverse("web-invoice-create"), {
+            "tenant": self.tenant_a.pk,
+            "invoice_number": "INV-2026-9899",
+            "date": "2026-06-01",
+            "due_date": "2026-06-30",
+            "status": "draft",
+            "notes": "",
+            "lines-TOTAL_FORMS": "1",
+            "lines-INITIAL_FORMS": "0",
+            "lines-MIN_NUM_FORMS": "0",
+            "lines-MAX_NUM_FORMS": "1000",
+            "lines-0-account": "",
+            "lines-0-description": "",
+            "lines-0-amount": "",
+        })
+        self.assertEqual(response.status_code, 302)
+        created = Invoice.objects.get(invoice_number="INV-2026-9899")
+        self.assertIsNone(created.rental_agreement)
+        self.assertIsNone(created.property)
+        detail = self.client.get(response["Location"])
+        self.assertEqual(detail.status_code, 200)
+
+    def test_owner_views_own_invoice(self):
+        self.client.login(username="invd_owner_a", password=self.password)
+        self.assertEqual(
+            self.client.get(reverse("web-invoice-detail", args=[self.invoice.pk])).status_code, 200,
+        )
+
+    def test_manager_views_owner_a_invoice(self):
+        self.client.login(username="invd_manager_a", password=self.password)
+        self.assertEqual(
+            self.client.get(reverse("web-invoice-detail", args=[self.invoice.pk])).status_code, 200,
+        )
+
+    def test_owner_cannot_view_owner_b_invoice(self):
+        self.client.login(username="invd_owner_a", password=self.password)
+        self.assertEqual(
+            self.client.get(reverse("web-invoice-detail", args=[self.invoice_b.pk])).status_code, 404,
+        )
+
+    def test_manager_cannot_view_owner_b_invoice(self):
+        self.client.login(username="invd_manager_a", password=self.password)
+        self.assertEqual(
+            self.client.get(reverse("web-invoice-detail", args=[self.invoice_b.pk])).status_code, 404,
+        )
