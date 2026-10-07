@@ -1626,3 +1626,78 @@ class PaymentDetailNullablePropertyTests(TestCase):
         self.assertEqual(
             self.client.get(reverse("web-payment-detail", args=[self.payment_b_unit.pk])).status_code, 404,
         )
+
+
+class TenantDetailNullablePropertyTests(TestCase):
+    """Tenant detail renders for agreements with and without a property, under ownership rules."""
+
+    password = "SafePassword123!"
+
+    def setUp(self):
+        self.owner_a = User.objects.create_user(
+            "tdn_owner_a", "+252617000131", self.password, full_name="Owner A", is_approved=True,
+        )
+        self.manager_a = User.objects.create_user(
+            "tdn_manager_a", "+252617000132", self.password, full_name="Manager A",
+            is_approved=True, managed_account=self.owner_a,
+        )
+        self.owner_b = User.objects.create_user(
+            "tdn_owner_b", "+252617000133", self.password, full_name="Owner B", is_approved=True,
+        )
+        self.prop_a = Property.objects.create(owner=self.owner_a, name="Alpha Court", location="Mogadishu")
+        self.prop_b = Property.objects.create(owner=self.owner_b, name="Beta Court", location="Mogadishu")
+        self.unit_a = Unit.objects.create(property=self.prop_a, unit_number="1A")
+        self.unit_b = Unit.objects.create(property=self.prop_b, unit_number="1B")
+        self.tenant_a = Tenant.objects.create(owner=self.owner_a, full_name="Customer A")
+        self.tenant_b = Tenant.objects.create(owner=self.owner_b, full_name="Customer B")
+        self.agreement_a_prop = RentalAgreement.objects.create(
+            tenant=self.tenant_a, property=self.prop_a, start_date=date(2026, 1, 1),
+            monthly_rent=Decimal("500.00"),
+        )
+        # Legitimate state: property NULL while unit is set satisfies agreement_has_rentable_space.
+        self.agreement_a_unit = RentalAgreement.objects.create(
+            tenant=self.tenant_a, property=None, unit=self.unit_a, start_date=date(2026, 2, 1),
+            monthly_rent=Decimal("300.00"),
+        )
+        self.agreement_b_unit = RentalAgreement.objects.create(
+            tenant=self.tenant_b, property=None, unit=self.unit_b, start_date=date(2026, 1, 1),
+            monthly_rent=Decimal("300.00"),
+        )
+        # Payment exists so the (currently non-resolving) Payment History loop is exercised.
+        self.payment_a_unit = Payment.objects.create(
+            rental_agreement=self.agreement_a_unit, amount=Decimal("150.00"), payment_date=date(2026, 6, 1),
+        )
+
+    def test_owner_opens_tenant_detail_with_property_agreement(self):
+        self.client.login(username="tdn_owner_a", password=self.password)
+        response = self.client.get(reverse("web-tenant-detail", args=[self.tenant_a.pk]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Alpha Court")
+        self.assertContains(response, f"/guryaha/{self.prop_a.pk}/")
+
+    def test_owner_opens_tenant_detail_with_propertyless_agreement(self):
+        self.client.login(username="tdn_owner_a", password=self.password)
+        response = self.client.get(reverse("web-tenant-detail", args=[self.tenant_a.pk]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Customer A")
+        self.assertContains(response, "300.00")
+        self.assertContains(response, "1A")
+        self.assertContains(response, "-")
+
+    def test_owner_cannot_open_owner_b_tenant_detail(self):
+        self.client.login(username="tdn_owner_a", password=self.password)
+        self.assertEqual(
+            self.client.get(reverse("web-tenant-detail", args=[self.tenant_b.pk])).status_code, 404,
+        )
+
+    def test_manager_opens_owner_a_tenant_detail(self):
+        self.client.login(username="tdn_manager_a", password=self.password)
+        response = self.client.get(reverse("web-tenant-detail", args=[self.tenant_a.pk]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Customer A")
+
+    def test_manager_cannot_open_owner_b_tenant_detail(self):
+        self.client.login(username="tdn_manager_a", password=self.password)
+        self.assertEqual(
+            self.client.get(reverse("web-tenant-detail", args=[self.tenant_b.pk])).status_code, 404,
+        )

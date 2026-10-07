@@ -25,9 +25,13 @@
         {% for agreement in tenant.rental_agreements.all %}
         <div class="flex justify-between py-4">
             <div>
+                {% if agreement.property %}
                 <a href="{% url 'web-property-detail' agreement.property.pk %}" class="font-semibold text-indigo-600 hover:underline">
                     {{ agreement.property.name }}
                 </a>
+                {% else %}
+                -
+                {% endif %}
                 {% if agreement.unit %}
                 <span class="text-slate-500"> - {{ agreement.unit.unit_number }}</span>
                 {% endif %}
