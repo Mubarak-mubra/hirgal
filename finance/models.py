@@ -32,7 +32,7 @@ class Payment(models.Model):
     payment_method = models.CharField(max_length=20, choices=PAYMENT_METHODS, default="mobile_money")
     bank_account = models.ForeignKey(BankAccount, on_delete=models.SET_NULL, null=True, blank=True, related_name="payments")
     destination_account = models.ForeignKey("accounting.Account", on_delete=models.SET_NULL, null=True, blank=True, related_name="payments_received", help_text="Account the payment was deposited into")
-    invoice = models.ForeignKey("accounting.Invoice", on_delete=models.SET_NULL, null=True, blank=True, related_name="payments")
+    invoice = models.ForeignKey("accounting.Invoice", on_delete=models.PROTECT, null=True, blank=True, related_name="payments")
     journal_entry = models.OneToOneField("accounting.JournalEntry", on_delete=models.SET_NULL, null=True, blank=True, related_name="payment_source")
     reference_number = models.CharField(max_length=100, blank=True)
     notes = models.TextField(blank=True)

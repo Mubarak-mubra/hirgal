@@ -426,7 +426,16 @@ def post_invoice(invoice):
     """
     user = invoice.owner
     total_amount = invoice.get_total_amount()
+
+    # A cancelled invoice must never leave posted AR/revenue accounting behind.
+    if invoice.status == "cancelled":
+        cancel_journal_entry_for_object(invoice)
+        return None
+
+    # An invoice without value posts nothing; void any previously posted JE so
+    # the ledger never keeps a stale entry after lines are removed.
     if total_amount <= 0:
+        cancel_journal_entry_for_object(invoice)
         return None
 
     ar_account = get_ar_account(user)
@@ -473,5 +482,7 @@ def cancel_journal_entry_for_object(instance):
     """Safely mark linked JournalEntry as cancelled when source object is deleted."""
     if hasattr(instance, "journal_entry") and instance.journal_entry:
         entry = instance.journal_entry
+        if entry.status == "cancelled":
+            return
         entry.status = "cancelled"
         entry.save(update_fields=["status"])

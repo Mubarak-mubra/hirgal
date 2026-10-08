@@ -519,6 +519,15 @@ class InvoiceForm(forms.ModelForm):
         if not self.instance.pk:
             self.fields["invoice_number"].initial = self._generate_invoice_number(user)
 
+    def clean(self):
+        cleaned = super().clean()
+        agreement = cleaned.get("rental_agreement")
+        if agreement:
+            # Invoice views derive invoice.property from the agreement; mirror
+            # that here so model validation sees a consistent pair.
+            self.instance.property = agreement.property
+        return cleaned
+
     def _generate_invoice_number(self, user):
         from datetime import date
         today = date.today()

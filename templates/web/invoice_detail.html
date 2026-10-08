@@ -17,7 +17,9 @@
     </a>
     <button onclick="window.print()" class="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50">🖨️ Print / PDF</button>
     <a href="{% url 'web-invoice-edit' invoice.pk %}" class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold hover:bg-slate-50 transition">Edit</a>
+    {% if not has_payments %}
     <a href="{% url 'web-invoice-delete' invoice.pk %}" class="rounded-lg bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-600 hover:bg-rose-100 transition">Delete</a>
+    {% endif %}
   </div>
 </div>
 

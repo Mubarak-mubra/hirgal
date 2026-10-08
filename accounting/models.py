@@ -1,5 +1,6 @@
 from django.db import models
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from properties.models import Property
 from rentals.models import Tenant, RentalAgreement
    
@@ -129,6 +130,26 @@ class Invoice(models.Model):
     def get_total_amount(self):
         return sum(line.amount for line in self.lines.all())
 
+    def clean(self):
+        """Enforce invoice invariants shared by forms, admin, and services."""
+        super().clean()
+        errors = {}
+        if self.tenant_id and self.owner_id and self.tenant.owner_id != self.owner_id:
+            errors["tenant"] = "Customer belongs to a different owner."
+        if self.rental_agreement_id and self.tenant_id and self.rental_agreement.tenant_id != self.tenant_id:
+            errors["rental_agreement"] = "Rental agreement belongs to a different customer."
+        if (
+            self.property_id
+            and self.rental_agreement_id
+            and self.rental_agreement.property_id
+            and self.rental_agreement.property_id != self.property_id
+        ):
+            errors["property"] = "Property does not match the rental agreement."
+        if self.status == "cancelled" and self.pk and self.payments.exists():
+            errors["status"] = "Cannot cancel an invoice that has payments."
+        if errors:
+            raise ValidationError(errors)
+
     def __str__(self):
         return f"{self.invoice_number} - {self.tenant.full_name}"
 
@@ -137,6 +158,20 @@ class InvoiceLine(models.Model):
     account = models.ForeignKey(Account, on_delete=models.PROTECT, related_name='invoice_lines', help_text="Revenue account")
     description = models.CharField('Description', max_length=255)
     amount = models.DecimalField('Lacagta', max_digits=10, decimal_places=2)
+
+    def clean(self):
+        """A line must post valid revenue: positive amount, revenue account, owner's account."""
+        super().clean()
+        errors = {}
+        if self.amount is not None and self.amount <= 0:
+            errors["amount"] = "Line amount must be greater than zero."
+        if self.account_id:
+            if self.account.category != "revenue":
+                errors["account"] = "Invoice lines must use a revenue account."
+            if self.invoice_id and self.account.owner_id != self.invoice.owner_id:
+                errors["account"] = "Account belongs to a different owner."
+        if errors:
+            raise ValidationError(errors)
 
     def __str__(self):
         return f"{self.invoice.invoice_number} - {self.description}"

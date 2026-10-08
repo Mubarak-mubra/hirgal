@@ -7,7 +7,7 @@ from django.views import View
 from django.views.generic import DetailView, TemplateView, ListView
 
 from django.db import transaction
-from django.db.models import Count, Q, Sum
+from django.db.models import Count, ProtectedError, Q, Sum
 from accounting.models import Account, Invoice, InvoiceLine, JournalEntry, JournalEntryLine
 from accounting.services import (
     link_bank_account_to_ledger, post_expense, post_payment, post_repair,
@@ -1264,6 +1264,7 @@ class InvoiceDetailView(LoginRequiredMixin, DetailView):
         context["paid_total"] = paid
         context["balance"] = context["total"] - paid
         context["payments"] = self.object.payments.select_related("bank_account").order_by("-payment_date")[:10]
+        context["has_payments"] = self.object.payments.exists()
         return context
 
 
@@ -1359,7 +1360,13 @@ class InvoiceDeleteView(LoginRequiredMixin, View):
 
     def post(self, request, pk):
         invoice = get_object_or_404(Invoice, pk=pk, owner=request.user.get_data_owner())
-        invoice.delete()
+        try:
+            invoice.delete()
+        except ProtectedError:
+            # Payments keep a live GL credit against AR; deleting the invoice
+            # would orphan those credits, so block it at the data boundary.
+            messages.error(request, "Cannot delete an invoice that has payments. Remove the payments first.")
+            return redirect("web-invoice-detail", pk)
         return redirect("web-invoice-list")
 
 

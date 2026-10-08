@@ -3,6 +3,7 @@ from datetime import date
 from decimal import Decimal
 from unittest.mock import patch
 
+from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.urls import reverse
 
@@ -2805,3 +2806,379 @@ class DashboardAccountingKpiTests(TestCase):
         ctx_b = self._dash("kpi_owner_b")
         self.assertEqual(ctx_b["net_income"], Decimal("999.00"))
         self.assertEqual(ctx_b["bank_balance"], Decimal("999.00"))
+
+
+class InvoiceLifecycleAccountingTests(TestCase):
+    """Invoice lifecycle audit scenarios: draft/sent posting, payments, line edits,
+    cancellation, deletion, validation invariants, and owner isolation."""
+
+    password = "SafePassword123!"
+
+    def setUp(self):
+        self.owner_a = User.objects.create_user(
+            "lifecycle_owner_a", "+252618000011", self.password, full_name="Owner A", is_approved=True,
+        )
+        self.manager_a = User.objects.create_user(
+            "lifecycle_manager_a", "+252618000012", self.password, full_name="Manager A",
+            is_approved=True, managed_account=self.owner_a,
+        )
+        self.owner_b = User.objects.create_user(
+            "lifecycle_owner_b", "+252618000013", self.password, full_name="Owner B", is_approved=True,
+        )
+        seed_default_chart_of_accounts(self.owner_a)
+        seed_default_chart_of_accounts(self.owner_b)
+        self.prop_a = Property.objects.create(owner=self.owner_a, name="Alpha Court", location="Mogadishu")
+        self.prop_a2 = Property.objects.create(owner=self.owner_a, name="Alpha Annex", location="Mogadishu")
+        self.prop_b = Property.objects.create(owner=self.owner_b, name="Beta Court", location="Mogadishu")
+        self.tenant_a = Tenant.objects.create(owner=self.owner_a, full_name="Customer A")
+        self.tenant_a2 = Tenant.objects.create(owner=self.owner_a, full_name="Customer A2")
+        self.tenant_b = Tenant.objects.create(owner=self.owner_b, full_name="Customer B")
+        self.agreement_a = RentalAgreement.objects.create(
+            tenant=self.tenant_a, property=self.prop_a, start_date=date(2026, 1, 1),
+            monthly_rent=Decimal("500.00"),
+        )
+        self.ar_a = Account.objects.get(owner=self.owner_a, code="1200")
+        self.rev_a = Account.objects.get(owner=self.owner_a, code="4010")
+        self.cash_a = Account.objects.get(owner=self.owner_a, code="1020")
+        self.exp_a = Account.objects.get(owner=self.owner_a, code="5030")
+        self.ar_b = Account.objects.get(owner=self.owner_b, code="1200")
+        self.rev_b = Account.objects.get(owner=self.owner_b, code="4010")
+        self._seq = 0
+
+    def _number(self, tag):
+        self._seq += 1
+        return "LC-%s-%04d" % (tag, self._seq)
+
+    def make_invoice(self, owner, tenant, tag="A", amount=Decimal("1000.00"), status="draft",
+                     agreement=None, prop=None):
+        invoice = Invoice.objects.create(
+            owner=owner, tenant=tenant, rental_agreement=agreement, property=prop,
+            invoice_number=self._number(tag), date=date(2026, 6, 1), due_date=date(2026, 6, 30),
+            status=status,
+        )
+        if amount is not None:
+            InvoiceLine.objects.create(
+                invoice=invoice,
+                account=Account.objects.get(owner=owner, code="4010"),
+                description="Monthly Rent", amount=amount,
+            )
+        post_invoice(invoice)  # mirrors InvoiceCreateView's explicit re-post
+        invoice.refresh_from_db()
+        return invoice
+
+    @staticmethod
+    def posted_balance(account):
+        total_dr = Decimal("0")
+        total_cr = Decimal("0")
+        for line in JournalEntryLine.objects.filter(account=account, journal_entry__status="posted"):
+            total_dr += line.debit
+            total_cr += line.credit
+        return total_dr - total_cr
+
+    def make_payment(self, invoice, amount, when=None):
+        return Payment.objects.create(
+            rental_agreement=self.agreement_a, invoice=invoice, amount=amount,
+            payment_date=when or date(2026, 6, 15),
+        )
+
+    def edit_payload(self, invoice, status):
+        line = invoice.lines.first()
+        prefix = InvoiceLineFormSet().prefix
+        payload = {
+            "tenant": invoice.tenant_id,
+            "rental_agreement": str(invoice.rental_agreement_id or ""),
+            "invoice_number": invoice.invoice_number,
+            "date": "2026-06-01",
+            "due_date": "2026-06-30",
+            "status": status,
+            "notes": "",
+            f"{prefix}-TOTAL_FORMS": "1",
+            f"{prefix}-INITIAL_FORMS": "1",
+            f"{prefix}-MIN_NUM_FORMS": "0",
+            f"{prefix}-MAX_NUM_FORMS": "1000",
+            f"{prefix}-0-id": str(line.pk),
+            f"{prefix}-0-account": str(line.account_id),
+            f"{prefix}-0-description": line.description,
+            f"{prefix}-0-amount": str(line.amount),
+        }
+        return payload
+
+    def create_payload(self, number, status, amount="1000.00", tenant=None, agreement=None):
+        prefix = InvoiceLineFormSet().prefix
+        payload = {
+            "tenant": (tenant or self.tenant_a).pk,
+            "rental_agreement": str(agreement.pk if agreement else ""),
+            "invoice_number": number,
+            "date": "2026-06-01",
+            "due_date": "2026-06-30",
+            "status": status,
+            "notes": "",
+            f"{prefix}-TOTAL_FORMS": "1",
+            f"{prefix}-INITIAL_FORMS": "0",
+            f"{prefix}-MIN_NUM_FORMS": "0",
+            f"{prefix}-MAX_NUM_FORMS": "1000",
+            f"{prefix}-0-account": str(self.rev_a.pk),
+            f"{prefix}-0-description": "Monthly Rent",
+            f"{prefix}-0-amount": amount,
+        }
+        return payload
+
+    # ── A–E: posting across the lifecycle ────────────────────────────────────
+
+    def test_draft_invoice_posts_ar_and_revenue(self):
+        invoice = self.make_invoice(self.owner_a, self.tenant_a, status="draft")
+        self.assertIsNotNone(invoice.journal_entry_id)
+        self.assertEqual(invoice.journal_entry.status, "posted")
+        self.assertEqual(self.posted_balance(self.ar_a), Decimal("1000.00"))
+        self.assertEqual(self.posted_balance(self.rev_a), Decimal("-1000.00"))
+
+    def test_sent_invoice_posts_ar_and_revenue(self):
+        invoice = self.make_invoice(self.owner_a, self.tenant_a, status="sent")
+        self.assertEqual(invoice.status, "sent")
+        self.assertEqual(invoice.journal_entry.status, "posted")
+        self.assertEqual(self.posted_balance(self.ar_a), Decimal("1000.00"))
+        self.assertEqual(self.posted_balance(self.rev_a), Decimal("-1000.00"))
+        self.assertEqual(self.posted_balance(self.cash_a), Decimal("0.00"))
+
+    def test_full_payment_clears_ar_without_double_revenue(self):
+        invoice = self.make_invoice(self.owner_a, self.tenant_a, amount=Decimal("1000.00"))
+        self.make_payment(invoice, Decimal("1000.00"))
+        invoice.refresh_from_db()
+        self.assertEqual(invoice.status, "paid")
+        self.assertEqual(self.posted_balance(self.ar_a), Decimal("0.00"))
+        self.assertEqual(self.posted_balance(self.rev_a), Decimal("-1000.00"))
+        self.assertEqual(self.posted_balance(self.cash_a), Decimal("1000.00"))
+        revenue_lines = JournalEntryLine.objects.filter(
+            account=self.rev_a, journal_entry__status="posted",
+        )
+        self.assertEqual(sum(l.credit for l in revenue_lines), Decimal("1000.00"))
+        self.assertEqual(sum(l.debit for l in revenue_lines), Decimal("0.00"))
+
+    def test_partial_payment_keeps_remaining_ar(self):
+        invoice = self.make_invoice(self.owner_a, self.tenant_a, amount=Decimal("1000.00"))
+        self.make_payment(invoice, Decimal("400.00"))
+        invoice.refresh_from_db()
+        self.assertNotEqual(invoice.status, "paid")
+        self.assertEqual(self.posted_balance(self.ar_a), Decimal("600.00"))
+        self.assertEqual(self.posted_balance(self.rev_a), Decimal("-1000.00"))
+        self.assertEqual(self.posted_balance(self.cash_a), Decimal("400.00"))
+
+    def test_multiple_payments_settle_invoice(self):
+        invoice = self.make_invoice(self.owner_a, self.tenant_a, amount=Decimal("1000.00"))
+        self.make_payment(invoice, Decimal("300.00"), when=date(2026, 6, 10))
+        self.make_payment(invoice, Decimal("200.00"), when=date(2026, 6, 12))
+        self.make_payment(invoice, Decimal("500.00"), when=date(2026, 6, 14))
+        invoice.refresh_from_db()
+        self.assertEqual(invoice.status, "paid")
+        self.assertEqual(self.posted_balance(self.ar_a), Decimal("0.00"))
+        self.assertEqual(self.posted_balance(self.rev_a), Decimal("-1000.00"))
+        self.assertEqual(self.posted_balance(self.cash_a), Decimal("1000.00"))
+
+    # ── F: cancellation must never leave posted accounting ───────────────────
+
+    def test_cancelled_status_cancels_posted_je(self):
+        invoice = self.make_invoice(self.owner_a, self.tenant_a)
+        self.assertEqual(invoice.journal_entry.status, "posted")
+        invoice.status = "cancelled"
+        invoice.save()
+        invoice.refresh_from_db()
+        self.assertEqual(invoice.status, "cancelled")
+        self.assertEqual(invoice.journal_entry.status, "cancelled")
+        self.assertEqual(self.posted_balance(self.ar_a), Decimal("0.00"))
+        self.assertEqual(self.posted_balance(self.rev_a), Decimal("0.00"))
+
+    def test_cancel_invoice_via_update_view_reverses_je(self):
+        invoice = self.make_invoice(self.owner_a, self.tenant_a)
+        self.client.login(username="lifecycle_owner_a", password=self.password)
+        response = self.client.post(
+            reverse("web-invoice-edit", args=[invoice.pk]),
+            self.edit_payload(invoice, "cancelled"),
+        )
+        self.assertEqual(response.status_code, 302)
+        invoice.refresh_from_db()
+        self.assertEqual(invoice.status, "cancelled")
+        self.assertEqual(invoice.journal_entry.status, "cancelled")
+        self.assertEqual(self.posted_balance(self.ar_a), Decimal("0.00"))
+        self.assertEqual(self.posted_balance(self.rev_a), Decimal("0.00"))
+
+    def test_invoice_created_as_cancelled_never_posts(self):
+        self.client.login(username="lifecycle_owner_a", password=self.password)
+        response = self.client.post(
+            reverse("web-invoice-create"),
+            self.create_payload("LC-CREATE-CANCEL", "cancelled"),
+        )
+        self.assertEqual(response.status_code, 302)
+        created = Invoice.objects.get(invoice_number="LC-CREATE-CANCEL")
+        self.assertEqual(created.status, "cancelled")
+        self.assertIsNone(created.journal_entry_id)
+        self.assertEqual(self.posted_balance(self.ar_a), Decimal("0.00"))
+
+    def test_cancel_invoice_with_payment_is_rejected(self):
+        invoice = self.make_invoice(self.owner_a, self.tenant_a)
+        self.make_payment(invoice, Decimal("400.00"))
+        self.client.login(username="lifecycle_owner_a", password=self.password)
+        response = self.client.post(
+            reverse("web-invoice-edit", args=[invoice.pk]),
+            self.edit_payload(invoice, "cancelled"),
+        )
+        self.assertEqual(response.status_code, 200)
+        invoice.refresh_from_db()
+        self.assertEqual(invoice.status, "draft")
+        self.assertEqual(invoice.journal_entry.status, "posted")
+        self.assertEqual(self.posted_balance(self.ar_a), Decimal("600.00"))
+
+    # ── deletion semantics ───────────────────────────────────────────────────
+
+    def test_deleting_unpaid_invoice_cancels_je(self):
+        invoice = self.make_invoice(self.owner_a, self.tenant_a)
+        entry_pk = invoice.journal_entry_id
+        self.client.login(username="lifecycle_owner_a", password=self.password)
+        response = self.client.post(reverse("web-invoice-delete", args=[invoice.pk]))
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], reverse("web-invoice-list"))
+        self.assertFalse(Invoice.objects.filter(pk=invoice.pk).exists())
+        entry = JournalEntry.objects.get(pk=entry_pk)
+        self.assertEqual(entry.status, "cancelled")
+        self.assertEqual(self.posted_balance(self.ar_a), Decimal("0.00"))
+        self.assertEqual(self.posted_balance(self.rev_a), Decimal("0.00"))
+
+    def test_deleting_invoice_with_payment_is_blocked(self):
+        invoice = self.make_invoice(self.owner_a, self.tenant_a)
+        self.make_payment(invoice, Decimal("400.00"))
+        self.client.login(username="lifecycle_owner_a", password=self.password)
+        response = self.client.post(reverse("web-invoice-delete", args=[invoice.pk]))
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], reverse("web-invoice-detail", args=[invoice.pk]))
+        self.assertTrue(Invoice.objects.filter(pk=invoice.pk).exists())
+        self.assertEqual(invoice.journal_entry.status, "posted")
+        # AR keeps the invoice debit minus the payment credit: no orphaned credit.
+        self.assertEqual(self.posted_balance(self.ar_a), Decimal("600.00"))
+        self.assertEqual(self.posted_balance(self.cash_a), Decimal("400.00"))
+        self.assertTrue(Payment.objects.filter(invoice=invoice).exists())
+
+    # ── line edits keep the JE in sync ───────────────────────────────────────
+
+    def test_removing_all_lines_cancels_invoice_je(self):
+        invoice = self.make_invoice(self.owner_a, self.tenant_a)
+        invoice.lines.all().delete()
+        post_invoice(invoice)  # mirrors InvoiceUpdateView after formset save
+        invoice.refresh_from_db()
+        self.assertEqual(invoice.get_total_amount(), Decimal("0.00"))
+        self.assertEqual(invoice.journal_entry.status, "cancelled")
+        self.assertEqual(self.posted_balance(self.ar_a), Decimal("0.00"))
+        self.assertEqual(self.posted_balance(self.rev_a), Decimal("0.00"))
+
+    def test_editing_line_amount_reposts_je(self):
+        invoice = self.make_invoice(self.owner_a, self.tenant_a, amount=Decimal("1000.00"))
+        line = invoice.lines.first()
+        line.amount = Decimal("500.00")
+        line.save()
+        invoice.refresh_from_db()
+        self.assertEqual(self.posted_balance(self.ar_a), Decimal("500.00"))
+        self.assertEqual(self.posted_balance(self.rev_a), Decimal("-500.00"))
+
+    def test_invoice_posting_is_idempotent(self):
+        invoice = self.make_invoice(self.owner_a, self.tenant_a, amount=Decimal("1000.00"))
+        entry_pk = invoice.journal_entry_id
+        post_invoice(invoice)
+        invoice.save()
+        post_invoice(invoice)
+        invoice.refresh_from_db()
+        self.assertEqual(invoice.journal_entry_id, entry_pk)
+        self.assertEqual(invoice.journal_entry.status, "posted")
+        self.assertEqual(invoice.journal_entry.lines.count(), 2)
+        self.assertEqual(self.posted_balance(self.ar_a), Decimal("1000.00"))
+        self.assertEqual(self.posted_balance(self.rev_a), Decimal("-1000.00"))
+
+    # ── G: owner isolation across the lifecycle ──────────────────────────────
+
+    def test_owner_isolation_across_invoice_lifecycle(self):
+        invoice_a = self.make_invoice(self.owner_a, self.tenant_a, tag="ISOA", amount=Decimal("1000.00"))
+        invoice_b = self.make_invoice(self.owner_b, self.tenant_b, tag="ISOB", amount=Decimal("700.00"))
+
+        self.client.login(username="lifecycle_manager_a", password=self.password)
+        detail = self.client.get(reverse("web-invoice-detail", args=[invoice_a.pk]))
+        self.assertEqual(detail.status_code, 200)
+
+        self.client.login(username="lifecycle_owner_b", password=self.password)
+        self.assertEqual(self.client.get(reverse("web-invoice-detail", args=[invoice_a.pk])).status_code, 404)
+        self.assertEqual(self.client.post(reverse("web-invoice-edit", args=[invoice_a.pk]), {}).status_code, 404)
+        self.assertEqual(self.client.post(reverse("web-invoice-delete", args=[invoice_a.pk]), {}).status_code, 404)
+
+        self.assertTrue(Invoice.objects.filter(pk=invoice_a.pk).exists())
+        self.assertEqual(invoice_a.journal_entry.status, "posted")
+        self.assertEqual(self.posted_balance(self.ar_a), Decimal("1000.00"))
+        self.assertEqual(self.posted_balance(self.ar_b), Decimal("700.00"))
+
+    # ── validation invariants (form boundary) ────────────────────────────────
+
+    def test_invoice_form_rejects_cross_tenant_agreement(self):
+        self.client.login(username="lifecycle_owner_a", password=self.password)
+        response = self.client.post(
+            reverse("web-invoice-create"),
+            self.create_payload("LC-XTENANT", "draft", tenant=self.tenant_a2, agreement=self.agreement_a),
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context["form"].errors)
+        self.assertFalse(Invoice.objects.filter(invoice_number="LC-XTENANT").exists())
+
+    def test_invoice_form_rejects_negative_line_amount(self):
+        self.client.login(username="lifecycle_owner_a", password=self.password)
+        response = self.client.post(
+            reverse("web-invoice-create"),
+            self.create_payload("LC-NEGAMT", "draft", amount="-50.00"),
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(Invoice.objects.filter(invoice_number="LC-NEGAMT").exists())
+
+    # ── validation invariants (model boundary: admin/service/forms) ──────────
+
+    def test_invoice_full_clean_rejects_cross_owner_tenant(self):
+        invoice = Invoice(
+            owner=self.owner_a, tenant=self.tenant_b,
+            invoice_number=self._number("XCORNER"), date=date(2026, 6, 1), due_date=date(2026, 6, 30),
+        )
+        with self.assertRaises(ValidationError):
+            invoice.full_clean()
+
+    def test_invoice_full_clean_rejects_agreement_tenant_mismatch(self):
+        invoice = Invoice(
+            owner=self.owner_a, tenant=self.tenant_a2, rental_agreement=self.agreement_a,
+            invoice_number=self._number("XAGR"), date=date(2026, 6, 1), due_date=date(2026, 6, 30),
+        )
+        with self.assertRaises(ValidationError):
+            invoice.full_clean()
+
+    def test_invoice_full_clean_rejects_property_agreement_mismatch(self):
+        invoice = Invoice(
+            owner=self.owner_a, tenant=self.tenant_a, rental_agreement=self.agreement_a,
+            property=self.prop_a2,
+            invoice_number=self._number("XPROP"), date=date(2026, 6, 1), due_date=date(2026, 6, 30),
+        )
+        with self.assertRaises(ValidationError):
+            invoice.full_clean()
+
+    def test_invoice_full_clean_rejects_cancel_with_payments(self):
+        invoice = self.make_invoice(self.owner_a, self.tenant_a)
+        self.make_payment(invoice, Decimal("400.00"))
+        invoice.status = "cancelled"
+        with self.assertRaises(ValidationError):
+            invoice.full_clean()
+
+    def test_invoice_line_full_clean_rejects_expense_account(self):
+        invoice = self.make_invoice(self.owner_a, self.tenant_a, amount=None)
+        line = InvoiceLine(invoice=invoice, account=self.exp_a, description="Not revenue", amount=Decimal("50.00"))
+        with self.assertRaises(ValidationError):
+            line.full_clean()
+
+    def test_invoice_line_full_clean_rejects_cross_owner_account(self):
+        invoice = self.make_invoice(self.owner_a, self.tenant_a, amount=None)
+        line = InvoiceLine(invoice=invoice, account=self.rev_b, description="Wrong owner", amount=Decimal("50.00"))
+        with self.assertRaises(ValidationError):
+            line.full_clean()
+
+    def test_invoice_line_full_clean_rejects_non_positive_amount(self):
+        invoice = self.make_invoice(self.owner_a, self.tenant_a, amount=None)
+        line = InvoiceLine(invoice=invoice, account=self.rev_a, description="Zero", amount=Decimal("0.00"))
+        with self.assertRaises(ValidationError):
+            line.full_clean()
