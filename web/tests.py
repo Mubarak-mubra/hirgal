@@ -2321,3 +2321,150 @@ class UnpostedEntryReportOwnershipTests(TestCase):
         self.assertEqual(
             self._income_statement_revenue("upo_owner_b"), Decimal("9999.00")
         )
+
+
+class SalesExpenseCsvExportTests(TestCase):
+    """Sales/Expense CSV exports must render valid CSV of posted-only,
+    effective-owner-scoped report data (same data as the HTML reports)."""
+
+    password = "SafePassword123!"
+
+    def setUp(self):
+        self.owner_a = User.objects.create_user(
+            "csv_owner_a", "+252619000081", self.password,
+            full_name="Owner A", is_approved=True,
+        )
+        self.manager_a = User.objects.create_user(
+            "csv_manager_a", "+252619000082", self.password, full_name="Manager A",
+            is_approved=True, managed_account=self.owner_a,
+        )
+        self.owner_b = User.objects.create_user(
+            "csv_owner_b", "+252619000083", self.password,
+            full_name="Owner B", is_approved=True,
+        )
+        for user in (self.owner_a, self.owner_b):
+            seed_default_chart_of_accounts(user)
+
+        self.prop_a = Property.objects.create(
+            owner=self.owner_a, name="CSV Alpha Court", location="Mogadishu",
+        )
+        self.prop_b = Property.objects.create(
+            owner=self.owner_b, name="CSV Beta Court", location="Mogadishu",
+        )
+
+        cash_a = Account.objects.get(owner=self.owner_a, code="1010")
+        rev_a = Account.objects.get(owner=self.owner_a, code="4010")
+        exp_a = Account.objects.get(owner=self.owner_a, code="5010")
+        cash_b = Account.objects.get(owner=self.owner_b, code="1010")
+        rev_b = Account.objects.get(owner=self.owner_b, code="4010")
+        exp_b = Account.objects.get(owner=self.owner_b, code="5010")
+
+        # Owner A: posted / draft / cancelled revenue under prop_a.
+        self._entry(self.owner_a, "posted", "SREV-A1", cash_a, rev_a,
+                    Decimal("1000.00"), cr_property=self.prop_a)
+        self._entry(self.owner_a, "draft", "SREV-A2", cash_a, rev_a,
+                    Decimal("500.00"), cr_property=self.prop_a)
+        self._entry(self.owner_a, "cancelled", "SREV-A3", cash_a, rev_a,
+                    Decimal("700.00"), cr_property=self.prop_a)
+        # Owner A: posted / draft / cancelled expense.
+        self._entry(self.owner_a, "posted", "SEXP-A1", exp_a, cash_a, Decimal("250.00"))
+        self._entry(self.owner_a, "draft", "SEXP-A2", exp_a, cash_a, Decimal("100.00"))
+        self._entry(self.owner_a, "cancelled", "SEXP-A3", exp_a, cash_a, Decimal("150.00"))
+        # Owner B: posted-only figures (distinct amounts identify the owner).
+        self._entry(self.owner_b, "posted", "SREV-B1", cash_b, rev_b,
+                    Decimal("9999.00"), cr_property=self.prop_b)
+        self._entry(self.owner_b, "posted", "SEXP-B1", exp_b, cash_b, Decimal("888.00"))
+
+        self.sales_url = reverse("web-sales-report") + "?start_date=2026-01-01&end_date=2026-12-31&export=csv"
+        self.expense_url = reverse("web-expense-report") + "?start_date=2026-01-01&end_date=2026-12-31&export=csv"
+
+    @staticmethod
+    def _entry(owner, status, ref, dr_account, cr_account, amount, cr_property=None):
+        je = JournalEntry.objects.create(
+            owner=owner, date=date(2026, 6, 15), status=status, reference=ref,
+        )
+        JournalEntryLine.objects.create(
+            journal_entry=je, account=dr_account, debit=amount, credit=Decimal("0.00"),
+        )
+        JournalEntryLine.objects.create(
+            journal_entry=je, account=cr_account, debit=Decimal("0.00"), credit=amount,
+            property=cr_property,
+        )
+
+    def _get_csv(self, url, username):
+        self.client.login(username=username, password=self.password)
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response["Content-Type"].startswith("text/csv"))
+        return response
+
+    # ── Sales CSV ────────────────────────────────────────────────────────────
+
+    def test_sales_csv_success_and_format(self):
+        response = self._get_csv(self.sales_url, "csv_owner_a")
+        self.assertEqual(
+            response["Content-Disposition"], "attachment; filename=sales_report.csv",
+        )
+        lines = response.content.decode().splitlines()
+        self.assertEqual(lines[0], "Property Name,Total Revenue ($)")
+        self.assertEqual(len(lines), 2)
+        self.assertTrue(lines[1].startswith("CSV Alpha Court,"))
+
+    def test_sales_csv_contains_only_posted_revenue(self):
+        content = self._get_csv(self.sales_url, "csv_owner_a").content.decode()
+        self.assertIn("1000.00", content)
+        self.assertNotIn("2200.00", content)  # posted+draft+cancelled
+        self.assertNotIn("500.00", content)
+        self.assertNotIn("700.00", content)
+
+    def test_sales_csv_owner_a_excludes_owner_b(self):
+        content = self._get_csv(self.sales_url, "csv_owner_a").content.decode()
+        self.assertNotIn("CSV Beta Court", content)
+        self.assertNotIn("9999.00", content)
+
+        self.client.logout()
+        content_b = self._get_csv(self.sales_url, "csv_owner_b").content.decode()
+        self.assertIn("CSV Beta Court", content_b)
+        self.assertIn("9999.00", content_b)
+        self.assertNotIn("CSV Alpha Court", content_b)
+        self.assertNotIn("1000.00", content_b)
+
+    def test_sales_csv_manager_a_sees_owner_a_only(self):
+        content = self._get_csv(self.sales_url, "csv_manager_a").content.decode()
+        self.assertIn("CSV Alpha Court", content)
+        self.assertIn("1000.00", content)
+        self.assertNotIn("CSV Beta Court", content)
+        self.assertNotIn("9999.00", content)
+
+    # ── Expense CSV ──────────────────────────────────────────────────────────
+
+    def test_expense_csv_success_and_format(self):
+        response = self._get_csv(self.expense_url, "csv_owner_a")
+        self.assertEqual(
+            response["Content-Disposition"], "attachment; filename=expense_report.csv",
+        )
+        lines = response.content.decode().splitlines()
+        self.assertEqual(lines[0], "Account Name,Total Expense ($)")
+        self.assertEqual(len(lines), 2)
+        self.assertTrue(lines[1].startswith("Maintenance & Repairs,"))
+
+    def test_expense_csv_contains_only_posted_expense(self):
+        content = self._get_csv(self.expense_url, "csv_owner_a").content.decode()
+        self.assertIn("250.00", content)
+        self.assertNotIn("500.00", content)  # posted+draft+cancelled
+        self.assertNotIn("100.00", content)
+        self.assertNotIn("150.00", content)
+
+    def test_expense_csv_owner_a_excludes_owner_b(self):
+        content = self._get_csv(self.expense_url, "csv_owner_a").content.decode()
+        self.assertNotIn("888.00", content)
+
+        self.client.logout()
+        content_b = self._get_csv(self.expense_url, "csv_owner_b").content.decode()
+        self.assertIn("888.00", content_b)
+        self.assertNotIn("250.00", content_b)
+
+    def test_expense_csv_manager_a_sees_owner_a_only(self):
+        content = self._get_csv(self.expense_url, "csv_manager_a").content.decode()
+        self.assertIn("250.00", content)
+        self.assertNotIn("888.00", content)

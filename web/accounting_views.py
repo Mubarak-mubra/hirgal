@@ -621,7 +621,7 @@ class SalesReportView(AccountingReportMixin, View):
         sales_list = list(sales_by_property)
 
         if request.GET.get("export") == "csv":
-            rows = [[s["property__name"] or "General", f"{s[total_revenue]:.2f}"] for s in sales_list]
+            rows = [[s["property__name"] or "General", f"{s['total_revenue']:.2f}"] for s in sales_list]
             return render_csv_response("sales_report", ["Property Name", "Total Revenue ($)"], rows)
 
         return render(request, "accounting/sales_report.html", {
@@ -649,7 +649,7 @@ class ExpenseReportView(AccountingReportMixin, View):
         exp_list = list(expense_by_account)
 
         if request.GET.get("export") == "csv":
-            rows = [[e["account__name"], f"{e[total_expense]:.2f}"] for e in exp_list]
+            rows = [[e["account__name"], f"{e['total_expense']:.2f}"] for e in exp_list]
             return render_csv_response("expense_report", ["Account Name", "Total Expense ($)"], rows)
 
         return render(request, "accounting/expense_report.html", {
