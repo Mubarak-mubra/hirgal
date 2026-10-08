@@ -96,7 +96,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         # ── Rent Status This Month ──────────────────────────────────────────
         active_agreements = RentalAgreement.objects.filter(
             tenant__owner=user, status="active"
-        ).select_related("tenant", "property", "unit")
+        ).select_related("tenant", "property", "unit", "unit__property", "room", "room__unit", "room__unit__property")
 
         paid_full = []      # Paid full rent this month
         paid_partial = []   # Paid but not full amount

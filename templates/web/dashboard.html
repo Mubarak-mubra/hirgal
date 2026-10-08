@@ -126,7 +126,7 @@
                 {% for item in rent_paid_full %}
                 <div class="py-2">
                     <a href="{% url 'web-tenant-detail' item.agreement.tenant.pk %}" class="text-sm font-semibold text-indigo-600 hover:underline">{{ item.agreement.tenant.full_name }}</a>
-                    <p class="text-xs text-slate-400">{{ item.agreement.property.name }}</p>
+                    <p class="text-xs text-slate-400">{% if item.agreement.property %}{{ item.agreement.property.name }}{% elif item.agreement.unit %}{{ item.agreement.unit }}{% elif item.agreement.room %}{{ item.agreement.room }}{% else %}-{% endif %}</p>
                     <p class="text-xs text-green-600 font-semibold">${{ item.total_paid|floatformat:0 }} / ${{ item.monthly_rent|floatformat:0 }}</p>
                 </div>
                 {% empty %}
@@ -143,7 +143,7 @@
                 {% for item in rent_paid_partial %}
                 <div class="py-2">
                     <a href="{% url 'web-tenant-detail' item.agreement.tenant.pk %}" class="text-sm font-semibold text-indigo-600 hover:underline">{{ item.agreement.tenant.full_name }}</a>
-                    <p class="text-xs text-slate-400">{{ item.agreement.property.name }}</p>
+                    <p class="text-xs text-slate-400">{% if item.agreement.property %}{{ item.agreement.property.name }}{% elif item.agreement.unit %}{{ item.agreement.unit }}{% elif item.agreement.room %}{{ item.agreement.room }}{% else %}-{% endif %}</p>
                     <div class="mt-1">
                         <div class="w-full bg-slate-200 rounded-full h-1.5">
                             <div class="h-1.5 rounded-full bg-amber-500" style="width: {% widthratio item.total_paid item.monthly_rent 100 %}%"></div>
@@ -166,7 +166,7 @@
                 <div class="py-2 flex justify-between items-start">
                     <div>
                         <a href="{% url 'web-tenant-detail' item.agreement.tenant.pk %}" class="text-sm font-semibold text-indigo-600 hover:underline">{{ item.agreement.tenant.full_name }}</a>
-                        <p class="text-xs text-slate-400">{{ item.agreement.property.name }}</p>
+                        <p class="text-xs text-slate-400">{% if item.agreement.property %}{{ item.agreement.property.name }}{% elif item.agreement.unit %}{{ item.agreement.unit }}{% elif item.agreement.room %}{{ item.agreement.room }}{% else %}-{% endif %}</p>
                         <p class="text-xs text-rose-600 font-semibold">${{ item.monthly_rent|floatformat:0 }} due</p>
                     </div>
                     <a href="{% url 'web-payment-create' %}" class="text-xs bg-green-100 text-green-700 font-bold px-2 py-1 rounded-lg hover:bg-green-200 transition whitespace-nowrap">+ Pay</a>

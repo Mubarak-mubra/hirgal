@@ -1923,3 +1923,126 @@ class DashboardPropertylessPaymentTests(TestCase):
         self.assertContains(response, "100.00")
         self.assertNotContains(response, "999.00")
         self.assertNotContains(response, "Customer B")
+
+
+class DashboardRentStatusPropertylessTests(TestCase):
+    """Dashboard Rent Status rows show property, unit, or room location information safely."""
+
+    password = "SafePassword123!"
+
+    def setUp(self):
+        self.owner_a = User.objects.create_user(
+            "drs_owner_a", "+252617000161", self.password, full_name="Owner A", is_approved=True,
+        )
+        self.manager_a = User.objects.create_user(
+            "drs_manager_a", "+252617000162", self.password, full_name="Manager A",
+            is_approved=True, managed_account=self.owner_a,
+        )
+        self.owner_b = User.objects.create_user(
+            "drs_owner_b", "+252617000163", self.password, full_name="Owner B", is_approved=True,
+        )
+        self.prop_a = Property.objects.create(owner=self.owner_a, name="Alpha Court", location="Mogadishu")
+        self.prop_b = Property.objects.create(owner=self.owner_b, name="Beta Court", location="Mogadishu")
+        self.unit_a = Unit.objects.create(property=self.prop_a, unit_number="1A")
+        self.room_a = Room.objects.create(
+            unit=self.unit_a, room_name="Bed 1", monthly_rent=Decimal("120.00"),
+        )
+        self.tenant_a = Tenant.objects.create(owner=self.owner_a, full_name="Customer A")
+        self.tenant_b = Tenant.objects.create(owner=self.owner_b, full_name="Customer B")
+
+        # All three agreements are active: property-based, unit-based (property NULL), room-based (property+unit NULL).
+        self.agreement_prop = RentalAgreement.objects.create(
+            tenant=self.tenant_a, property=self.prop_a, start_date=date(2026, 1, 1),
+            monthly_rent=Decimal("500.00"),
+        )
+        self.agreement_unit = RentalAgreement.objects.create(
+            tenant=self.tenant_a, property=None, unit=self.unit_a, start_date=date(2026, 1, 1),
+            monthly_rent=Decimal("300.00"),
+        )
+        self.agreement_room = RentalAgreement.objects.create(
+            tenant=self.tenant_a, property=None, unit=None, room=self.room_a,
+            start_date=date(2026, 1, 1), monthly_rent=Decimal("120.00"),
+        )
+        self.agreement_b = RentalAgreement.objects.create(
+            tenant=self.tenant_b, property=self.prop_b, start_date=date(2026, 1, 1),
+            monthly_rent=Decimal("500.00"),
+        )
+
+        today = date.today()
+        # Full payment this month -> Paid Full; partial payment this month -> Partial; none -> Not Paid.
+        self.payment_prop = Payment.objects.create(
+            rental_agreement=self.agreement_prop, amount=Decimal("500.00"), payment_date=today,
+        )
+        self.payment_unit = Payment.objects.create(
+            rental_agreement=self.agreement_unit, amount=Decimal("150.00"), payment_date=today,
+        )
+
+    def test_property_agreement_shows_property_in_paid_full(self):
+        self.client.login(username="drs_owner_a", password=self.password)
+        response = self.client.get(reverse("dashboard"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Alpha Court</p>")
+        self.assertContains(response, "$500 / $500")
+        self.assertEqual(len(response.context["rent_paid_full"]), 1)
+        self.assertEqual(
+            response.context["rent_paid_full"][0]["agreement"].pk, self.agreement_prop.pk,
+        )
+
+    def test_unit_agreement_shows_unit_in_partial(self):
+        self.client.login(username="drs_owner_a", password=self.password)
+        response = self.client.get(reverse("dashboard"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Alpha Court - 1A</p>")
+        self.assertContains(response, "$150 / $300")
+        self.assertEqual(len(response.context["rent_paid_partial"]), 1)
+        self.assertEqual(
+            response.context["rent_paid_partial"][0]["agreement"].pk, self.agreement_unit.pk,
+        )
+
+    def test_room_agreement_shows_room_in_not_paid(self):
+        self.client.login(username="drs_owner_a", password=self.password)
+        response = self.client.get(reverse("dashboard"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Bed 1</p>")
+        self.assertContains(response, "$120 due")
+        self.assertEqual(len(response.context["rent_not_paid"]), 1)
+        self.assertEqual(
+            response.context["rent_not_paid"][0]["agreement"].pk, self.agreement_room.pk,
+        )
+
+    def test_dashboard_200_for_propertyless_agreements(self):
+        self.client.login(username="drs_owner_a", password=self.password)
+        response = self.client.get(reverse("dashboard"))
+        self.assertEqual(response.status_code, 200)
+        bucket_pks = {
+            item["agreement"].pk
+            for key in ("rent_paid_full", "rent_paid_partial", "rent_not_paid")
+            for item in response.context[key]
+        }
+        self.assertEqual(
+            bucket_pks, {self.agreement_prop.pk, self.agreement_unit.pk, self.agreement_room.pk},
+        )
+
+    def test_owner_sees_only_own_rent_status(self):
+        self.client.login(username="drs_owner_a", password=self.password)
+        response = self.client.get(reverse("dashboard"))
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Customer B")
+        self.assertNotContains(response, "Beta Court")
+        for key in ("rent_paid_full", "rent_paid_partial", "rent_not_paid"):
+            for item in response.context[key]:
+                self.assertEqual(item["agreement"].tenant.owner_id, self.owner_a.pk)
+
+    def test_manager_sees_owner_a_not_owner_b_rent_status(self):
+        self.client.login(username="drs_manager_a", password=self.password)
+        response = self.client.get(reverse("dashboard"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Alpha Court</p>")
+        self.assertNotContains(response, "Customer B")
+        self.assertNotContains(response, "Beta Court")
+        bucket_pks = {
+            item["agreement"].pk
+            for key in ("rent_paid_full", "rent_paid_partial", "rent_not_paid")
+            for item in response.context[key]
+        }
+        self.assertNotIn(self.agreement_b.pk, bucket_pks)
