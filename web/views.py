@@ -7,7 +7,7 @@ from django.views import View
 from django.views.generic import DetailView, TemplateView, ListView
 
 from django.db import transaction
-from django.db.models import Count, Q
+from django.db.models import Count, Q, Sum
 from accounting.models import Account, Invoice, InvoiceLine, JournalEntry, JournalEntryLine
 from accounting.services import (
     link_bank_account_to_ledger, post_expense, post_payment, post_repair,
@@ -57,14 +57,43 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         context["total_revenue"] = sum(p.amount for p in all_payments)
         context["expense_total"] = sum(e.amount for e in all_expenses)
         context["repair_total"] = sum(r.repair_cost for r in all_repairs)
-        context["net_income"] = context["total_revenue"] - context["expense_total"] - context["repair_total"]
+        # Net income: posted revenue minus posted expenses (accounting source
+        # of truth, all-time to preserve the KPI's existing period semantics).
+        rev_agg = JournalEntryLine.objects.filter(
+            journal_entry__owner=user,
+            journal_entry__status="posted",
+            account__category="revenue",
+        ).aggregate(credit=Sum("credit"), debit=Sum("debit"))
+        exp_agg = JournalEntryLine.objects.filter(
+            journal_entry__owner=user,
+            journal_entry__status="posted",
+            account__category="expense",
+        ).aggregate(debit=Sum("debit"), credit=Sum("credit"))
+        context["net_income"] = (
+            (rev_agg["credit"] or 0) - (rev_agg["debit"] or 0)
+        ) - (
+            (exp_agg["debit"] or 0) - (exp_agg["credit"] or 0)
+        )
 
-        # Bank accounts
-        from finance.models import BankAccount
-        bank_accounts = BankAccount.objects.filter(owner=user, is_active=True)
-        context["bank_balance"] = sum(
-            sum(p.amount for p in bank.payments.all()) - sum(e.amount for e in bank.general_expenses.all()) - sum(r.repair_cost for r in bank.maintenance_repairs.all())
-            for bank in bank_accounts
+        # Cash balance: posted balances of cash/bank ledger accounts (1010 +
+        # 1020-1099 auto-linked bank accounts, plus any explicitly linked ones).
+        cash_ids = set(
+            Account.objects.filter(owner=user)
+            .filter(Q(code="1010") | Q(code__gte="1020", code__lt="1100"))
+            .values_list("id", flat=True)
+        ) | set(
+            BankAccount.objects.filter(owner=user)
+            .exclude(linked_account=None)
+            .values_list("linked_account_id", flat=True)
+        )
+        cash_lines = JournalEntryLine.objects.filter(
+            journal_entry__owner=user,
+            journal_entry__status="posted",
+            account_id__in=cash_ids,
+        )
+        context["bank_balance"] = (
+            (cash_lines.aggregate(total=Sum("debit"))["total"] or 0)
+            - (cash_lines.aggregate(total=Sum("credit"))["total"] or 0)
         )
 
         # Recent activity
@@ -82,8 +111,6 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         context["rented_units"] = rented_units
 
         # Outstanding AR
-        from accounting.models import Account, JournalEntryLine
-        from django.db.models import Sum
         ar_account = Account.objects.filter(owner=user, code="1200").first()
         if ar_account:
             ar_lines = ar_account.journal_lines.filter(journal_entry__status="posted")

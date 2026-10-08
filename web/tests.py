@@ -8,8 +8,11 @@ from django.urls import reverse
 
 from accounts.models import User
 from accounting.models import Account, Invoice, InvoiceLine, JournalEntry, JournalEntryLine
-from accounting.services import DEFAULT_COA, get_rental_income_account, post_invoice, seed_default_chart_of_accounts
-from finance.models import Payment, GeneralExpense, MaintenanceRepair
+from accounting.services import (
+    DEFAULT_COA, get_rental_income_account, link_bank_account_to_ledger,
+    post_invoice, seed_default_chart_of_accounts,
+)
+from finance.models import BankAccount, Payment, GeneralExpense, MaintenanceRepair
 from properties.models import Property, PropertyAsset, PropertyType, Room, Unit
 from rentals.models import RentalAgreement, Tenant
 
@@ -2617,3 +2620,188 @@ class BalanceSheetInternalConsistencyTests(TestCase):
         self.assertEqual(ctx["total_assets"], Decimal("400.00"))
         self.assertEqual(ctx["net_income"], Decimal("400.00"))
         self.assertTrue(ctx["balance_ok"])
+
+
+class DashboardAccountingKpiTests(TestCase):
+    """Dashboard net_income and bank_balance are accounting figures and must
+    reflect posted Journal Entries (owner-scoped, all-time), not raw
+    Finance-model totals."""
+
+    password = "SafePassword123!"
+
+    def setUp(self):
+        self.owner_a = User.objects.create_user(
+            "kpi_owner_a", "+252619000101", self.password,
+            full_name="Owner A", is_approved=True,
+        )
+        self.manager_a = User.objects.create_user(
+            "kpi_manager_a", "+252619000102", self.password, full_name="Manager A",
+            is_approved=True, managed_account=self.owner_a,
+        )
+        self.owner_b = User.objects.create_user(
+            "kpi_owner_b", "+252619000103", self.password,
+            full_name="Owner B", is_approved=True,
+        )
+        for user in (self.owner_a, self.owner_b):
+            seed_default_chart_of_accounts(user)
+
+        self.prop_a = Property.objects.create(
+            owner=self.owner_a, name="KPI Alpha Court", location="Mogadishu",
+        )
+        self.prop_b = Property.objects.create(
+            owner=self.owner_b, name="KPI Beta Court", location="Mogadishu",
+        )
+        self.tenant_a = Tenant.objects.create(owner=self.owner_a, full_name="KPI Customer A")
+        self.tenant_b = Tenant.objects.create(owner=self.owner_b, full_name="KPI Customer B")
+        self.agreement_a = RentalAgreement.objects.create(
+            tenant=self.tenant_a, property=self.prop_a, start_date=date(2026, 1, 1),
+            monthly_rent=Decimal("500.00"),
+        )
+        self.agreement_b = RentalAgreement.objects.create(
+            tenant=self.tenant_b, property=self.prop_b, start_date=date(2026, 1, 1),
+            monthly_rent=Decimal("500.00"),
+        )
+        # Mirrors BankAccountCreateView: create bank, then link ledger account.
+        self.bank_a = BankAccount.objects.create(
+            owner=self.owner_a, bank_name="KPI Bank A", account_number="1001",
+            account_name="KPI Checking A",
+        )
+        link_bank_account_to_ledger(self.bank_a)
+        self.bank_b = BankAccount.objects.create(
+            owner=self.owner_b, bank_name="KPI Bank B", account_number="1002",
+            account_name="KPI Checking B",
+        )
+        link_bank_account_to_ledger(self.bank_b)
+
+    def _dash(self, username):
+        self.client.login(username=username, password=self.password)
+        response = self.client.get(reverse("dashboard"))
+        self.assertEqual(response.status_code, 200)
+        return response.context
+
+    def _payment(self, agreement, amount, when=None, bank=None):
+        return Payment.objects.create(
+            rental_agreement=agreement, amount=amount,
+            payment_date=when or date(2026, 6, 15), bank_account=bank,
+        )
+
+    @staticmethod
+    def _set_je_status(payment, status):
+        """Flip JE status the way JournalEntryUpdateView's form does (status
+        is an editable field), leaving the Finance record live."""
+        entry = payment.journal_entry
+        entry.status = status
+        entry.save(update_fields=["status"])
+
+    def _invoice(self, owner, tenant, prop, agreement, amount, number):
+        invoice = Invoice.objects.create(
+            owner=owner, tenant=tenant, property=prop, rental_agreement=agreement,
+            invoice_number=number, date=date(2026, 6, 1), due_date=date(2026, 6, 30),
+        )
+        InvoiceLine.objects.create(
+            invoice=invoice, account=get_rental_income_account(owner),
+            description="Rent", amount=amount,
+        )
+        post_invoice(invoice)
+        return invoice
+
+    # ── net_income ───────────────────────────────────────────────────────────
+
+    def test_net_income_includes_posted_invoice_revenue(self):
+        self._invoice(
+            self.owner_a, self.tenant_a, self.prop_a, self.agreement_a,
+            Decimal("1000.00"), "KPI-INV-1",
+        )
+        ctx = self._dash("kpi_owner_a")
+        self.assertEqual(ctx["net_income"], Decimal("1000.00"))
+        self.assertEqual(ctx["ar_balance"], Decimal("1000.00"))
+
+    def test_net_income_excludes_cancelled_payment_journal(self):
+        payment = self._payment(self.agreement_a, Decimal("600.00"), bank=self.bank_a)
+        self._set_je_status(payment, "cancelled")
+        ctx = self._dash("kpi_owner_a")
+        self.assertEqual(ctx["net_income"], 0)
+        self.assertEqual(ctx["bank_balance"], 0)
+
+    def test_net_income_excludes_draft_payment_journal(self):
+        payment = self._payment(self.agreement_a, Decimal("600.00"), bank=self.bank_a)
+        self._set_je_status(payment, "draft")
+        ctx = self._dash("kpi_owner_a")
+        self.assertEqual(ctx["net_income"], 0)
+        self.assertEqual(ctx["bank_balance"], 0)
+
+    def test_net_income_matches_paid_flows(self):
+        self._payment(self.agreement_a, Decimal("500.00"), bank=self.bank_a)
+        GeneralExpense.objects.create(
+            property=self.prop_a, title="KPI office", category="office",
+            amount=Decimal("200.00"), payment_status="paid",
+            bank_account=self.bank_a, expense_date=date(2026, 6, 10),
+        )
+        ctx = self._dash("kpi_owner_a")
+        self.assertEqual(ctx["net_income"], Decimal("300.00"))
+        self.assertEqual(ctx["bank_balance"], Decimal("300.00"))
+
+    def test_net_income_includes_earlier_year_activity(self):
+        self._payment(self.agreement_a, Decimal("250.00"), when=date(2025, 12, 20))
+        ctx = self._dash("kpi_owner_a")
+        self.assertEqual(ctx["net_income"], Decimal("250.00"))
+
+    # ── bank_balance ─────────────────────────────────────────────────────────
+
+    def test_cash_balance_ignores_unpaid_expense_and_repair(self):
+        self._payment(self.agreement_a, Decimal("1000.00"), bank=self.bank_a)
+        GeneralExpense.objects.create(
+            property=self.prop_a, title="KPI unpaid bill", category="office",
+            amount=Decimal("300.00"), payment_status="unpaid",
+            bank_account=self.bank_a, expense_date=date(2026, 6, 10),
+        )
+        MaintenanceRepair.objects.create(
+            property=self.prop_a, title="KPI unpaid repair", description="Leak",
+            category="plumbing", repair_cost=Decimal("400.00"),
+            payment_status="unpaid", bank_account=self.bank_a,
+            reported_date=date(2026, 6, 11),
+        )
+        ctx = self._dash("kpi_owner_a")
+        self.assertEqual(ctx["bank_balance"], Decimal("1000.00"))
+        self.assertEqual(ctx["net_income"], Decimal("300.00"))
+
+    def test_cash_balance_subtracts_paid_expense(self):
+        self._payment(self.agreement_a, Decimal("1000.00"), bank=self.bank_a)
+        GeneralExpense.objects.create(
+            property=self.prop_a, title="KPI paid bill", category="office",
+            amount=Decimal("300.00"), payment_status="paid",
+            bank_account=self.bank_a, expense_date=date(2026, 6, 10),
+        )
+        ctx = self._dash("kpi_owner_a")
+        self.assertEqual(ctx["bank_balance"], Decimal("700.00"))
+
+    def test_cash_balance_includes_payments_without_bank_account(self):
+        self._payment(self.agreement_a, Decimal("250.00"))
+        ctx = self._dash("kpi_owner_a")
+        self.assertEqual(ctx["bank_balance"], Decimal("250.00"))
+        self.assertEqual(ctx["net_income"], Decimal("250.00"))
+
+    def test_cash_balance_includes_deactivated_bank_ledger(self):
+        self._payment(self.agreement_a, Decimal("700.00"), bank=self.bank_a)
+        self.bank_a.is_active = False
+        self.bank_a.save(update_fields=["is_active"])
+        ctx = self._dash("kpi_owner_a")
+        self.assertEqual(ctx["bank_balance"], Decimal("700.00"))
+
+    # ── ownership ────────────────────────────────────────────────────────────
+
+    def test_kpi_ownership_isolation(self):
+        self._payment(self.agreement_a, Decimal("100.00"), bank=self.bank_a)
+        self._payment(self.agreement_b, Decimal("999.00"), bank=self.bank_b)
+
+        ctx_a = self._dash("kpi_owner_a")
+        self.assertEqual(ctx_a["net_income"], Decimal("100.00"))
+        self.assertEqual(ctx_a["bank_balance"], Decimal("100.00"))
+
+        ctx_m = self._dash("kpi_manager_a")
+        self.assertEqual(ctx_m["net_income"], Decimal("100.00"))
+        self.assertEqual(ctx_m["bank_balance"], Decimal("100.00"))
+
+        ctx_b = self._dash("kpi_owner_b")
+        self.assertEqual(ctx_b["net_income"], Decimal("999.00"))
+        self.assertEqual(ctx_b["bank_balance"], Decimal("999.00"))
