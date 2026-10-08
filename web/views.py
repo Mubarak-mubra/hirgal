@@ -86,7 +86,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         from django.db.models import Sum
         ar_account = Account.objects.filter(owner=user, code="1200").first()
         if ar_account:
-            ar_lines = ar_account.journal_lines.all()
+            ar_lines = ar_account.journal_lines.filter(journal_entry__status="posted")
             dr = ar_lines.aggregate(total=Sum("debit"))["total"] or 0
             cr = ar_lines.aggregate(total=Sum("credit"))["total"] or 0
             context["ar_balance"] = dr - cr

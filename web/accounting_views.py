@@ -66,7 +66,7 @@ class ChartOfAccountsView(AccountingReportMixin, View):
             if cat not in category_totals:
                 category_totals[cat] = {"count": 0, "total_balance": 0}
             category_totals[cat]["count"] += 1
-            lines = acc.journal_lines.all()
+            lines = acc.journal_lines.filter(journal_entry__status="posted")
             dr = lines.aggregate(total=Sum("debit"))["total"] or 0
             cr = lines.aggregate(total=Sum("credit"))["total"] or 0
             balance = (dr - cr) if acc.category in ["asset", "expense"] else (cr - dr)
@@ -90,6 +90,7 @@ class AccountLedgerView(AccountingReportMixin, View):
         start, end = self.get_date_range(request)
         lines = JournalEntryLine.objects.filter(
             account=account,
+            journal_entry__status="posted",
             journal_entry__date__gte=start,
             journal_entry__date__lte=end,
         ).select_related("journal_entry").order_by("journal_entry__date")
@@ -152,12 +153,14 @@ class IncomeStatementView(AccountingReportMixin, View):
         start, end = self.get_date_range(request)
         revenues = JournalEntryLine.objects.filter(
             journal_entry__owner=request.user.get_data_owner(),
+            journal_entry__status="posted",
             account__category="revenue",
             journal_entry__date__gte=start,
             journal_entry__date__lte=end,
         )
         expenses = JournalEntryLine.objects.filter(
             journal_entry__owner=request.user.get_data_owner(),
+            journal_entry__status="posted",
             account__category="expense",
             journal_entry__date__gte=start,
             journal_entry__date__lte=end,
@@ -193,6 +196,7 @@ class BalanceSheetView(AccountingReportMixin, View):
         def _sum_lines(category, s, e):
             lines = JournalEntryLine.objects.filter(
                 journal_entry__owner=request.user.get_data_owner(),
+                journal_entry__status="posted",
                 account__category=category,
                 journal_entry__date__gte=s,
                 journal_entry__date__lte=e,
@@ -207,11 +211,13 @@ class BalanceSheetView(AccountingReportMixin, View):
 
         rev_all = JournalEntryLine.objects.filter(
             journal_entry__owner=request.user.get_data_owner(),
+            journal_entry__status="posted",
             account__category="revenue",
             journal_entry__date__lte=end,
         )
         exp_all = JournalEntryLine.objects.filter(
             journal_entry__owner=request.user.get_data_owner(),
+            journal_entry__status="posted",
             account__category="expense",
             journal_entry__date__lte=end,
         )
@@ -255,6 +261,7 @@ class TrialBalanceView(AccountingReportMixin, View):
         total_cr = 0
         for acc in accounts:
             lines = acc.journal_lines.filter(
+                journal_entry__status="posted",
                 journal_entry__date__gte=start,
                 journal_entry__date__lte=end,
             )
@@ -306,6 +313,7 @@ class GeneralLedgerView(AccountingReportMixin, View):
         csv_rows = []
         for acc in accounts:
             lines = acc.journal_lines.select_related("journal_entry").filter(
+                journal_entry__status="posted",
                 journal_entry__date__gte=start,
                 journal_entry__date__lte=end,
             ).order_by("journal_entry__date")
@@ -369,6 +377,7 @@ class CashFlowStatementView(AccountingReportMixin, View):
         ).filter(Q(name__icontains="Cash") | Q(name__icontains="Bank") | Q(code__startswith="10"))
         lines = JournalEntryLine.objects.filter(
             account__in=cash_accounts,
+            journal_entry__status="posted",
             journal_entry__date__gte=start,
             journal_entry__date__lte=end,
         )
@@ -403,6 +412,7 @@ class AccountsReceivableView(AccountingReportMixin, View):
         ar_accounts = Account.objects.filter(owner=request.user.get_data_owner(), code="1200")
         lines = JournalEntryLine.objects.filter(
             account__in=ar_accounts,
+            journal_entry__status="posted",
             journal_entry__date__gte=start,
             journal_entry__date__lte=end,
         ).select_related("journal_entry", "journal_entry__tenant").order_by("-journal_entry__date")
@@ -499,6 +509,7 @@ class AccountsPayableView(AccountingReportMixin, View):
         ap_accounts = Account.objects.filter(owner=request.user.get_data_owner(), code="2010")
         lines = JournalEntryLine.objects.filter(
             account__in=ap_accounts,
+            journal_entry__status="posted",
             journal_entry__date__gte=start,
             journal_entry__date__lte=end,
         ).select_related("journal_entry", "journal_entry__tenant").order_by("-journal_entry__date")
@@ -599,6 +610,7 @@ class SalesReportView(AccountingReportMixin, View):
         start, end = self.get_date_range(request)
         revenues = JournalEntryLine.objects.filter(
             journal_entry__owner=request.user.get_data_owner(),
+            journal_entry__status="posted",
             account__category="revenue",
             journal_entry__date__gte=start,
             journal_entry__date__lte=end,
@@ -626,6 +638,7 @@ class ExpenseReportView(AccountingReportMixin, View):
         start, end = self.get_date_range(request)
         expenses = JournalEntryLine.objects.filter(
             journal_entry__owner=request.user.get_data_owner(),
+            journal_entry__status="posted",
             account__category="expense",
             journal_entry__date__gte=start,
             journal_entry__date__lte=end,
@@ -653,6 +666,7 @@ class SalesReportDetailView(AccountingReportMixin, View):
         start, end = self.get_date_range(request)
         lines = JournalEntryLine.objects.filter(
             journal_entry__owner=request.user.get_data_owner(),
+            journal_entry__status="posted",
             account__category="revenue",
             journal_entry__date__gte=start,
             journal_entry__date__lte=end,
@@ -703,6 +717,7 @@ class ExpenseReportDetailView(AccountingReportMixin, View):
         start, end = self.get_date_range(request)
         lines = JournalEntryLine.objects.filter(
             journal_entry__owner=request.user.get_data_owner(),
+            journal_entry__status="posted",
             account__category="expense",
             journal_entry__date__gte=start,
             journal_entry__date__lte=end,
@@ -748,12 +763,14 @@ class ProfitLossView(AccountingReportMixin, View):
         start, end = self.get_date_range(request)
         revenues = JournalEntryLine.objects.filter(
             journal_entry__owner=request.user.get_data_owner(),
+            journal_entry__status="posted",
             account__category="revenue",
             journal_entry__date__gte=start,
             journal_entry__date__lte=end,
         )
         expenses = JournalEntryLine.objects.filter(
             journal_entry__owner=request.user.get_data_owner(),
+            journal_entry__status="posted",
             account__category="expense",
             journal_entry__date__gte=start,
             journal_entry__date__lte=end,

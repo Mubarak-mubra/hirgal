@@ -10,7 +10,7 @@ from accounts.models import User
 from accounting.models import Account, Invoice, InvoiceLine, JournalEntry, JournalEntryLine
 from accounting.services import DEFAULT_COA, get_rental_income_account, post_invoice, seed_default_chart_of_accounts
 from finance.models import Payment, GeneralExpense, MaintenanceRepair
-from properties.models import Property, PropertyType, Room, Unit
+from properties.models import Property, PropertyAsset, PropertyType, Room, Unit
 from rentals.models import RentalAgreement, Tenant
 
 from .chatbot import explore_financial_summary
@@ -1150,18 +1150,21 @@ class AccountsPayableSourceLinkTests(TestCase):
 
     def test_deleted_source_objects_leave_no_ap_link(self):
         pk = self.expense_a.pk
-        self.expense_a.delete()
+        self.expense_a.delete()  # post_delete signal cancels the journal entry
         self.client.login(username="apl_owner_a", password=self.password)
         response = self.client.get(reverse("web-ap") + self.range_qs)
         self.assertEqual(response.status_code, 200)
         items = response.context["items"]
+        # Cancelled entries no longer affect the AP report: no row, therefore
+        # no link to the deleted object can appear anywhere in the report.
         gone = [i for i in items if i["reference"] == "EXP-%d" % pk]
-        self.assertEqual(len(gone), 1)
-        self.assertIsNone(gone[0]["source_url"])
+        self.assertEqual(gone, [])
+        urls = self._source_urls(response)
+        self.assertFalse([u for u in urls if u and "/kharashka/%d/" % pk in u])
         # the surviving repair link is untouched
         self.assertIn(
             reverse("web-maintenance-detail", args=[self.repair_a.pk]),
-            self._source_urls(response),
+            urls,
         )
 
 
@@ -2046,3 +2049,275 @@ class DashboardRentStatusPropertylessTests(TestCase):
             for item in response.context[key]
         }
         self.assertNotIn(self.agreement_b.pk, bucket_pks)
+
+
+class UnpostedJournalEntryReportTests(TestCase):
+    """Financial reports must include only status="posted" journal entries."""
+
+    password = "SafePassword123!"
+
+    def setUp(self):
+        self.owner = User.objects.create_user(
+            "upj_owner", "+252618000061", self.password,
+            full_name="Owner Unposted", is_approved=True,
+        )
+        seed_default_chart_of_accounts(self.owner)
+        self.cash = Account.objects.get(owner=self.owner, code="1010")
+        self.ar = Account.objects.get(owner=self.owner, code="1200")
+        self.ap = Account.objects.get(owner=self.owner, code="2010")
+        self.revenue = Account.objects.get(owner=self.owner, code="4010")
+        self.expense = Account.objects.get(owner=self.owner, code="5010")
+        self.property = Property.objects.create(
+            owner=self.owner, name="Unposted Villa", location="Mogadishu",
+        )
+        self.range_qs = "?start_date=2026-01-01&end_date=2026-12-31"
+        self.client.login(username="upj_owner", password=self.password)
+
+    def _entry(self, status, ref, dr_account, cr_account, amount, description,
+               dr_property=None, cr_property=None):
+        je = JournalEntry.objects.create(
+            owner=self.owner, date=date(2026, 6, 15), status=status, reference=ref,
+        )
+        JournalEntryLine.objects.create(
+            journal_entry=je, account=dr_account, debit=amount, credit=Decimal("0.00"),
+            description="%s dr" % description, property=dr_property,
+        )
+        JournalEntryLine.objects.create(
+            journal_entry=je, account=cr_account, debit=Decimal("0.00"), credit=amount,
+            description="%s cr" % description, property=cr_property,
+        )
+        return je
+
+    def _revenue_trio(self, cr_property=None):
+        self._entry("posted", "REV-POST", self.cash, self.revenue,
+                    Decimal("1000.00"), "Posted revenue", cr_property=cr_property)
+        self._entry("draft", "REV-DRAFT", self.cash, self.revenue,
+                    Decimal("500.00"), "Draft revenue", cr_property=cr_property)
+        self._entry("cancelled", "REV-CANCEL", self.cash, self.revenue,
+                    Decimal("700.00"), "Cancelled revenue", cr_property=cr_property)
+
+    def test_income_statement_counts_only_posted(self):
+        self._revenue_trio()
+        response = self.client.get(reverse("web-income-statement") + self.range_qs)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["total_revenue"], Decimal("1000.00"))
+        self.assertEqual(response.context["net_income"], Decimal("1000.00"))
+
+    def test_balance_sheet_counts_only_posted(self):
+        self._revenue_trio()
+        response = self.client.get(reverse("web-balance-sheet") + self.range_qs)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["total_assets"], Decimal("1000.00"))
+        self.assertEqual(response.context["net_income"], Decimal("1000.00"))
+        self.assertTrue(response.context["balance_ok"])
+
+    def test_trial_balance_counts_only_posted(self):
+        self._revenue_trio()
+        response = self.client.get(reverse("web-trial-balance") + self.range_qs)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["total_debit"], Decimal("1000.00"))
+        self.assertEqual(response.context["total_credit"], Decimal("1000.00"))
+        rows = {r["code"]: r for r in response.context["accounts"]}
+        self.assertEqual(rows["1010"]["debit"], Decimal("1000.00"))
+        self.assertEqual(rows["4010"]["credit"], Decimal("1000.00"))
+
+    def test_general_ledger_lists_only_posted(self):
+        self._revenue_trio()
+        response = self.client.get(reverse("web-general-ledger") + self.range_qs)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Posted revenue")
+        self.assertNotContains(response, "Draft revenue")
+        self.assertNotContains(response, "Cancelled revenue")
+
+    def test_profit_loss_counts_only_posted(self):
+        self._revenue_trio()
+        response = self.client.get(reverse("web-profit-loss") + self.range_qs)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["total_revenue"], Decimal("1000.00"))
+        self.assertEqual(response.context["net_income"], Decimal("1000.00"))
+
+    def test_accounts_receivable_counts_only_posted(self):
+        self._entry("posted", "INV-A", self.ar, self.revenue,
+                    Decimal("300.00"), "Posted AR")
+        self._entry("draft", "INV-B", self.ar, self.revenue,
+                    Decimal("150.00"), "Draft AR")
+        self._entry("cancelled", "INV-C", self.ar, self.revenue,
+                    Decimal("170.00"), "Cancelled AR")
+        response = self.client.get(reverse("web-ar") + self.range_qs)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["outstanding_balance"], Decimal("300.00"))
+        self.assertEqual(len(response.context["items"]), 1)
+
+    def test_accounts_payable_counts_only_posted(self):
+        self._entry("posted", "EXP-A", self.expense, self.ap,
+                    Decimal("400.00"), "Posted AP")
+        self._entry("draft", "EXP-B", self.expense, self.ap,
+                    Decimal("200.00"), "Draft AP")
+        self._entry("cancelled", "EXP-C", self.expense, self.ap,
+                    Decimal("100.00"), "Cancelled AP")
+        response = self.client.get(reverse("web-ap") + self.range_qs)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["outstanding_payable"], Decimal("400.00"))
+        self.assertEqual(len(response.context["items"]), 1)
+
+    def test_sales_report_counts_only_posted(self):
+        self._revenue_trio(cr_property=self.property)
+        response = self.client.get(reverse("web-sales-report") + self.range_qs)
+        self.assertEqual(response.status_code, 200)
+        sales = response.context["sales_data"]
+        self.assertEqual(len(sales), 1)
+        self.assertEqual(sales[0]["total_revenue"], Decimal("1000.00"))
+
+    def test_sales_report_detail_counts_only_posted(self):
+        self._revenue_trio(cr_property=self.property)
+        response = self.client.get(
+            reverse("web-sales-report-detail", args=[self.property.pk]) + self.range_qs
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["total"], Decimal("1000.00"))
+        self.assertEqual(len(response.context["items"]), 1)
+
+    def test_expense_report_counts_only_posted(self):
+        self._entry("posted", "EXP-1", self.expense, self.cash,
+                    Decimal("250.00"), "Posted expense")
+        self._entry("draft", "EXP-2", self.expense, self.cash,
+                    Decimal("100.00"), "Draft expense")
+        self._entry("cancelled", "EXP-3", self.expense, self.cash,
+                    Decimal("150.00"), "Cancelled expense")
+        response = self.client.get(reverse("web-expense-report") + self.range_qs)
+        self.assertEqual(response.status_code, 200)
+        expenses = response.context["expense_data"]
+        self.assertEqual(len(expenses), 1)
+        self.assertEqual(expenses[0]["total_expense"], Decimal("250.00"))
+
+    def test_expense_report_detail_counts_only_posted(self):
+        self._entry("posted", "EXP-1", self.expense, self.cash,
+                    Decimal("250.00"), "Posted expense")
+        self._entry("draft", "EXP-2", self.expense, self.cash,
+                    Decimal("100.00"), "Draft expense")
+        self._entry("cancelled", "EXP-3", self.expense, self.cash,
+                    Decimal("150.00"), "Cancelled expense")
+        response = self.client.get(
+            reverse("web-expense-report-detail", args=[self.expense.pk]) + self.range_qs
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["total"], Decimal("250.00"))
+        self.assertEqual(len(response.context["items"]), 1)
+
+    def test_cash_flow_counts_only_posted(self):
+        self._entry("posted", "CF-IN1", self.cash, self.revenue,
+                    Decimal("1000.00"), "Posted inflow")
+        self._entry("draft", "CF-IN2", self.cash, self.revenue,
+                    Decimal("500.00"), "Draft inflow")
+        self._entry("cancelled", "CF-IN3", self.cash, self.revenue,
+                    Decimal("700.00"), "Cancelled inflow")
+        self._entry("posted", "CF-OUT1", self.expense, self.cash,
+                    Decimal("250.00"), "Posted outflow")
+        self._entry("draft", "CF-OUT2", self.expense, self.cash,
+                    Decimal("100.00"), "Draft outflow")
+        response = self.client.get(reverse("web-cash-flow") + self.range_qs)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["cash_in"], Decimal("1000.00"))
+        self.assertEqual(response.context["cash_out"], Decimal("250.00"))
+        self.assertEqual(response.context["net_cash_flow"], Decimal("750.00"))
+
+    def test_account_ledger_lists_only_posted(self):
+        self._revenue_trio()
+        response = self.client.get(
+            reverse("web-account-ledger", args=[self.cash.pk]) + self.range_qs
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["total_debit"], Decimal("1000.00"))
+        self.assertEqual(response.context["total_credit"], Decimal("0.00"))
+        self.assertContains(response, "Posted revenue")
+        self.assertNotContains(response, "Draft revenue")
+        self.assertNotContains(response, "Cancelled revenue")
+
+    def test_chart_of_accounts_balances_count_only_posted(self):
+        self._revenue_trio()
+        response = self.client.get(
+            reverse("web-chart-of-accounts") + self.range_qs + "&export=csv"
+        )
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertIn("1000.00", content)
+        self.assertNotIn("2200.00", content)
+
+    def test_dashboard_ar_balance_counts_only_posted(self):
+        self._entry("posted", "DASH-AR1", self.ar, self.revenue,
+                    Decimal("300.00"), "Posted AR dash")
+        self._entry("draft", "DASH-AR2", self.ar, self.revenue,
+                    Decimal("150.00"), "Draft AR dash")
+        self._entry("cancelled", "DASH-AR3", self.ar, self.revenue,
+                    Decimal("170.00"), "Cancelled AR dash")
+        response = self.client.get(reverse("dashboard"))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["ar_balance"], Decimal("300.00"))
+
+    def test_inventory_report_independent_of_journal_status(self):
+        PropertyAsset.objects.create(property=self.property, name="Generator", quantity=2)
+        self._revenue_trio()
+        response = self.client.get(reverse("web-inventory-report"))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.context["assets"]), 1)
+
+
+class UnpostedEntryReportOwnershipTests(TestCase):
+    """Posted-only reporting must stay inside the effective-owner boundary."""
+
+    password = "SafePassword123!"
+
+    def setUp(self):
+        self.owner_a = User.objects.create_user(
+            "upo_owner_a", "+252618000071", self.password, full_name="Owner A", is_approved=True,
+        )
+        self.manager_a = User.objects.create_user(
+            "upo_manager_a", "+252618000072", self.password, full_name="Manager A",
+            is_approved=True, managed_account=self.owner_a,
+        )
+        self.owner_b = User.objects.create_user(
+            "upo_owner_b", "+252618000073", self.password, full_name="Owner B", is_approved=True,
+        )
+        for user in (self.owner_a, self.owner_b):
+            seed_default_chart_of_accounts(user)
+
+        self.rev_a = Account.objects.get(owner=self.owner_a, code="4010")
+        self.cash_a = Account.objects.get(owner=self.owner_a, code="1010")
+        self.rev_b = Account.objects.get(owner=self.owner_b, code="4010")
+        self.cash_b = Account.objects.get(owner=self.owner_b, code="1010")
+        self.range_qs = "?start_date=2026-01-01&end_date=2026-12-31"
+
+        self._entry(self.owner_a, self.cash_a, self.rev_a, "posted", Decimal("1000.00"))
+        self._entry(self.owner_a, self.cash_a, self.rev_a, "draft", Decimal("500.00"))
+        self._entry(self.owner_a, self.cash_a, self.rev_a, "cancelled", Decimal("700.00"))
+        self._entry(self.owner_b, self.cash_b, self.rev_b, "posted", Decimal("9999.00"))
+
+    def _entry(self, owner, dr_account, cr_account, status, amount):
+        je = JournalEntry.objects.create(owner=owner, date=date(2026, 6, 15), status=status)
+        JournalEntryLine.objects.create(
+            journal_entry=je, account=dr_account, debit=amount, credit=Decimal("0.00"),
+        )
+        JournalEntryLine.objects.create(
+            journal_entry=je, account=cr_account, debit=Decimal("0.00"), credit=amount,
+        )
+
+    def _income_statement_revenue(self, username):
+        self.client.login(username=username, password=self.password)
+        response = self.client.get(reverse("web-income-statement") + self.range_qs)
+        self.assertEqual(response.status_code, 200)
+        return response.context["total_revenue"]
+
+    def test_owner_a_sees_only_own_posted_revenue(self):
+        self.assertEqual(
+            self._income_statement_revenue("upo_owner_a"), Decimal("1000.00")
+        )
+
+    def test_manager_a_sees_only_owner_a_posted_revenue(self):
+        self.assertEqual(
+            self._income_statement_revenue("upo_manager_a"), Decimal("1000.00")
+        )
+
+    def test_owner_b_sees_only_own_posted_revenue(self):
+        self.assertEqual(
+            self._income_statement_revenue("upo_owner_b"), Decimal("9999.00")
+        )
