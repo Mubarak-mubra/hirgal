@@ -22,6 +22,6 @@
         {% if form.password.errors %}<p class="text-red-500 text-sm">{{ form.password.errors.0 }}</p>{% endif %}
         <button class="mt-6 w-full rounded-lg bg-ink px-4 py-3 font-bold text-white hover:bg-indigo-900" type="submit">Register</button>
     </form>
-    <p class="mt-4 text-center text-sm text-slate-600">Already registered? <a href="{% url 'login' %}" class="font-semibold text-indigo-600 hover:underline">Sign in</a></p>
+    <p class="mt-4 text-center text-sm text-slate-600">Already registered? <a href="{% url 'web-login' %}" class="font-semibold text-indigo-600 hover:underline">Sign in</a></p>
 </section>
 {% endblock %}

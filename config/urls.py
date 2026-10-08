@@ -13,11 +13,6 @@ admin.site.index_title = "Manage data"
 
 urlpatterns = [
     path("", include("web.urls")),
-    path("api/v1/properties/", include("properties.urls")),
-    path("api/v1/rentals/", include("rentals.urls")),
-    path("api/v1/finance/", include("finance.urls")),
-    path("api/v1/accounts/", include("accounts.urls")),
-    path("api/v1/accounting/", include("accounting.urls")),
     path("admin/", admin.site.urls),
 ]
 

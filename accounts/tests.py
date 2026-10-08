@@ -1,49 +1,34 @@
 from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.urls import reverse
-from rest_framework import status
-from rest_framework.test import APITestCase
 
 from .models import User
 from properties.models import Property
 
 
-class AuthenticationApiTests(APITestCase):
-    registration_data = {
-        "username": "farhan",
-        "full_name": "Farhan Xasan",
-        "phone_number": "+252612345678",
-        "password": "SafePassword123!",
-    }
+class WebAuthTests(TestCase):
+    """Normal Django session authentication (no REST API)."""
 
-    def test_user_can_register(self):
-        response = self.client.post(reverse("register"), self.registration_data)
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertIn("Wait for admin approval", response.data["detail"])
-        self.assertFalse(User.objects.get(username="farhan").is_approved)
+    def test_register_page_renders_with_sign_in_link(self):
+        response = self.client.get(reverse("web-register"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'href="/login/"')
 
-    def test_user_can_login_with_username_or_phone(self):
-        self.client.post(reverse("register"), self.registration_data)
-        User.objects.filter(username="farhan").update(is_approved=True)
-        for identifier in ("farhan", "+252612345678"):
-            response = self.client.post(reverse("login"), {"username_or_phone": identifier, "password": "SafePassword123!"})
-            self.assertEqual(response.status_code, status.HTTP_200_OK)
-            self.assertIn("refresh", response.data)
-
-    def test_authenticated_user_can_view_profile(self):
-        user = User.objects.create_user(
+    def test_user_can_login_through_web_form(self):
+        User.objects.create_user(
             username="farhan", phone_number="+252612345678",
             password="SafePassword123!", full_name="Farhan Xasan", is_approved=True,
         )
-        login_response = self.client.post(
-            reverse("login"),
+        response = self.client.post(
+            reverse("web-login"),
             {"username_or_phone": "farhan", "password": "SafePassword123!"},
         )
-        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {login_response.data['access']}")
-        response = self.client.get(reverse("current-user"))
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["username"], "farhan")
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, "/")
+        self.assertIn("_auth_user_id", self.client.session)
 
+
+class DelegatedAccountAccessWebTests(TestCase):
     def test_delegated_account_access_in_web(self):
         farhan = User.objects.create_user(
             username="farhan", phone_number="+252611111111",
@@ -61,7 +46,7 @@ class AuthenticationApiTests(APITestCase):
         # Liban logs into the web UI
         self.client.login(username="liban", password="Password123!")
         response = self.client.get(reverse("web-properties"))
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.status_code, 200)
         self.assertIn("Farhan Tower", response.content.decode())
 
 
