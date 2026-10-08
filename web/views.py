@@ -69,7 +69,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
 
         # Recent activity
         context["recent_payments"] = all_payments.select_related(
-            "rental_agreement__tenant", "rental_agreement__property"
+            "rental_agreement__tenant", "rental_agreement__property", "rental_agreement__unit", "rental_agreement__room"
         ).order_by("-payment_date")[:5]
         context["recent_expenses"] = all_expenses.select_related("property").order_by("-expense_date")[:5]
         context["recent_repairs"] = all_repairs.select_related("property").order_by("-reported_date")[:5]

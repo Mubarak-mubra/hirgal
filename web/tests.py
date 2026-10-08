@@ -10,7 +10,7 @@ from accounts.models import User
 from accounting.models import Account, Invoice, InvoiceLine, JournalEntry, JournalEntryLine
 from accounting.services import DEFAULT_COA, get_rental_income_account, post_invoice, seed_default_chart_of_accounts
 from finance.models import Payment, GeneralExpense, MaintenanceRepair
-from properties.models import Property, PropertyType, Unit
+from properties.models import Property, PropertyType, Room, Unit
 from rentals.models import RentalAgreement, Tenant
 
 from .chatbot import explore_financial_summary
@@ -1830,3 +1830,96 @@ class TenantDetailPaymentHistoryTests(TestCase):
         self.assertEqual(
             self.client.get(reverse("web-tenant-detail", args=[self.tenant_b.pk])).status_code, 404,
         )
+
+
+class DashboardPropertylessPaymentTests(TestCase):
+    """Dashboard payment rows show property, unit, or room location information safely."""
+
+    password = "SafePassword123!"
+
+    def setUp(self):
+        self.owner_a = User.objects.create_user(
+            "dpp_owner_a", "+252617000151", self.password, full_name="Owner A", is_approved=True,
+        )
+        self.manager_a = User.objects.create_user(
+            "dpp_manager_a", "+252617000152", self.password, full_name="Manager A",
+            is_approved=True, managed_account=self.owner_a,
+        )
+        self.owner_b = User.objects.create_user(
+            "dpp_owner_b", "+252617000153", self.password, full_name="Owner B", is_approved=True,
+        )
+        self.prop_a = Property.objects.create(owner=self.owner_a, name="Alpha Court", location="Mogadishu")
+        self.prop_b = Property.objects.create(owner=self.owner_b, name="Beta Court", location="Mogadishu")
+        self.unit_a = Unit.objects.create(property=self.prop_a, unit_number="1A")
+        self.room_a = Room.objects.create(
+            unit=self.unit_a, room_name="Bed 1", monthly_rent=Decimal("120.00"),
+        )
+        self.tenant_a = Tenant.objects.create(owner=self.owner_a, full_name="Customer A")
+        self.tenant_b = Tenant.objects.create(owner=self.owner_b, full_name="Customer B")
+
+        self.agreement_a_prop = RentalAgreement.objects.create(
+            tenant=self.tenant_a, property=self.prop_a, start_date=date(2026, 1, 1),
+            monthly_rent=Decimal("500.00"),
+        )
+        # Legitimate state: property NULL while unit/room is set satisfies agreement_has_rentable_space.
+        self.agreement_a_unit = RentalAgreement.objects.create(
+            tenant=self.tenant_a, property=None, unit=self.unit_a, start_date=date(2026, 1, 1),
+            monthly_rent=Decimal("300.00"),
+        )
+        self.agreement_a_room = RentalAgreement.objects.create(
+            tenant=self.tenant_a, property=None, unit=None, room=self.room_a,
+            start_date=date(2026, 1, 1), monthly_rent=Decimal("120.00"),
+        )
+        self.agreement_b = RentalAgreement.objects.create(
+            tenant=self.tenant_b, property=self.prop_b, start_date=date(2026, 1, 1),
+            monthly_rent=Decimal("500.00"),
+        )
+
+        self.payment_a_prop = Payment.objects.create(
+            rental_agreement=self.agreement_a_prop, amount=Decimal("100.00"), payment_date=date(2026, 6, 1),
+        )
+        self.payment_a_unit = Payment.objects.create(
+            rental_agreement=self.agreement_a_unit, amount=Decimal("200.00"), payment_date=date(2026, 6, 2),
+        )
+        self.payment_a_room = Payment.objects.create(
+            rental_agreement=self.agreement_a_room, amount=Decimal("150.00"), payment_date=date(2026, 6, 3),
+        )
+        self.payment_b = Payment.objects.create(
+            rental_agreement=self.agreement_b, amount=Decimal("999.00"), payment_date=date(2026, 6, 4),
+        )
+
+    def test_dashboard_renders_payment_with_property(self):
+        self.client.login(username="dpp_owner_a", password=self.password)
+        response = self.client.get(reverse("dashboard"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "100.00")
+        self.assertContains(response, "Alpha Court")
+
+    def test_dashboard_renders_propertyless_unit_payment(self):
+        self.client.login(username="dpp_owner_a", password=self.password)
+        response = self.client.get(reverse("dashboard"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "200.00")
+        self.assertContains(response, "Alpha Court - 1A ·")
+
+    def test_dashboard_renders_room_only_payment(self):
+        self.client.login(username="dpp_owner_a", password=self.password)
+        response = self.client.get(reverse("dashboard"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "150.00")
+        self.assertContains(response, "Bed 1")
+
+    def test_owner_sees_only_own_payment_data_on_dashboard(self):
+        self.client.login(username="dpp_owner_a", password=self.password)
+        response = self.client.get(reverse("dashboard"))
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "999.00")
+        self.assertNotContains(response, "Customer B")
+
+    def test_manager_sees_owner_a_not_owner_b_payments_on_dashboard(self):
+        self.client.login(username="dpp_manager_a", password=self.password)
+        response = self.client.get(reverse("dashboard"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "100.00")
+        self.assertNotContains(response, "999.00")
+        self.assertNotContains(response, "Customer B")
