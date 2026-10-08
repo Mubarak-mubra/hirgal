@@ -2468,3 +2468,152 @@ class SalesExpenseCsvExportTests(TestCase):
         content = self._get_csv(self.expense_url, "csv_manager_a").content.decode()
         self.assertIn("250.00", content)
         self.assertNotIn("888.00", content)
+
+
+class BalanceSheetPointInTimeTests(TestCase):
+    """Balance Sheet is a snapshot: position as of end_date, including all
+    posted activity on or before end_date regardless of start_date."""
+
+    password = "SafePassword123!"
+
+    def setUp(self):
+        self.owner_a = User.objects.create_user(
+            "bs_owner_a", "+252619000091", self.password,
+            full_name="Owner A", is_approved=True,
+        )
+        self.manager_a = User.objects.create_user(
+            "bs_manager_a", "+252619000092", self.password, full_name="Manager A",
+            is_approved=True, managed_account=self.owner_a,
+        )
+        self.owner_b = User.objects.create_user(
+            "bs_owner_b", "+252619000093", self.password,
+            full_name="Owner B", is_approved=True,
+        )
+        for user in (self.owner_a, self.owner_b):
+            seed_default_chart_of_accounts(user)
+
+        cash_a = Account.objects.get(owner=self.owner_a, code="1010")
+        cap_a = Account.objects.get(owner=self.owner_a, code="3010")
+        rev_a = Account.objects.get(owner=self.owner_a, code="4010")
+        cash_b = Account.objects.get(owner=self.owner_b, code="1010")
+        cap_b = Account.objects.get(owner=self.owner_b, code="3010")
+
+        # Before selected start_date (2025-12-15): opening cash + capital.
+        self._entry(self.owner_a, "posted", "BS-OPEN", date(2025, 12, 15),
+                    cash_a, cap_a, Decimal("1000.00"))
+        # Draft/cancelled pre-start entries must never count.
+        self._entry(self.owner_a, "draft", "BS-DRAFT", date(2025, 12, 10),
+                    cash_a, cap_a, Decimal("700.00"))
+        self._entry(self.owner_a, "cancelled", "BS-CANCEL", date(2025, 12, 12),
+                    cash_a, cap_a, Decimal("900.00"))
+        # During the selected period (2026-03-15): cash + revenue.
+        self._entry(self.owner_a, "posted", "BS-INPERIOD", date(2026, 3, 15),
+                    cash_a, rev_a, Decimal("500.00"))
+        # After selected end_date (2026-07-15): must be excluded.
+        self._entry(self.owner_a, "posted", "BS-FUTURE", date(2026, 7, 15),
+                    cash_a, rev_a, Decimal("300.00"))
+        # Owner B: pre-start position only (distinct amount identifies owner).
+        self._entry(self.owner_b, "posted", "BS-B-OPEN", date(2025, 12, 15),
+                    cash_b, cap_b, Decimal("4000.00"))
+
+        self.url = reverse("web-balance-sheet") + "?start_date=2026-01-01&end_date=2026-06-30"
+
+    @staticmethod
+    def _entry(owner, status, ref, when, dr_account, cr_account, amount):
+        je = JournalEntry.objects.create(
+            owner=owner, date=when, status=status, reference=ref,
+        )
+        JournalEntryLine.objects.create(
+            journal_entry=je, account=dr_account, debit=amount, credit=Decimal("0.00"),
+        )
+        JournalEntryLine.objects.create(
+            journal_entry=je, account=cr_account, debit=Decimal("0.00"), credit=amount,
+        )
+
+    def _get(self, username):
+        self.client.login(username=username, password=self.password)
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        return response.context
+
+    def test_position_includes_pre_start_activity(self):
+        ctx = self._get("bs_owner_a")
+        self.assertEqual(ctx["total_assets"], Decimal("1500.00"))
+        self.assertEqual(ctx["total_liabilities"], 0)
+        self.assertEqual(ctx["total_equity"], Decimal("1000.00"))
+        self.assertEqual(ctx["net_income"], Decimal("500.00"))
+        self.assertEqual(
+            ctx["liabilities_equity_total"], Decimal("1500.00"),
+        )
+        self.assertTrue(ctx["balance_ok"])
+
+    def test_post_end_activity_excluded(self):
+        ctx = self._get("bs_owner_a")
+        self.assertNotEqual(ctx["total_assets"], Decimal("1800.00"))
+        self.assertNotEqual(ctx["net_income"], Decimal("800.00"))
+
+    def test_draft_and_cancelled_pre_start_excluded(self):
+        ctx = self._get("bs_owner_a")
+        self.assertNotEqual(ctx["total_assets"], Decimal("3100.00"))
+        self.assertNotEqual(ctx["total_equity"], Decimal("2600.00"))
+
+    def test_owner_b_sees_own_position_only(self):
+        ctx = self._get("bs_owner_b")
+        self.assertEqual(ctx["total_assets"], Decimal("4000.00"))
+        self.assertEqual(ctx["total_equity"], Decimal("4000.00"))
+        self.assertNotEqual(ctx["total_assets"], Decimal("1500.00"))
+
+    def test_manager_a_sees_owner_a_position(self):
+        ctx = self._get("bs_manager_a")
+        self.assertEqual(ctx["total_assets"], Decimal("1500.00"))
+        self.assertEqual(ctx["total_equity"], Decimal("1000.00"))
+        self.assertNotEqual(ctx["total_assets"], Decimal("4000.00"))
+
+    def test_balance_sheet_csv_uses_same_position_values(self):
+        self.client.login(username="bs_owner_a", password=self.password)
+        response = self.client.get(self.url + "&export=csv")
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertIn("Total Assets,1500.00", content)
+        self.assertIn("Total Equity,1000.00", content)
+        self.assertIn("Net Income,500.00", content)
+        self.assertNotIn("Total Assets,500.00", content)
+
+
+class BalanceSheetInternalConsistencyTests(TestCase):
+    """Net Income is cumulative through end_date; assets/liabilities/equity
+    must use the same cutoff or valid books show 'Not balanced'."""
+
+    password = "SafePassword123!"
+
+    def setUp(self):
+        self.owner = User.objects.create_user(
+            "bsc_owner", "+252619000094", self.password,
+            full_name="Owner Consistency", is_approved=True,
+        )
+        seed_default_chart_of_accounts(self.owner)
+        ar = Account.objects.get(owner=self.owner, code="1200")
+        rev = Account.objects.get(owner=self.owner, code="4010")
+
+        # Pre-start revenue: asset + income both exist at end_date.
+        je = JournalEntry.objects.create(
+            owner=self.owner, date=date(2025, 12, 20), status="posted",
+            reference="BSC-PRE-REV",
+        )
+        JournalEntryLine.objects.create(
+            journal_entry=je, account=ar, debit=Decimal("400.00"), credit=Decimal("0.00"),
+        )
+        JournalEntryLine.objects.create(
+            journal_entry=je, account=rev, debit=Decimal("0.00"), credit=Decimal("400.00"),
+        )
+
+        self.url = reverse("web-balance-sheet") + "?start_date=2026-01-01&end_date=2026-06-30"
+
+    def test_pre_start_revenue_keeps_balance_check_balanced(self):
+        self.client.login(username="bsc_owner", password=self.password)
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        ctx = response.context
+        self.assertEqual(ctx["total_assets"], Decimal("400.00"))
+        self.assertEqual(ctx["net_income"], Decimal("400.00"))
+        self.assertTrue(ctx["balance_ok"])

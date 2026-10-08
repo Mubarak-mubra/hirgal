@@ -193,21 +193,20 @@ class BalanceSheetView(AccountingReportMixin, View):
     def get(self, request):
         start, end = self.get_date_range(request)
 
-        def _sum_lines(category, s, e):
+        def _sum_lines(category, e):
             lines = JournalEntryLine.objects.filter(
                 journal_entry__owner=request.user.get_data_owner(),
                 journal_entry__status="posted",
                 account__category=category,
-                journal_entry__date__gte=s,
                 journal_entry__date__lte=e,
             )
             dr = lines.aggregate(total=Sum("debit"))["total"] or 0
             cr = lines.aggregate(total=Sum("credit"))["total"] or 0
             return dr - cr if category == "asset" else cr - dr
 
-        total_assets = _sum_lines("asset", start, end)
-        total_liabilities = _sum_lines("liability", start, end)
-        total_equity = _sum_lines("equity", start, end)
+        total_assets = _sum_lines("asset", end)
+        total_liabilities = _sum_lines("liability", end)
+        total_equity = _sum_lines("equity", end)
 
         rev_all = JournalEntryLine.objects.filter(
             journal_entry__owner=request.user.get_data_owner(),
