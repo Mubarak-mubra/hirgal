@@ -130,6 +130,14 @@ class Invoice(models.Model):
     def get_total_amount(self):
         return sum(line.amount for line in self.lines.all())
 
+    def save(self, *args, **kwargs):
+        # save() never runs full_clean(); enforce the cancellation invariant at
+        # this boundary so direct ORM writes cannot void posted accounting while
+        # payment JEs still credit Accounts Receivable against it.
+        if self.status == "cancelled" and self.pk and self.payments.exists():
+            raise ValidationError({"status": "Cannot cancel an invoice that has payments."})
+        super().save(*args, **kwargs)
+
     def clean(self):
         """Enforce invoice invariants shared by forms, admin, and services."""
         super().clean()
@@ -158,6 +166,12 @@ class InvoiceLine(models.Model):
     account = models.ForeignKey(Account, on_delete=models.PROTECT, related_name='invoice_lines', help_text="Revenue account")
     description = models.CharField('Description', max_length=255)
     amount = models.DecimalField('Lacagta', max_digits=10, decimal_places=2)
+
+    def save(self, *args, **kwargs):
+        # save() never runs full_clean(); validate here so invalid lines can
+        # never reach the ledger through the post_save -> post_invoice path.
+        self.full_clean()
+        super().save(*args, **kwargs)
 
     def clean(self):
         """A line must post valid revenue: positive amount, revenue account, owner's account."""

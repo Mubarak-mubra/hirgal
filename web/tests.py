@@ -3182,3 +3182,165 @@ class InvoiceLifecycleAccountingTests(TestCase):
         line = InvoiceLine(invoice=invoice, account=self.rev_a, description="Zero", amount=Decimal("0.00"))
         with self.assertRaises(ValidationError):
             line.full_clean()
+
+
+class InvoiceOrmBypassGuardTests(TestCase):
+    """Regression: direct ORM saves must not bypass invoice validation or
+    corrupt the ledger (Django save() never calls full_clean())."""
+
+    password = "SafePassword123!"
+
+    def setUp(self):
+        self.owner_a = User.objects.create_user(
+            "ormguard_owner_a", "+252618000021", self.password, full_name="Owner A", is_approved=True,
+        )
+        self.owner_b = User.objects.create_user(
+            "ormguard_owner_b", "+252618000022", self.password, full_name="Owner B", is_approved=True,
+        )
+        seed_default_chart_of_accounts(self.owner_a)
+        seed_default_chart_of_accounts(self.owner_b)
+        self.prop_a = Property.objects.create(owner=self.owner_a, name="Guard Court", location="Mogadishu")
+        self.tenant_a = Tenant.objects.create(owner=self.owner_a, full_name="Customer A")
+        self.agreement_a = RentalAgreement.objects.create(
+            tenant=self.tenant_a, property=self.prop_a, start_date=date(2026, 1, 1),
+            monthly_rent=Decimal("500.00"),
+        )
+        self.ar_a = Account.objects.get(owner=self.owner_a, code="1200")
+        self.rev_a = Account.objects.get(owner=self.owner_a, code="4010")
+        self.cash_a = Account.objects.get(owner=self.owner_a, code="1020")
+        self.exp_a = Account.objects.get(owner=self.owner_a, code="5030")
+        self.rev_b = Account.objects.get(owner=self.owner_b, code="4010")
+        self._seq = 0
+
+    def _number(self):
+        self._seq += 1
+        return "GD-%04d" % self._seq
+
+    def make_invoice(self, amount=Decimal("1000.00")):
+        invoice = Invoice.objects.create(
+            owner=self.owner_a, tenant=self.tenant_a,
+            invoice_number=self._number(), date=date(2026, 6, 1), due_date=date(2026, 6, 30),
+        )
+        if amount is not None:
+            InvoiceLine.objects.create(
+                invoice=invoice, account=self.rev_a, description="Monthly Rent", amount=amount,
+            )
+        post_invoice(invoice)
+        invoice.refresh_from_db()
+        return invoice
+
+    def make_payment(self, invoice, amount):
+        return Payment.objects.create(
+            rental_agreement=self.agreement_a, invoice=invoice, amount=amount,
+            payment_date=date(2026, 6, 15),
+        )
+
+    @staticmethod
+    def posted_balance(account):
+        total_dr = Decimal("0")
+        total_cr = Decimal("0")
+        for line in JournalEntryLine.objects.filter(account=account, journal_entry__status="posted"):
+            total_dr += line.debit
+            total_cr += line.credit
+        return total_dr - total_cr
+
+    def test_direct_cancellation_of_invoice_with_payment_is_rejected(self):
+        invoice = self.make_invoice()
+        self.make_payment(invoice, Decimal("400.00"))
+
+        invoice.status = "cancelled"
+        with self.assertRaises(ValidationError):
+            invoice.save()
+
+        invoice.refresh_from_db()
+        self.assertEqual(invoice.status, "draft")
+        # Both journal entries must remain posted and balances intact.
+        self.assertEqual(invoice.journal_entry.status, "posted")
+        payment = invoice.payments.get()
+        self.assertEqual(payment.journal_entry.status, "posted")
+        self.assertEqual(self.posted_balance(self.ar_a), Decimal("600.00"))
+        self.assertEqual(self.posted_balance(self.cash_a), Decimal("400.00"))
+        self.assertEqual(self.posted_balance(self.rev_a), Decimal("-1000.00"))
+
+    def test_direct_creation_of_invalid_lines_is_rejected(self):
+        invoice = self.make_invoice(amount=None)
+        self.assertIsNone(invoice.journal_entry_id)
+
+        invalid_specs = [
+            {"account": self.rev_a, "amount": Decimal("0.00")},
+            {"account": self.rev_a, "amount": Decimal("-25.00")},
+            {"account": self.exp_a, "amount": Decimal("50.00")},
+            {"account": self.rev_b, "amount": Decimal("50.00")},
+        ]
+        for spec in invalid_specs:
+            with self.assertRaises(ValidationError):
+                InvoiceLine.objects.create(invoice=invoice, description="Bad line", **spec)
+
+        self.assertEqual(invoice.lines.count(), 0)
+        invoice.refresh_from_db()
+        self.assertIsNone(invoice.journal_entry_id)
+        self.assertEqual(self.posted_balance(self.ar_a), Decimal("0.00"))
+        self.assertEqual(self.posted_balance(self.rev_a), Decimal("0.00"))
+
+    def test_direct_line_amount_update_to_invalid_value_is_rejected(self):
+        invoice = self.make_invoice(amount=Decimal("1000.00"))
+        line = invoice.lines.get()
+
+        line.amount = Decimal("0.00")
+        with self.assertRaises(ValidationError):
+            line.save()
+        line.refresh_from_db()
+        self.assertEqual(line.amount, Decimal("1000.00"))
+
+        line.amount = Decimal("-100.00")
+        with self.assertRaises(ValidationError):
+            line.save()
+        line.refresh_from_db()
+        self.assertEqual(line.amount, Decimal("1000.00"))
+
+        self.assertEqual(invoice.journal_entry.status, "posted")
+        self.assertEqual(self.posted_balance(self.ar_a), Decimal("1000.00"))
+        self.assertEqual(self.posted_balance(self.rev_a), Decimal("-1000.00"))
+
+    def test_direct_line_account_update_to_invalid_account_is_rejected(self):
+        invoice = self.make_invoice(amount=Decimal("1000.00"))
+        line = invoice.lines.get()
+
+        line.account = self.exp_a
+        with self.assertRaises(ValidationError):
+            line.save()
+        line.refresh_from_db()
+        self.assertEqual(line.account_id, self.rev_a.pk)
+
+        line.account = self.rev_b
+        with self.assertRaises(ValidationError):
+            line.save()
+        line.refresh_from_db()
+        self.assertEqual(line.account_id, self.rev_a.pk)
+
+        # Ledger untouched: revenue still credited, expense/foreign accounts never posted.
+        self.assertEqual(self.posted_balance(self.rev_a), Decimal("-1000.00"))
+        self.assertEqual(self.posted_balance(self.exp_a), Decimal("0.00"))
+        self.assertEqual(self.posted_balance(self.ar_a), Decimal("1000.00"))
+
+    def test_post_invoice_never_voids_entries_for_paid_invoices(self):
+        invoice = self.make_invoice()
+        self.make_payment(invoice, Decimal("400.00"))
+        # Bulk update bypasses save() and signals entirely; the posting service
+        # itself must still refuse to void accounting behind live payments.
+        Invoice.objects.filter(pk=invoice.pk).update(status="cancelled")
+        invoice.refresh_from_db()
+
+        post_invoice(invoice)
+        invoice.refresh_from_db()
+        self.assertEqual(invoice.journal_entry.status, "posted")
+        self.assertEqual(self.posted_balance(self.ar_a), Decimal("600.00"))
+        self.assertEqual(self.posted_balance(self.cash_a), Decimal("400.00"))
+
+    def test_direct_valid_line_edit_still_reposts_ledger(self):
+        invoice = self.make_invoice(amount=Decimal("1000.00"))
+        line = invoice.lines.get()
+        line.amount = Decimal("500.00")
+        line.save()
+        self.assertEqual(self.posted_balance(self.ar_a), Decimal("500.00"))
+        self.assertEqual(self.posted_balance(self.rev_a), Decimal("-500.00"))

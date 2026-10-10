@@ -427,15 +427,19 @@ def post_invoice(invoice):
     user = invoice.owner
     total_amount = invoice.get_total_amount()
 
-    # A cancelled invoice must never leave posted AR/revenue accounting behind.
+    # A cancelled invoice must never leave posted AR/revenue accounting behind,
+    # and posted accounting must never be voided while payment JEs still credit
+    # AR against it.
     if invoice.status == "cancelled":
-        cancel_journal_entry_for_object(invoice)
+        if not invoice.payments.exists():
+            cancel_journal_entry_for_object(invoice)
         return None
 
     # An invoice without value posts nothing; void any previously posted JE so
     # the ledger never keeps a stale entry after lines are removed.
     if total_amount <= 0:
-        cancel_journal_entry_for_object(invoice)
+        if not invoice.payments.exists():
+            cancel_journal_entry_for_object(invoice)
         return None
 
     ar_account = get_ar_account(user)
