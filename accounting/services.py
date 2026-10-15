@@ -1,8 +1,9 @@
 import datetime
 from decimal import Decimal
 from django.core.exceptions import ValidationError
-from django.db import transaction
-from django.db.models import Sum
+from django.db import IntegrityError, transaction
+from django.db.models import Q, Sum
+from django.utils import timezone
 from .models import Account, AccountCategory, JournalEntry, JournalEntryLine, Invoice
 
 
@@ -334,6 +335,8 @@ def post_expense(expense):
     Debit: Expense account (5030 General Expense or specified)
     Credit: Bank/Cash account (1020/1010) if paid, or Accounts Payable (2010) if unpaid
     """
+    if expense.amount is None or expense.amount <= 0:
+        raise ValidationError("Expense amount must be greater than zero.")
     user = expense.property.owner
     amount = Decimal(str(expense.amount))
     prop = expense.property
@@ -388,6 +391,8 @@ def post_repair(repair):
     Only posts if repair_cost > 0. If repair_cost <= 0, cancels existing entry if present.
     Credit side: Bank/Cash if paid, or Accounts Payable (2010) if unpaid.
     """
+    if repair.repair_cost is not None and repair.repair_cost < 0:
+        raise ValidationError("Repair cost cannot be negative.")
     if repair.repair_cost <= 0:
         if repair.journal_entry:
             je = repair.journal_entry
@@ -454,6 +459,17 @@ def post_invoice(invoice):
     user = invoice.owner
     total_amount = invoice.get_total_amount()
 
+    # Drafts are prepared documents, not collectible receivables. If an issued
+    # invoice is moved back to draft, remove its AR/revenue entry as long as it
+    # has no payments (Invoice.clean enforces that invariant).
+    if invoice.status == "draft":
+        if invoice.payments.exists():
+            raise ValidationError(
+                f"Draft invoice {invoice.invoice_number} has payments; refusing to remove its receivable accounting."
+            )
+        cancel_journal_entry_for_object(invoice)
+        return None
+
     # A cancelled invoice must never leave posted AR/revenue accounting behind,
     # and posted accounting must never be voided while payment JEs still credit
     # AR against it. Bulk operations (QuerySet.update(), raw queries) can reach
@@ -518,6 +534,112 @@ def post_invoice(invoice):
         invoice.save(update_fields=["journal_entry"])
 
     return entry
+
+
+def generate_monthly_rent_invoices(period=None, owner=None):
+    """Create one draft rent invoice for each agreement covering a full month.
+
+    Existing invoices for the agreement/month, including legacy invoices with
+    no billing_period whose invoice or due date falls in that month, are left
+    untouched. The unique constraint is a second guard against concurrent
+    runs and manual duplicates. Pass an owner to limit generation to one
+    account; omitting it keeps the management command's all-owner behavior.
+    """
+    from calendar import monthrange
+    from rentals.models import RentalAgreement
+    from .models import InvoiceLine
+
+    period = period or timezone.localdate()
+    period = period.replace(day=1)
+    invoice_date = timezone.localdate()
+    due_date = invoice_date + datetime.timedelta(days=7)
+    month_end = period.replace(day=monthrange(period.year, period.month)[1])
+    agreements = RentalAgreement.objects.filter(
+        status__in=("active", "ended"),
+        start_date__lte=period,
+        monthly_rent__gt=0,
+    ).filter(
+        Q(end_date__isnull=True) | Q(end_date__gte=month_end)
+    )
+    if owner is not None:
+        agreements = agreements.filter(tenant__owner=owner)
+    agreement_ids = list(agreements.order_by("pk").values_list("pk", flat=True))
+
+    created = []
+    skipped = 0
+
+    def existing_invoice(agreement):
+        return Invoice.objects.filter(
+            owner_id=agreement.tenant.owner_id,
+            rental_agreement=agreement,
+        ).exclude(status="cancelled").filter(
+            Q(billing_period=period)
+            | (
+                Q(billing_period__isnull=True)
+                & (
+                    Q(date__year=period.year, date__month=period.month)
+                    | Q(due_date__year=period.year, due_date__month=period.month)
+                )
+            )
+        ).exists()
+
+    for agreement_id in agreement_ids:
+        with transaction.atomic():
+            agreement = RentalAgreement.objects.select_related(
+                "tenant", "property"
+            ).select_for_update().get(pk=agreement_id)
+            if existing_invoice(agreement):
+                skipped += 1
+                continue
+
+            owner = agreement.tenant.owner
+            # Serialize number allocation for scheduled runs by the same owner.
+            owner.__class__.objects.select_for_update().get(pk=owner.pk)
+            prefix = f"INV-{period.year}-"
+            sequence = Invoice.objects.filter(
+                owner=owner, invoice_number__startswith=prefix
+            ).count() + 1
+            invoice_number = f"{prefix}{sequence:04d}"
+            while Invoice.objects.filter(owner=owner, invoice_number=invoice_number).exists():
+                sequence += 1
+                invoice_number = f"{prefix}{sequence:04d}"
+
+            try:
+                with transaction.atomic():
+                    invoice = Invoice.objects.create(
+                        owner=owner,
+                        tenant=agreement.tenant,
+                        rental_agreement=agreement,
+                        property=agreement.property,
+                        invoice_number=invoice_number,
+                        date=invoice_date,
+                        due_date=due_date,
+                        billing_period=period,
+                        status="draft",
+                        notes=f"Monthly rent invoice for {period.strftime('%B %Y')}.",
+                    )
+                    InvoiceLine.objects.create(
+                        invoice=invoice,
+                        account=get_rental_income_account(owner),
+                        description=f"Rent - {period.strftime('%B %Y')}",
+                        amount=agreement.monthly_rent,
+                    )
+            except (IntegrityError, ValidationError):
+                # A manual invoice may have won a race after the initial
+                # existence check. Treat that month as already covered, but
+                # re-raise unrelated invoice/account validation failures.
+                if existing_invoice(agreement):
+                    skipped += 1
+                    continue
+                raise
+            created.append(invoice)
+
+    return {
+        "period": period,
+        "created": created,
+        "skipped": skipped,
+        "eligible": len(agreement_ids),
+    }
 
 
 def cancel_journal_entry_for_object(instance):

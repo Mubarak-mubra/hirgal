@@ -4,11 +4,57 @@
 <section class="mb-7 flex items-end justify-between">
   <div>
     <a class="text-sm font-semibold text-indigo-700" href="{% url 'home' %}">← Home</a>
+    {% if selected_month and selected_status == "draft" %}
+    <h1 class="mt-4 text-3xl font-bold">Monthly rent drafts</h1>
+    <p class="mt-2 text-slate-500">Review the {{ selected_month_label }} drafts, then send each invoice to the customer.</p>
+    {% else %}
     <h1 class="mt-4 text-3xl font-bold">Invoices</h1>
-    <p class="mt-2 text-slate-500">All rent invoices.</p>
+    <p class="mt-2 text-slate-500">Prepare rent drafts for a selected month, then review and send each invoice to the customer.</p>
+    {% endif %}
   </div>
   <a class="rounded-lg bg-ink px-4 py-3 text-sm font-bold text-white" href="{% url 'web-invoice-create' %}">+ Ku cusub</a>
 </section>
+
+{% if messages %}
+<section class="mb-5 space-y-2">
+  {% for message in messages %}
+  <div class="rounded-lg border px-4 py-3 text-sm font-medium {% if 'success' in message.tags %}border-emerald-200 bg-emerald-50 text-emerald-800{% elif 'warning' in message.tags or 'error' in message.tags %}border-amber-200 bg-amber-50 text-amber-800{% else %}border-sky-200 bg-sky-50 text-sky-800{% endif %}">{{ message }}</div>
+  {% endfor %}
+</section>
+{% endif %}
+
+<form method="post" action="{% url 'web-invoice-generate-monthly' %}" onsubmit="return confirm('Prepare draft rent invoices for ' + this.elements.month.value + '? The invoice date will be today and payment will be due in 7 days. Existing invoices will be skipped, and nothing will be sent yet.');" class="mb-5 flex flex-wrap items-end justify-between gap-4 rounded-xl border border-indigo-100 bg-indigo-50/50 p-4">
+  {% csrf_token %}
+  <div>
+    <h2 class="font-bold text-slate-800">Prepare monthly rent invoices</h2>
+    <p class="mt-1 max-w-2xl text-sm text-slate-600">Choose a month to create one draft for each rental agreement covering the full month. Each draft uses today as its invoice date and gives the customer 7 calendar days to pay. Existing invoices are skipped to prevent duplicates; drafts must be reviewed and sent manually.</p>
+  </div>
+  <div class="flex flex-wrap items-end gap-3">
+    <label class="grid gap-1 text-sm font-semibold text-slate-600">
+      Rent month
+      {{ monthly_generation_form.month }}
+    </label>
+    <button type="submit" class="rounded-lg bg-indigo-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-indigo-800">Generate invoices for all customers</button>
+  </div>
+</form>
+
+<form method="get" class="mb-5 flex flex-wrap items-end gap-3 rounded-xl border bg-white p-4 shadow-sm">
+  <label class="grid gap-1 text-sm font-semibold text-slate-600">
+    Rent month
+    <input type="month" name="month" value="{{ selected_month }}" class="rounded-lg border px-3 py-2 font-normal text-slate-800">
+  </label>
+  <label class="grid gap-1 text-sm font-semibold text-slate-600">
+    Status
+    <select name="status" class="rounded-lg border bg-white px-3 py-2 font-normal text-slate-800">
+      <option value="">All statuses</option>
+      {% for value, label in invoice_status_choices %}
+      <option value="{{ value }}" {% if selected_status == value %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <button type="submit" class="rounded-lg bg-ink px-4 py-2.5 text-sm font-bold text-white">Filter</button>
+  {% if has_invoice_filters %}<a href="{% url 'web-invoice-list' %}" class="px-2 py-2.5 text-sm font-semibold text-indigo-700 hover:underline">Clear filters</a>{% endif %}
+</form>
 
 <section class="rounded-xl border bg-white shadow-sm overflow-hidden">
   {% if invoices %}
@@ -18,6 +64,7 @@
         <tr>
           <th class="px-4 py-3 font-semibold">Number</th>
           <th class="px-4 py-3 font-semibold">Customer</th>
+          <th class="px-4 py-3 font-semibold">Rent Month</th>
           <th class="px-4 py-3 font-semibold">Date</th>
           <th class="px-4 py-3 font-semibold">Due Date</th>
           <th class="px-4 py-3 font-semibold text-right">Amount</th>
@@ -32,6 +79,7 @@
             <a href="{% url 'web-invoice-detail' invoice.pk %}" class="hover:underline">{{ invoice.invoice_number }}</a>
           </td>
           <td class="px-4 py-3"><a href="{% url 'web-tenant-detail' invoice.tenant.pk %}" class="text-indigo-600 hover:underline">{{ invoice.tenant.full_name }}</a></td>
+          <td class="px-4 py-3">{% if invoice.billing_period %}{{ invoice.billing_period|date:"F Y" }}{% elif invoice.rental_agreement %}{{ invoice.due_date|date:"F Y" }}{% else %}—{% endif %}</td>
           <td class="px-4 py-3">{{ invoice.date }}</td>
           <td class="px-4 py-3">{{ invoice.due_date }}</td>
           <td class="px-4 py-3 text-right font-mono text-xs">{{ invoice.get_total_amount }}</td>
@@ -48,8 +96,12 @@
   </div>
   {% else %}
   <div class="p-10 text-center">
-    <p class="font-semibold text-slate-700">No invoices.</p>
+    <p class="font-semibold text-slate-700">{% if has_invoice_filters %}No invoices match these filters.{% else %}No invoices.{% endif %}</p>
+    {% if has_invoice_filters %}
+    <p class="mt-2 text-sm text-slate-500">Try another month or status, or clear the filters to see all invoices.</p>
+    {% else %}
     <p class="mt-2 text-sm text-slate-500">Add a new invoice to get started.</p>
+    {% endif %}
   </div>
   {% endif %}
 </section>

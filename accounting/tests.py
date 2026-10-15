@@ -1,5 +1,6 @@
 from decimal import Decimal
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.test import TestCase
 from django.utils import timezone
@@ -131,6 +132,37 @@ class DoubleEntryAccountingTests(TestCase):
         self.assertIsNotNone(repair.journal_entry)
         debit_line = repair.journal_entry.lines.get(debit__gt=0)
         self.assertEqual(debit_line.debit, Decimal("200.00"))
+
+    def test_general_expense_rejects_zero_amount(self):
+        with self.assertRaises(ValidationError):
+            GeneralExpense.objects.create(
+                property=self.property, title="Invalid expense", category="utility",
+                amount=Decimal("0.00"), expense_date=timezone.now().date(),
+            )
+        self.assertFalse(GeneralExpense.objects.filter(title="Invalid expense").exists())
+
+    def test_general_expense_rejects_foreign_owner_account(self):
+        other = User.objects.create_user(
+            username="expense_other", phone_number="252615999998", password="password123",
+        )
+        foreign_account = Account.objects.create(
+            owner=other, code="5030", name="Other expense", category="expense",
+        )
+        with self.assertRaises(ValidationError):
+            GeneralExpense.objects.create(
+                property=self.property, title="Invalid expense", category="utility",
+                amount=Decimal("10.00"), expense_date=timezone.now().date(),
+                expense_account=foreign_account,
+            )
+        self.assertFalse(GeneralExpense.objects.filter(title="Invalid expense").exists())
+
+    def test_repair_rejects_negative_cost(self):
+        with self.assertRaises(ValidationError):
+            MaintenanceRepair.objects.create(
+                property=self.property, title="Invalid repair", repair_cost=Decimal("-1.00"),
+                reported_date=timezone.now().date(),
+            )
+        self.assertFalse(MaintenanceRepair.objects.filter(title="Invalid repair").exists())
 
     def test_invoice_creation_and_payment_settlement(self):
         invoice = Invoice.objects.create(

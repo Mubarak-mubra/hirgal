@@ -1,9 +1,7 @@
 import os
 import json
-import traceback
-from pathlib import Path
-
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from django.db.models import Sum
 from django.utils import timezone
 
@@ -225,68 +223,32 @@ def explore_bank_accounts(user):
 
 # ── Tool definitions for Gemini ───────────────────────────────────────────────
 
-TOOLS = [
-    genai.protos.Tool(
-        function_declarations=[
-            genai.protos.FunctionDeclaration(
-                name="explore_properties",
-                description="List all properties owned by the user with their details",
-                parameters=genai.protos.Schema(type=genai.protos.Type.OBJECT),
-            ),
-            genai.protos.FunctionDeclaration(
-                name="explore_tenants",
-                description="List all tenants with their contact information",
-                parameters=genai.protos.Schema(type=genai.protos.Type.OBJECT),
-            ),
-            genai.protos.FunctionDeclaration(
-                name="explore_agreements",
-                description="List all active rental agreements with rent amounts and dates",
-                parameters=genai.protos.Schema(type=genai.protos.Type.OBJECT),
-            ),
-            genai.protos.FunctionDeclaration(
-                name="explore_payments",
-                description="List recent rent payments received from tenants",
-                parameters=genai.protos.Schema(
-                    type=genai.protos.Type.OBJECT,
-                    properties={"limit": genai.protos.Schema(type=genai.protos.Type.INTEGER, description="Max results to return, default 20")},
-                ),
-            ),
-            genai.protos.FunctionDeclaration(
-                name="explore_expenses",
-                description="List recent property expenses like utilities, bills, etc.",
-                parameters=genai.protos.Schema(
-                    type=genai.protos.Type.OBJECT,
-                    properties={"limit": genai.protos.Schema(type=genai.protos.Type.INTEGER, description="Max results to return, default 20")},
-                ),
-            ),
-            genai.protos.FunctionDeclaration(
-                name="explore_repairs",
-                description="List recent maintenance and repair records",
-                parameters=genai.protos.Schema(
-                    type=genai.protos.Type.OBJECT,
-                    properties={"limit": genai.protos.Schema(type=genai.protos.Type.INTEGER, description="Max results to return, default 20")},
-                ),
-            ),
-            genai.protos.FunctionDeclaration(
-                name="explore_invoices",
-                description="List invoices and their payment status (draft, sent, paid, cancelled)",
-                parameters=genai.protos.Schema(
-                    type=genai.protos.Type.OBJECT,
-                    properties={"limit": genai.protos.Schema(type=genai.protos.Type.INTEGER, description="Max results to return, default 20")},
-                ),
-            ),
-            genai.protos.FunctionDeclaration(
-                name="explore_financial_summary",
-                description="Get financial summary: total revenue, expenses, net income, accounts receivable, accounts payable",
-                parameters=genai.protos.Schema(type=genai.protos.Type.OBJECT),
-            ),
-            genai.protos.FunctionDeclaration(
-                name="explore_bank_accounts",
-                description="List bank accounts with their balances",
-                parameters=genai.protos.Schema(type=genai.protos.Type.OBJECT),
-            ),
-        ]
+def _function_declaration(name, description, has_limit=False):
+    properties = {}
+    if has_limit:
+        properties["limit"] = types.Schema(
+            type=types.Type.INTEGER,
+            description="Maximum results to return; defaults to 20.",
+        )
+    return types.FunctionDeclaration(
+        name=name,
+        description=description,
+        parameters=types.Schema(type=types.Type.OBJECT, properties=properties),
     )
+
+
+TOOLS = [
+    types.Tool(function_declarations=[
+        _function_declaration("explore_properties", "List the user's properties and unit counts."),
+        _function_declaration("explore_tenants", "List the user's tenants and contact details."),
+        _function_declaration("explore_agreements", "List active rental agreements with rents and dates."),
+        _function_declaration("explore_payments", "List recent rent payments.", has_limit=True),
+        _function_declaration("explore_expenses", "List recent property expenses.", has_limit=True),
+        _function_declaration("explore_repairs", "List recent maintenance and repair records.", has_limit=True),
+        _function_declaration("explore_invoices", "List invoices and their payment status.", has_limit=True),
+        _function_declaration("explore_financial_summary", "Summarize revenue, expenses, net income, receivables, and payables."),
+        _function_declaration("explore_bank_accounts", "List bank accounts with masked numbers and balances."),
+    ])
 ]
 
 # ── Tool dispatcher ───────────────────────────────────────────────────────────
@@ -310,10 +272,7 @@ def ask_ai(user, question):
     """Send a question to Gemini with database exploration tools."""
     api_key = get_api_key()
     if not api_key:
-        return "API key not configured. Please set API_GEMINI in your .env file."
-
-    genai.configure(api_key=api_key)
-    model = genai.GenerativeModel("gemini-3.6-flash", tools=TOOLS)
+        return "API key not configured. Add it in Site Settings or set API_GEMINI in the environment."
 
     system_prompt = """You are a helpful assistant for the Hirgal Kiro rent management system.
 You can explore the user's database to answer questions about their properties, tenants, rent payments, expenses, repairs, invoices, and finances.
@@ -323,30 +282,29 @@ Be concise and direct. Always use tools to get real data — do not make up info
 When the user asks about numbers, totals, or specific records, use the tools to get accurate data.
 When you get results from a tool, summarize them clearly. If a tool returns an error, mention it briefly and suggest trying again."""
 
-    chat = model.start_chat(history=[
-        genai.protos.Content(role="user", parts=[genai.protos.Part(text=system_prompt)]),
-        genai.protos.Content(role="model", parts=[genai.protos.Part(text="Understood. I'll use the database tools to answer questions about the rent management system.")]),
-    ])
-
+    client = genai.Client(api_key=api_key)
+    contents = [types.Content(role="user", parts=[types.Part.from_text(text=question)])]
+    config = types.GenerateContentConfig(system_instruction=system_prompt, tools=TOOLS)
     try:
-        response = chat.send_message(question)
-
-        # Handle function calls in a loop
-        max_iterations = 10
-        iteration = 0
-        while response.candidates and response.candidates[0].content.parts:
-            iteration += 1
-            if iteration > max_iterations:
-                break
-
-            function_calls = [p for p in response.candidates[0].content.parts if p.function_call]
+        for _ in range(10):
+            response = client.models.generate_content(
+                model="gemini-3.6-flash",
+                contents=contents,
+                config=config,
+            )
+            candidates = response.candidates or []
+            candidate = candidates[0] if candidates else None
+            content = candidate.content if candidate else None
+            parts = content.parts if content else []
+            function_calls = [part.function_call for part in parts if part.function_call]
             if not function_calls:
-                break
+                return response.text or "I couldn't generate a response. Please try again."
 
+            contents.append(content)
             function_responses = []
-            for fc in function_calls:
-                fn_name = fc.function_call.name
-                fn_args = dict(fc.function_call.args) if fc.function_call.args else {}
+            for function_call in function_calls:
+                fn_name = function_call.name
+                fn_args = dict(function_call.args) if function_call.args else {}
 
                 if fn_name in TOOL_MAP:
                     fn = TOOL_MAP[fn_name]
@@ -358,23 +316,19 @@ When you get results from a tool, summarize them clearly. If a tool returns an e
                     result = json.dumps({"error": f"Unknown function: {fn_name}"})
 
                 function_responses.append(
-                    genai.protos.Part(
-                        function_response=genai.protos.FunctionResponse(
+                    types.Part(
+                        function_response=types.FunctionResponse(
                             name=fn_name,
                             response={"result": result},
+                            **({"id": function_call.id} if function_call.id else {}),
                         )
                     )
                 )
-
-            response = chat.send_message(function_responses)
-
-        # Extract final text response
-        if response.candidates and response.candidates[0].content.parts:
-            text_parts = [p.text for p in response.candidates[0].content.parts if hasattr(p, 'text') and p.text]
-            if text_parts:
-                return "\n".join(text_parts)
+            contents.append(types.Content(role="user", parts=function_responses))
 
         return "I couldn't generate a response. Please try again."
 
     except Exception as e:
         return f"Sorry, I couldn't process that question. Error: {str(e)}"
+    finally:
+        client.close()

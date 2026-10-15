@@ -1,16 +1,19 @@
 from django.contrib import messages
 from django.contrib.auth import get_user_model, login, logout
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.http import JsonResponse
+from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.views import View
 from django.views.generic import DetailView, TemplateView, ListView
 
 from django.db import transaction
 from django.db.models import Count, ProtectedError, Q, Sum
+from datetime import date
+from django.utils import timezone
 from accounting.models import Account, Invoice, InvoiceLine, JournalEntry, JournalEntryLine
 from accounting.services import (
-    link_bank_account_to_ledger, post_expense, post_payment, post_repair,
+    generate_monthly_rent_invoices, link_bank_account_to_ledger, post_expense, post_payment, post_repair,
     seed_default_chart_of_accounts,
 )
 from finance.models import BankAccount, GeneralExpense, MaintenanceRepair, Payment
@@ -20,7 +23,7 @@ from rentals.models import RentalAgreement, Tenant
 from .forms import (
     AccountForm, BankAccountForm, GeneralExpenseForm, InvoiceForm, InvoiceLineFormSet,
     JournalEntryForm, JournalEntryLineFormSet, MaintenanceRepairForm,
-    PaymentForm, PropertyAssetForm, PropertyForm, PropertyTypeForm, RegistrationForm,
+    MonthlyRentInvoiceGenerationForm, PaymentForm, PropertyAssetForm, PropertyForm, PropertyTypeForm, RegistrationForm,
     RentalAgreementForm, RoomForm, TenantForm, UnitForm, UserProfileForm,
     VillaDetailsForm,
 )
@@ -244,7 +247,7 @@ class InvoicesByTenantView(LoginRequiredMixin, View):
             owner=owner,
             tenant_id=tenant_id,
         ).filter(
-            Q(status__in=["draft", "sent"]) | Q(pk=selected_invoice_id or None)
+            Q(status="sent") | Q(pk=selected_invoice_id or None)
         )
         if agreement_id:
             invoices = invoices.filter(
@@ -798,6 +801,64 @@ class TenantDetailView(HomeView):
         context["payments"] = Payment.objects.filter(
             rental_agreement__tenant=tenant
         ).select_related("rental_agreement__property").order_by("-payment_date", "-id")
+
+        current_month = timezone.localdate().replace(day=1)
+        current_due = 0
+        current_drafts = 0
+        previous_due = 0
+        previous_groups = {}
+        previous_draft_groups = {}
+        invoices = Invoice.objects.filter(
+            owner=tenant.owner, tenant=tenant
+        ).exclude(status="cancelled").prefetch_related("lines", "payments").order_by(
+            "-billing_period", "-date", "-pk"
+        )
+        for invoice in invoices:
+            total = invoice.get_total_amount()
+            paid = sum(payment.amount for payment in invoice.payments.all())
+            balance = max(total - paid, 0)
+            if balance <= 0:
+                continue
+
+            month = invoice.billing_period or (
+                invoice.due_date.replace(day=1)
+                if invoice.rental_agreement_id
+                else invoice.date.replace(day=1)
+            )
+            if month == current_month:
+                if invoice.status == "draft":
+                    current_drafts += balance
+                elif invoice.status in ("sent", "paid"):
+                    current_due += balance
+                continue
+            if month >= current_month:
+                continue
+
+            group_map = previous_draft_groups if invoice.status == "draft" else previous_groups
+            group = group_map.setdefault(month, {
+                "period": month,
+                "label": month.strftime("%B %Y"),
+                "invoices": [],
+                "total": 0,
+            })
+            group["invoices"].append({
+                "invoice": invoice,
+                "balance": balance,
+            })
+            group["total"] += balance
+            if invoice.status in ("sent", "paid"):
+                previous_due += balance
+
+        context["current_month_label"] = current_month.strftime("%B %Y")
+        context["current_month_due"] = current_due
+        context["current_month_drafts"] = current_drafts
+        context["previous_month_outstanding"] = previous_due
+        context["previous_month_groups"] = sorted(
+            previous_groups.values(), key=lambda group: group["period"], reverse=True
+        )
+        context["previous_draft_groups"] = sorted(
+            previous_draft_groups.values(), key=lambda group: group["period"], reverse=True
+        )
         return context
 
 
@@ -1232,6 +1293,10 @@ class JournalEntryDetailView(LoginRequiredMixin, DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["lines"] = self.object.lines.select_related("account", "property")
+        context["can_edit"] = self.object.status == "draft" and not self.object.is_source_generated
+        totals = self.object.lines.aggregate(total_debit=Sum("debit"), total_credit=Sum("credit"))
+        context["total_debit"] = totals["total_debit"] or 0
+        context["total_credit"] = totals["total_credit"] or 0
         return context
 
 
@@ -1246,12 +1311,16 @@ class JournalEntryCreateView(LoginRequiredMixin, View):
     def post(self, request):
         form = JournalEntryForm(request.POST, user=request.user.get_data_owner())
         formset = JournalEntryLineFormSet(request.POST, user=request.user.get_data_owner())
-        if form.is_valid() and formset.is_valid():
+        form_is_valid = form.is_valid()
+        if form_is_valid:
+            formset.instance.status = form.cleaned_data["status"]
+        if form_is_valid and formset.is_valid():
             entry = form.save(commit=False)
             entry.owner = request.user.get_data_owner()
-            entry.save()
-            formset.instance = entry
-            formset.save()
+            with transaction.atomic():
+                entry.save()
+                formset.instance = entry
+                formset.save()
             return redirect("web-journal-detail", entry.pk)
         return render(request, "web/journal_form.html", {"form": form, "formset": formset})
 
@@ -1261,17 +1330,25 @@ class JournalEntryUpdateView(LoginRequiredMixin, View):
 
     def get(self, request, pk):
         entry = get_object_or_404(JournalEntry, pk=pk, owner=request.user.get_data_owner())
+        if entry.status != "draft" or entry.is_source_generated:
+            raise Http404
         form = JournalEntryForm(instance=entry, user=request.user.get_data_owner())
         formset = JournalEntryLineFormSet(instance=entry, user=request.user.get_data_owner())
         return render(request, "web/journal_form.html", {"form": form, "formset": formset, "editing": True})
 
     def post(self, request, pk):
         entry = get_object_or_404(JournalEntry, pk=pk, owner=request.user.get_data_owner())
+        if entry.status != "draft" or entry.is_source_generated:
+            raise Http404
         form = JournalEntryForm(request.POST, instance=entry, user=request.user.get_data_owner())
         formset = JournalEntryLineFormSet(request.POST, instance=entry, user=request.user.get_data_owner())
-        if form.is_valid() and formset.is_valid():
-            form.save()
-            formset.save()
+        form_is_valid = form.is_valid()
+        if form_is_valid:
+            formset.instance.status = form.cleaned_data["status"]
+        if form_is_valid and formset.is_valid():
+            with transaction.atomic():
+                form.save()
+                formset.save()
             return redirect("web-journal-detail", pk)
         return render(request, "web/journal_form.html", {"form": form, "formset": formset, "editing": True})
 
@@ -1281,10 +1358,14 @@ class JournalEntryDeleteView(LoginRequiredMixin, View):
 
     def get(self, request, pk):
         entry = get_object_or_404(JournalEntry, pk=pk, owner=request.user.get_data_owner())
+        if entry.status != "draft" or entry.is_source_generated:
+            raise Http404
         return render(request, "web/confirm_delete.html", {"object": entry, "cancel_url": "web-journal-list"})
 
     def post(self, request, pk):
         entry = get_object_or_404(JournalEntry, pk=pk, owner=request.user.get_data_owner())
+        if entry.status != "draft" or entry.is_source_generated:
+            raise Http404
         entry.delete()
         return redirect("web-journal-list")
 
@@ -1296,8 +1377,86 @@ class InvoiceListView(HomeView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["invoices"] = Invoice.objects.filter(owner=self.request.user.get_data_owner()).select_related("tenant", "property")
+        invoices = Invoice.objects.filter(
+            owner=self.request.user.get_data_owner()
+        ).select_related("tenant", "property")
+
+        raw_month = self.request.GET.get("month", "").strip()
+        selected_month = None
+        if raw_month:
+            try:
+                year, month = raw_month.split("-", 1)
+                selected_month = date(int(year), int(month), 1)
+            except (TypeError, ValueError):
+                raw_month = ""
+
+        if selected_month:
+            invoices = invoices.filter(
+                Q(billing_period=selected_month)
+                | Q(
+                    billing_period__isnull=True,
+                    rental_agreement__isnull=False,
+                    due_date__year=selected_month.year,
+                    due_date__month=selected_month.month,
+                )
+            )
+
+        valid_statuses = {value for value, _label in Invoice.STATUS_CHOICES}
+        selected_status = self.request.GET.get("status", "").strip()
+        if selected_status in valid_statuses:
+            invoices = invoices.filter(status=selected_status)
+        else:
+            selected_status = ""
+
+        context["invoices"] = invoices.order_by("-date", "-pk")
+        context["selected_month"] = selected_month.strftime("%Y-%m") if selected_month else ""
+        context["selected_month_label"] = selected_month.strftime("%B %Y") if selected_month else ""
+        context["selected_status"] = selected_status
+        context["has_invoice_filters"] = bool(selected_month or selected_status)
+        context["invoice_status_choices"] = Invoice.STATUS_CHOICES
+        context["monthly_generation_form"] = MonthlyRentInvoiceGenerationForm(
+            initial={"month": selected_month or timezone.localdate().replace(day=1)}
+        )
         return context
+
+
+class GenerateMonthlyRentInvoicesView(LoginRequiredMixin, View):
+    login_url = "/login/"
+    http_method_names = ["post"]
+
+    def post(self, request):
+        form = MonthlyRentInvoiceGenerationForm(request.POST)
+        if not form.is_valid():
+            messages.error(request, "Choose a valid month before preparing rent invoices.")
+            return redirect("web-invoice-list")
+
+        period = form.cleaned_data["month"].replace(day=1)
+        result = generate_monthly_rent_invoices(
+            period=period,
+            owner=request.user.get_data_owner(),
+        )
+        created_count = len(result["created"])
+        skipped_count = result["skipped"]
+
+        if created_count:
+            notice = f"Prepared {created_count} rent draft(s) for {period:%B %Y}."
+            if skipped_count:
+                notice += f" {skipped_count} agreement(s) already had an invoice and were skipped."
+            messages.success(request, notice)
+        elif skipped_count:
+            messages.info(
+                request,
+                f"Invoices for all eligible rental agreements in {period:%B %Y} have already been generated. No duplicates were created.",
+            )
+        else:
+            messages.warning(
+                request,
+                f"No eligible rental agreements cover the full month of {period:%B %Y}; no drafts were created.",
+            )
+
+        return redirect(
+            f"{reverse('web-invoice-list')}?month={period:%Y-%m}&status=draft"
+        )
 
 
 class InvoiceDetailView(LoginRequiredMixin, DetailView):
@@ -1313,10 +1472,19 @@ class InvoiceDetailView(LoginRequiredMixin, DetailView):
         context = super().get_context_data(**kwargs)
         context["lines"] = self.object.lines.select_related("account")
         context["total"] = self.object.get_total_amount()
-        paid = sum(p.amount for p in self.object.payments.all())
+        invoice_month = self.object.billing_period
+        if not invoice_month and self.object.rental_agreement_id:
+            invoice_month = self.object.due_date.replace(day=1)
+        context["invoice_month_label"] = (
+            invoice_month.strftime("%B %Y") if invoice_month else None
+        )
+        paid = self.object.payments.aggregate(total=Sum("amount"))["total"] or 0
         context["paid_total"] = paid
         context["balance"] = context["total"] - paid
-        context["payments"] = self.object.payments.select_related("bank_account").order_by("-payment_date")[:10]
+        context["is_overdue"] = context["balance"] > 0 and self.object.due_date < timezone.localdate()
+        context["payments"] = self.object.payments.select_related("bank_account").order_by(
+            "-payment_date", "-id"
+        )[:10]
         context["has_payments"] = self.object.payments.exists()
         return context
 
@@ -1338,9 +1506,14 @@ class InvoiceSendView(LoginRequiredMixin, View):
         phone = _re.sub(r"\D", "", invoice.tenant.phone_number or "")
         if phone.startswith("0"):
             phone = "252" + phone[1:]
+        rent_month_line = (
+            f"Rent month: {(invoice.billing_period or invoice.due_date.replace(day=1)).strftime('%B %Y')}\n"
+            if invoice.billing_period or invoice.rental_agreement_id else ""
+        )
         message = (
             f"Hello {invoice.tenant.full_name},\n\n"
             f"Invoice {invoice.invoice_number} from Hirgal Kiro\n"
+            f"{rent_month_line}"
             f"Amount: ${invoice.get_total_amount()}\n"
             f"Date: {invoice.date}\n"
             f"Due: {invoice.due_date}\n\n"
@@ -1364,7 +1537,10 @@ class InvoiceCreateView(LoginRequiredMixin, View):
     def post(self, request):
         form = InvoiceForm(request.POST, user=request.user.get_data_owner())
         formset = InvoiceLineFormSet(request.POST, user=request.user.get_data_owner())
-        if form.is_valid() and formset.is_valid():
+        form_is_valid = form.is_valid()
+        if form_is_valid:
+            formset.instance = form.instance
+        if form_is_valid and formset.is_valid():
             with transaction.atomic():
                 invoice = form.save(commit=False)
                 invoice.owner = request.user.get_data_owner()
@@ -1393,7 +1569,10 @@ class InvoiceUpdateView(LoginRequiredMixin, View):
         invoice = get_object_or_404(Invoice, pk=pk, owner=request.user.get_data_owner())
         form = InvoiceForm(request.POST, instance=invoice, user=request.user.get_data_owner())
         formset = InvoiceLineFormSet(request.POST, instance=invoice, user=request.user.get_data_owner())
-        if form.is_valid() and formset.is_valid():
+        form_is_valid = form.is_valid()
+        if form_is_valid:
+            formset.instance = form.instance
+        if form_is_valid and formset.is_valid():
             with transaction.atomic():
                 invoice = form.save(commit=False)
                 invoice.property = invoice.rental_agreement.property if invoice.rental_agreement else None

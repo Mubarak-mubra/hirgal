@@ -5,7 +5,7 @@ from .views import (
     AgreementsByTenantView, InvoicesByTenantView, BankAccountCreateView, BankAccountDeleteView, BankAccountDetailView,
     BankAccountListView, BankAccountUpdateView,
     CheckTenantPaidView, ChatbotView, ChatSessionDeleteView,
-    DashboardView, GeneralExpenseCreateView, GeneralExpenseDeleteView,
+    DashboardView, GenerateMonthlyRentInvoicesView, GeneralExpenseCreateView, GeneralExpenseDeleteView,
     GeneralExpenseDetailView, GeneralExpenseListView, GeneralExpenseUpdateView,
     HomeView, InvoiceCreateView, InvoiceDeleteView, InvoiceDetailView,
     InvoiceListView, InvoiceSendView, InvoiceUpdateView, InventoryItemCreateView, JournalEntryCreateView,
@@ -128,6 +128,7 @@ urlpatterns = [
 
     # Accounting - Invoices
     path("xisaabiyadda/biilasha/", InvoiceListView.as_view(), name="web-invoice-list"),
+    path("xisaabiyadda/biilasha/generate-monthly/", GenerateMonthlyRentInvoicesView.as_view(), name="web-invoice-generate-monthly"),
     path("xisaabiyadda/biilasha/new/", InvoiceCreateView.as_view(), name="web-invoice-create"),
     path("xisaabiyadda/biilasha/<int:pk>/", InvoiceDetailView.as_view(), name="web-invoice-detail"),
     path("xisaabiyadda/biilasha/<int:pk>/send/", InvoiceSendView.as_view(), name="web-invoice-send"),

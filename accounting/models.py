@@ -85,6 +85,14 @@ class JournalEntry(models.Model):
     def __str__(self):
         return f"JE-{self.id} ({self.date})"
 
+    @property
+    def is_source_generated(self):
+        """Whether a business record owns this entry and updates it automatically."""
+        return any(
+            getattr(self, relation, None) is not None
+            for relation in ("invoice", "payment_source", "repair_source", "general_expense_source")
+        )
+
 class JournalEntryLine(models.Model):
     journal_entry = models.ForeignKey(JournalEntry, on_delete=models.CASCADE, related_name='lines')
     account = models.ForeignKey(Account, on_delete=models.PROTECT, related_name='journal_lines')
@@ -109,6 +117,9 @@ class Invoice(models.Model):
     tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name='invoices')
     rental_agreement = models.ForeignKey(RentalAgreement, on_delete=models.SET_NULL, null=True, blank=True, related_name='invoices')
     property = models.ForeignKey(Property, on_delete=models.SET_NULL, null=True, blank=True, related_name='invoices')
+    # First day of the rent month represented by this invoice. Null preserves
+    # compatibility with historical and non-recurring invoices.
+    billing_period = models.DateField('Billing month', null=True, blank=True)
     
     invoice_number = models.CharField('Invoice number', max_length=50)
     date = models.DateField('Invoice date')
@@ -125,6 +136,13 @@ class Invoice(models.Model):
     class Meta:
         constraints = [
             models.UniqueConstraint(fields=["owner", "invoice_number"], name="unique_invoice_number_per_owner"),
+            models.UniqueConstraint(
+                fields=["rental_agreement", "billing_period"],
+                condition=models.Q(rental_agreement__isnull=False)
+                & models.Q(billing_period__isnull=False)
+                & ~models.Q(status="cancelled"),
+                name="unique_active_invoice_per_agreement_month",
+            ),
         ]
 
     def get_total_amount(self):
@@ -154,8 +172,30 @@ class Invoice(models.Model):
             and self.rental_agreement.property_id != self.property_id
         ):
             errors["property"] = "Property does not match the rental agreement."
+        if self.billing_period and self.billing_period.day != 1:
+            errors["billing_period"] = "Billing month must use the first day of the month."
+        if self.status != "cancelled" and self.rental_agreement_id and self.billing_period:
+            from django.db.models import Q
+
+            duplicates = Invoice.objects.filter(
+                owner_id=self.owner_id,
+                rental_agreement_id=self.rental_agreement_id,
+            ).exclude(status="cancelled")
+            if self.pk:
+                duplicates = duplicates.exclude(pk=self.pk)
+            period_match = Q(billing_period=self.billing_period) | (
+                Q(billing_period__isnull=True)
+                & (
+                    Q(date__year=self.billing_period.year, date__month=self.billing_period.month)
+                    | Q(due_date__year=self.billing_period.year, due_date__month=self.billing_period.month)
+                )
+            )
+            if duplicates.filter(period_match).exists():
+                errors["billing_period"] = "An invoice already exists for this agreement and month. Open that invoice instead of creating another."
         if self.status == "cancelled" and self.pk and self.payments.exists():
             errors["status"] = "Cannot cancel an invoice that has payments."
+        if self.status == "draft" and self.pk and self.payments.exists():
+            errors["status"] = "An invoice with payments cannot be moved back to draft."
         if self.status == "paid":
             total_amount = self.get_total_amount()
             total_paid = self.payments.aggregate(total=models.Sum("amount"))["total"] or 0

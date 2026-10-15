@@ -69,8 +69,8 @@ class Payment(models.Model):
                     errors["invoice"] = "Invoice belongs to a different customer."
                 elif invoice.rental_agreement_id and invoice.rental_agreement_id != self.rental_agreement_id:
                     errors["invoice"] = "Invoice belongs to a different rental agreement."
-                elif invoice.status == "cancelled":
-                    errors["invoice"] = "A cancelled invoice cannot receive payments."
+                elif invoice.status not in ("sent", "paid"):
+                    errors["invoice"] = "Only a sent invoice can receive a payment. Send the draft first."
                 elif self.amount is not None:
                     invoice_total = invoice.get_total_amount()
                     if invoice_total <= 0:
@@ -126,6 +126,38 @@ class MaintenanceRepair(models.Model):
     fixed_date = models.DateField(null=True, blank=True)
     notes = models.TextField(blank=True)
 
+    def clean(self):
+        super().clean()
+        errors = {}
+        owner_id = self.property.owner_id if self.property_id else None
+        if self.repair_cost is not None and self.repair_cost < 0:
+            errors["repair_cost"] = "Repair cost cannot be negative."
+        if self.unit_id and self.property_id and self.unit.property_id != self.property_id:
+            errors["unit"] = "Unit must belong to the selected property."
+        if self.rental_agreement_id and owner_id and self.rental_agreement.tenant.owner_id != owner_id:
+            errors["rental_agreement"] = "Rental agreement belongs to a different owner."
+        if self.reported_by_tenant_id and owner_id and self.reported_by_tenant.owner_id != owner_id:
+            errors["reported_by_tenant"] = "Customer belongs to a different owner."
+        if self.expense_account_id:
+            if self.expense_account.owner_id != owner_id:
+                errors["expense_account"] = "Expense account belongs to a different owner."
+            elif self.expense_account.category != "expense":
+                errors["expense_account"] = "Repair costs must use an expense account."
+        if self.bank_account_id:
+            if self.bank_account.owner_id != owner_id:
+                errors["bank_account"] = "Bank account belongs to a different owner."
+            elif self.bank_account.linked_account_id:
+                account = self.bank_account.linked_account
+                if account.owner_id != owner_id or account.category != "asset":
+                    errors["bank_account"] = "Bank account must link to an asset account owned by this user."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        with transaction.atomic():
+            super().save(*args, **kwargs)
+
     def __str__(self):
         return self.title
 
@@ -143,6 +175,32 @@ class GeneralExpense(models.Model):
     journal_entry = models.OneToOneField("accounting.JournalEntry", on_delete=models.SET_NULL, null=True, blank=True, related_name="general_expense_source")
     expense_date = models.DateField()
     notes = models.TextField(blank=True)
+
+    def clean(self):
+        super().clean()
+        errors = {}
+        owner_id = self.property.owner_id if self.property_id else None
+        if self.amount is not None and self.amount <= 0:
+            errors["amount"] = "Expense amount must be greater than zero."
+        if self.expense_account_id:
+            if self.expense_account.owner_id != owner_id:
+                errors["expense_account"] = "Expense account belongs to a different owner."
+            elif self.expense_account.category != "expense":
+                errors["expense_account"] = "Expenses must use an expense account."
+        if self.bank_account_id:
+            if self.bank_account.owner_id != owner_id:
+                errors["bank_account"] = "Bank account belongs to a different owner."
+            elif self.bank_account.linked_account_id:
+                account = self.bank_account.linked_account
+                if account.owner_id != owner_id or account.category != "asset":
+                    errors["bank_account"] = "Bank account must link to an asset account owned by this user."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        with transaction.atomic():
+            super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.title} - {self.amount}"

@@ -18,6 +18,71 @@
 <p class="mt-3 text-slate-500">{{ tenant.notes }}</p>
 {% endif %}
 
+<section class="mt-7 grid gap-4 md:grid-cols-2">
+    <a href="{% url 'web-invoice-list' %}" class="rounded-2xl border bg-white p-5 shadow-sm transition hover:border-indigo-300">
+        <p class="text-sm font-semibold text-slate-500">{{ current_month_label }} due</p>
+        <p class="mt-2 text-3xl font-bold text-ink">${{ current_month_due|floatformat:2 }}</p>
+        <p class="mt-2 text-sm text-slate-500">Unpaid sent invoices for this month.</p>
+        {% if current_month_drafts %}
+        <p class="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800">${{ current_month_drafts|floatformat:2 }} in draft invoices ready to review and send.</p>
+        {% endif %}
+    </a>
+
+    <details class="rounded-2xl border bg-white shadow-sm">
+        <summary class="cursor-pointer list-none p-5">
+            <p class="text-sm font-semibold text-slate-500">Previous months outstanding</p>
+            <p class="mt-2 text-3xl font-bold text-ink">${{ previous_month_outstanding|floatformat:2 }}</p>
+            <p class="mt-2 text-sm text-slate-500">Click to see unpaid balances by month.</p>
+            {% if previous_draft_groups %}<p class="mt-2 text-xs text-amber-700">Older draft invoices waiting to be sent are listed separately below.</p>{% endif %}
+        </summary>
+        <div class="border-t px-5 pb-5 pt-4" id="previous-months">
+            <h3 class="font-bold text-slate-800">Sent invoices with a remaining balance</h3>
+            <div class="mt-3 space-y-4">
+                {% for group in previous_month_groups %}
+                <section class="rounded-xl bg-slate-50 p-4">
+                    <div class="flex justify-between font-semibold">
+                        <span>{{ group.label }} remains</span>
+                        <span>${{ group.total|floatformat:2 }}</span>
+                    </div>
+                    <div class="mt-2 divide-y">
+                        {% for row in group.invoices %}
+                        <div class="flex justify-between gap-3 py-2 text-sm">
+                            <a class="text-indigo-700 hover:underline" href="{% url 'web-invoice-detail' row.invoice.pk %}">{{ row.invoice.invoice_number }} · {{ row.invoice.get_status_display }}</a>
+                            <strong>${{ row.balance|floatformat:2 }}</strong>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </section>
+                {% empty %}
+                <p class="text-sm text-slate-500">No unpaid invoices from previous months.</p>
+                {% endfor %}
+            </div>
+
+            {% if previous_draft_groups %}
+            <h3 class="mt-6 font-bold text-amber-800">Drafts not sent</h3>
+            <div class="mt-3 space-y-4">
+                {% for group in previous_draft_groups %}
+                <section class="rounded-xl bg-amber-50 p-4">
+                    <div class="flex justify-between font-semibold">
+                        <span>{{ group.label }} draft total</span>
+                        <span>${{ group.total|floatformat:2 }}</span>
+                    </div>
+                    <div class="mt-2 divide-y divide-amber-200">
+                        {% for row in group.invoices %}
+                        <div class="flex justify-between gap-3 py-2 text-sm">
+                            <a class="text-indigo-700 hover:underline" href="{% url 'web-invoice-detail' row.invoice.pk %}">{{ row.invoice.invoice_number }} · Review and send</a>
+                            <strong>${{ row.balance|floatformat:2 }}</strong>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </section>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+    </details>
+</section>
+
 <!-- Agreements -->
 <section class="mt-7 rounded-2xl border bg-white p-5 shadow-sm">
     <h2 class="text-lg font-bold">Rental Agreements</h2>

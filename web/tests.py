@@ -1,10 +1,12 @@
 import json
 from datetime import date
 from decimal import Decimal
-from unittest.mock import patch
+from types import SimpleNamespace
+from unittest.mock import Mock, patch
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.db.models import Sum
 from django.test import TestCase
 from django.urls import reverse
 
@@ -18,8 +20,8 @@ from finance.models import BankAccount, Payment, GeneralExpense, MaintenanceRepa
 from properties.models import Property, PropertyAsset, PropertyType, Room, Unit
 from rentals.models import RentalAgreement, Tenant
 
-from .chatbot import explore_financial_summary
-from .forms import InvoiceForm, InvoiceLineFormSet, PaymentForm
+from .chatbot import ask_ai, explore_financial_summary
+from .forms import InvoiceForm, InvoiceLineFormSet, JournalEntryLineFormSet, PaymentForm
 
 
 class CheckTenantPaidViewOwnershipTests(TestCase):
@@ -3599,3 +3601,152 @@ class InvoiceOrmBypassGuardTests(TestCase):
         self.assertEqual(self.posted_balance(self.rev_a), Decimal("-1000.00"))
         cash_on_hand = get_default_cash_account(self.owner_a)
         self.assertEqual(self.posted_balance(cash_on_hand), Decimal("1000.00"))
+
+
+class JournalEntryWorkflowGuardTests(TestCase):
+    password = "SafePassword123!"
+
+    def setUp(self):
+        self.owner = User.objects.create_user(
+            "journal_guard_owner", "+252618000099", self.password,
+            full_name="Journal Owner", is_approved=True,
+        )
+        seed_default_chart_of_accounts(self.owner)
+        self.property = Property.objects.create(
+            owner=self.owner, name="Journal Guard Property", location="Mogadishu",
+        )
+        self.debit_account = Account.objects.get(owner=self.owner, code="1010")
+        self.credit_account = Account.objects.get(owner=self.owner, code="4010")
+
+    def formset_for(self, status, line_amounts):
+        entry = JournalEntry(owner=self.owner, date=date.today(), status=status)
+        prefix = JournalEntryLineFormSet(instance=entry).prefix
+        data = {
+            f"{prefix}-TOTAL_FORMS": str(len(line_amounts)),
+            f"{prefix}-INITIAL_FORMS": "0",
+            f"{prefix}-MIN_NUM_FORMS": "0",
+            f"{prefix}-MAX_NUM_FORMS": "1000",
+        }
+        for index, (account, debit, credit) in enumerate(line_amounts):
+            data.update({
+                f"{prefix}-{index}-account": str(account.pk),
+                f"{prefix}-{index}-description": "Manual posting",
+                f"{prefix}-{index}-debit": str(debit),
+                f"{prefix}-{index}-credit": str(credit),
+                f"{prefix}-{index}-property": "",
+            })
+        return JournalEntryLineFormSet(data, instance=entry, user=self.owner)
+
+    def test_posted_manual_entry_requires_balanced_lines(self):
+        formset = self.formset_for("posted", [
+            (self.debit_account, "100.00", "0"),
+            (self.credit_account, "0", "90.00"),
+        ])
+
+        self.assertFalse(formset.is_valid())
+        self.assertIn("equal, positive", str(formset.non_form_errors()))
+
+    def test_posted_manual_entry_accepts_balanced_lines(self):
+        formset = self.formset_for("posted", [
+            (self.debit_account, "100.00", "0"),
+            (self.credit_account, "0", "100.00"),
+        ])
+
+        self.assertTrue(formset.is_valid(), formset.errors)
+
+    def create_entry_data(self, lines):
+        formset = self.formset_for("posted", lines)
+        data = dict(formset.data.items())
+        data.update({
+            "date": date.today().isoformat(),
+            "reference": "MANUAL-POST",
+            "description": "Manual journal entry",
+            "status": "posted",
+            "tenant": "",
+        })
+        return data
+
+    def test_create_view_rejects_unbalanced_posted_entry(self):
+        self.client.login(username="journal_guard_owner", password=self.password)
+        response = self.client.post(reverse("web-journal-create"), self.create_entry_data([
+            (self.debit_account, "100.00", "0"),
+            (self.credit_account, "0", "99.00"),
+        ]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(JournalEntry.objects.filter(owner=self.owner).count(), 0)
+        self.assertTrue(response.context["formset"].non_form_errors())
+
+    def test_create_view_posts_balanced_entry_atomically(self):
+        self.client.login(username="journal_guard_owner", password=self.password)
+        response = self.client.post(reverse("web-journal-create"), self.create_entry_data([
+            (self.debit_account, "100.00", "0"),
+            (self.credit_account, "0", "100.00"),
+        ]))
+
+        self.assertEqual(response.status_code, 302)
+        entry = JournalEntry.objects.get(owner=self.owner)
+        self.assertEqual(entry.status, "posted")
+        self.assertEqual(entry.lines.aggregate(total=Sum("debit"))["total"], Decimal("100.00"))
+        self.assertEqual(entry.lines.aggregate(total=Sum("credit"))["total"], Decimal("100.00"))
+
+    def test_automatically_generated_journal_entry_cannot_be_edited_or_deleted(self):
+        expense = GeneralExpense.objects.create(
+            property=self.property, title="Office supplies", category="office",
+            amount=Decimal("25.00"), expense_date=date.today(),
+        )
+        entry = expense.journal_entry
+        self.client.login(username="journal_guard_owner", password=self.password)
+
+        detail = self.client.get(reverse("web-journal-detail", args=[entry.pk]))
+        self.assertEqual(detail.status_code, 200)
+        self.assertFalse(detail.context["can_edit"])
+        self.assertEqual(self.client.get(reverse("web-journal-edit", args=[entry.pk])).status_code, 404)
+        self.assertEqual(self.client.post(reverse("web-journal-edit", args=[entry.pk]), {}).status_code, 404)
+        self.assertEqual(self.client.get(reverse("web-journal-delete", args=[entry.pk])).status_code, 404)
+        self.assertEqual(self.client.post(reverse("web-journal-delete", args=[entry.pk]), {}).status_code, 404)
+
+        entry.refresh_from_db()
+        self.assertEqual(entry.status, "posted")
+        self.assertEqual(entry.lines.count(), 2)
+
+
+class ChatbotSdkIntegrationTests(TestCase):
+    def response(self, text=None, function_call=None):
+        part = SimpleNamespace(function_call=function_call)
+        content = SimpleNamespace(parts=[part])
+        candidate = SimpleNamespace(content=content)
+        return SimpleNamespace(candidates=[candidate], text=text)
+
+    @patch("web.chatbot.get_api_key", return_value="test-api-key")
+    def test_ask_ai_returns_model_text(self, _get_api_key):
+        client = Mock()
+        client.models.generate_content.return_value = self.response(text="Here is the answer.")
+
+        with patch("web.chatbot.genai.Client", return_value=client):
+            result = ask_ai(user=object(), question="How many properties do I have?")
+
+        self.assertEqual(result, "Here is the answer.")
+        client.models.generate_content.assert_called_once()
+        client.close.assert_called_once()
+
+    @patch("web.chatbot.get_api_key", return_value="test-api-key")
+    def test_ask_ai_dispatches_read_only_tool_and_sends_result_back(self, _get_api_key):
+        function_call = SimpleNamespace(name="explore_properties", args={}, id="call-1")
+        client = Mock()
+        client.models.generate_content.side_effect = [
+            self.response(function_call=function_call),
+            self.response(text="You have two properties."),
+        ]
+        with patch("web.chatbot.genai.Client", return_value=client), patch(
+            "web.chatbot.TOOL_MAP", {"explore_properties": Mock(return_value="[]")}
+        ) as tool_map:
+            result = ask_ai(user=object(), question="List my properties")
+
+        self.assertEqual(result, "You have two properties.")
+        tool_map["explore_properties"].assert_called_once()
+        self.assertEqual(client.models.generate_content.call_count, 2)
+        second_contents = client.models.generate_content.call_args_list[1].kwargs["contents"]
+        self.assertEqual(second_contents[-1].parts[0].function_response.id, "call-1")
+        self.assertEqual(second_contents[-1].parts[0].function_response.response, {"result": "[]"})
+        client.close.assert_called_once()

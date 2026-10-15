@@ -9,10 +9,10 @@
       <h1 class="text-2xl font-bold">JE-{{ entry.id }}</h1>
       <p class="mt-2 text-slate-500">{{ entry.description }}</p>
     </div>
-    <div class="flex gap-2">
+    {% if can_edit %}<div class="flex gap-2">
       <a href="{% url 'web-journal-edit' entry.pk %}" class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold hover:bg-slate-50 transition">Edit</a>
       <a href="{% url 'web-journal-delete' entry.pk %}" class="rounded-lg bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-600 hover:bg-rose-100 transition">Delete</a>
-    </div>
+    </div>{% endif %}
   </div>
 
   <div class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

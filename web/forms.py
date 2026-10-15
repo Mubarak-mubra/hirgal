@@ -3,6 +3,7 @@ from decimal import Decimal
 from django import forms
 from django.contrib.auth import get_user_model
 from django.db.models import Q, Sum
+from django.utils import timezone
 
 from accounting.models import Account, Invoice, InvoiceLine, JournalEntry, JournalEntryLine
 from finance.models import BankAccount, GeneralExpense, MaintenanceRepair, Payment
@@ -300,11 +301,11 @@ class PaymentForm(forms.ModelForm):
             invoices = Invoice.objects.filter(owner=user)
             if self.instance.invoice_id:
                 self.fields["invoice"].queryset = invoices.filter(
-                    Q(status__in=["sent", "draft"]) | Q(pk=self.instance.invoice_id)
+                    Q(status__in=["sent", "paid"]) | Q(pk=self.instance.invoice_id)
                 ).order_by("-date")
             else:
                 self.fields["invoice"].queryset = invoices.filter(
-                    status__in=["sent", "draft"]
+                    status="sent"
                 ).order_by("-date")
             self.fields["invoice"].label_from_instance = lambda invoice: (
                 f"{invoice.invoice_number} — {invoice.tenant.full_name}"
@@ -532,13 +533,38 @@ class JournalEntryLineForm(forms.ModelForm):
             self.fields["property"].queryset = Property.objects.filter(owner=user)
         _style_fields(self)
 
+    def clean(self):
+        cleaned_data = super().clean()
+        account = cleaned_data.get("account")
+        debit = cleaned_data.get("debit") or Decimal("0")
+        credit = cleaned_data.get("credit") or Decimal("0")
+
+        if debit < 0:
+            self.add_error("debit", "Debit must be zero or greater.")
+        if credit < 0:
+            self.add_error("credit", "Credit must be zero or greater.")
+        if debit > 0 and credit > 0:
+            raise forms.ValidationError("A journal line cannot have both a debit and a credit.")
+        if account and debit == 0 and credit == 0:
+            raise forms.ValidationError("Enter a positive debit or credit for this account.")
+
+        return cleaned_data
+
 
 class InvoiceForm(forms.ModelForm):
+    billing_period = forms.DateField(
+        required=False,
+        input_formats=["%Y-%m"],
+        widget=forms.DateInput(attrs={"type": "month"}, format="%Y-%m"),
+        label="Rent month",
+    )
+
     class Meta:
         model = Invoice
-        fields = ("tenant", "rental_agreement", "invoice_number", "date", "due_date", "status", "notes")
+        fields = ("tenant", "rental_agreement", "billing_period", "invoice_number", "date", "due_date", "status", "notes")
         labels = {
             "tenant": "Customer", "rental_agreement": "Rental Agreement",
+            "billing_period": "Rent Month",
             "invoice_number": "Invoice Number", "date": "Invoice Date", "due_date": "Due Date",
             "status": "Status", "notes": "Notes",
         }
@@ -555,16 +581,51 @@ class InvoiceForm(forms.ModelForm):
         _style_fields(self)
         self.fields["notes"].widget.attrs["rows"] = 3
 
+        if self.instance.pk:
+            self.fields["billing_period"].initial = (
+                self.instance.billing_period
+                or (
+                    self.instance.due_date.replace(day=1)
+                    if self.instance.rental_agreement_id
+                    else self.instance.date.replace(day=1)
+                )
+            )
+        else:
+            self.fields["billing_period"].initial = timezone.localdate().replace(day=1)
+
         if not self.instance.pk:
             self.fields["invoice_number"].initial = self._generate_invoice_number(user)
 
     def clean(self):
         cleaned = super().clean()
         agreement = cleaned.get("rental_agreement")
+        period = cleaned.get("billing_period")
+        status = cleaned.get("status")
         if agreement:
             # Invoice views derive invoice.property from the agreement; mirror
             # that here so model validation sees a consistent pair.
             self.instance.property = agreement.property
+            if status != "cancelled" and not period:
+                self.add_error("billing_period", "Choose the month this rent invoice covers.")
+            elif period and status != "cancelled":
+                duplicates = Invoice.objects.filter(
+                    owner=agreement.tenant.owner,
+                    rental_agreement=agreement,
+                ).exclude(status="cancelled")
+                if self.instance.pk:
+                    duplicates = duplicates.exclude(pk=self.instance.pk)
+                period_match = Q(billing_period=period) | (
+                    Q(billing_period__isnull=True)
+                    & (
+                        Q(date__year=period.year, date__month=period.month)
+                        | Q(due_date__year=period.year, due_date__month=period.month)
+                    )
+                )
+                if duplicates.filter(period_match).exists():
+                    self.add_error(
+                        "billing_period",
+                        "An invoice already exists for this agreement and month. Open that invoice instead.",
+                    )
         return cleaned
 
     def _generate_invoice_number(self, user):
@@ -574,6 +635,18 @@ class InvoiceForm(forms.ModelForm):
         prefix = "INV-%s-" % year
         count = Invoice.objects.filter(owner=user, date__year=year).count()
         return "%s%04d" % (prefix, count + 1)
+
+
+class MonthlyRentInvoiceGenerationForm(forms.Form):
+    month = forms.DateField(
+        label="Rent month",
+        input_formats=["%Y-%m"],
+        widget=forms.DateInput(attrs={"type": "month"}, format="%Y-%m"),
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        _style_fields(self)
 
 
 class InvoiceLineForm(forms.ModelForm):
@@ -607,7 +680,31 @@ class UserFormSetMixin:
 
 
 class JournalEntryLineFormSet(UserFormSetMixin, forms.BaseInlineFormSet):
-    pass
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+
+        total_debit = Decimal("0")
+        total_credit = Decimal("0")
+        line_count = 0
+        for form in self.forms:
+            data = getattr(form, "cleaned_data", None)
+            if not data or data.get("DELETE"):
+                continue
+            if not data.get("account"):
+                continue
+            line_count += 1
+            total_debit += data.get("debit") or Decimal("0")
+            total_credit += data.get("credit") or Decimal("0")
+
+        if self.instance.status == "posted":
+            if line_count < 2:
+                raise forms.ValidationError("A posted journal entry needs at least two lines.")
+            if total_debit <= 0 or total_debit != total_credit:
+                raise forms.ValidationError(
+                    "A posted journal entry must have equal, positive debit and credit totals."
+                )
 
 
 class InvoiceLineFormSetClass(UserFormSetMixin, forms.BaseInlineFormSet):
@@ -618,6 +715,22 @@ class InvoiceLineFormSetClass(UserFormSetMixin, forms.BaseInlineFormSet):
         deletions are applied."""
         super().clean()
         invoice = self.instance
+        if invoice and invoice.tenant_id and not invoice.rental_agreement_id and not invoice.pk:
+            has_rent_line = any(
+                getattr(form, "cleaned_data", {}).get("account")
+                and (
+                    getattr(form, "cleaned_data", {})["account"].code == "4010"
+                    or "rent" in (getattr(form, "cleaned_data", {}).get("description") or "").lower()
+                )
+                and not getattr(form, "cleaned_data", {}).get("DELETE")
+                for form in self.forms
+            )
+            if has_rent_line and RentalAgreement.objects.filter(
+                tenant_id=invoice.tenant_id, status="active"
+            ).exists():
+                raise forms.ValidationError(
+                    "Choose the rental agreement for rent invoices. This lets the system identify the rent month and prevent duplicate invoices."
+                )
         if not invoice or not invoice.pk or not invoice.payments.exists():
             return
         total_paid = invoice.payments.aggregate(total=Sum("amount"))["total"] or Decimal("0")

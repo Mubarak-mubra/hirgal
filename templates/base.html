@@ -48,6 +48,21 @@
                 border-bottom: 1px solid #10194f !important;
                 color: #10194f !important; font-weight: 700 !important;
             }
+            .balance-due-row.is-overdue td {
+                background: #fef2f2 !important;
+                border-top: 2px solid #b91c1c !important;
+                color: #b91c1c !important;
+            }
+            .balance-due-row.is-current td {
+                background: #fffbeb !important;
+                border-top: 2px solid #b45309 !important;
+                color: #b45309 !important;
+            }
+            .balance-due-row.is-paid td {
+                background: #f0fdf4 !important;
+                border-top: 2px solid #15803d !important;
+                color: #15803d !important;
+            }
 
             h1, h2, h3, h4 { color: #10194f !important; }
             .report-sheet { border: none !important; }
@@ -455,26 +470,30 @@
                     </button>
                 </div>
                 <div class="topbar-right">
-                    {% if rent_notification.unpaid %}
+                    {% if rent_notification.should_show %}
                     <div class="relative">
-                        <button type="button" id="rentNotifBtn" onclick="toggleRentNotif(event)" class="relative rounded-lg p-2 text-slate-500 hover:bg-slate-100" title="Rent notifications">
+                        <button type="button" id="rentNotifBtn" onclick="toggleRentNotif(event)" class="relative rounded-lg p-2 text-slate-500 hover:bg-slate-100" title="Monthly rent invoices">
                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-5 w-5"><path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" /></svg>
-                            <span class="absolute -right-1 -top-1 min-w-[18px] rounded-full bg-rose-500 px-1 text-center text-[10px] font-bold leading-[18px] text-white">{{ rent_notification.unpaid|length }}</span>
+                            {% if rent_notification.draft_count %}
+                            <span class="absolute -right-1 -top-1 min-w-[18px] rounded-full bg-rose-500 px-1 text-center text-[10px] font-bold leading-[18px] text-white">{{ rent_notification.draft_count }}</span>
+                            {% elif rent_notification.needs_generation %}
+                            <span class="absolute -right-1 -top-1 min-w-[18px] rounded-full bg-rose-500 px-1 text-center text-[10px] font-bold leading-[18px] text-white">!</span>
+                            {% endif %}
                         </button>
                         <div id="rentNotifMenu" class="hidden absolute right-0 mt-2 w-80 overflow-hidden rounded-xl border bg-white shadow-2xl" style="z-index: 50;">
-                            <div class="border-b bg-slate-50 px-4 py-3">
-                                <p class="text-sm font-bold text-ink">{{ rent_notification.unpaid|length }}/{{ rent_notification.total }} customers haven't paid rent this month</p>
-                                <p class="mt-0.5 text-xs text-slate-500">{{ rent_notification.month_label }}</p>
-                            </div>
-                            <div class="max-h-72 overflow-y-auto">
-                                {% for c in rent_notification.unpaid %}
-                                <a href="{% url 'web-tenant-detail' c.tenant_id %}" class="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-2.5 last:border-0 hover:bg-slate-50">
-                                    <span class="text-sm font-semibold text-slate-700">{{ c.name }}</span>
-                                    <span class="shrink-0 text-sm font-bold text-rose-600">${{ c.remaining|floatformat:0 }}</span>
-                                </a>
-                                {% endfor %}
-                            </div>
-                            <a href="{% url 'web-payments' %}" class="block border-t bg-slate-50 px-4 py-2.5 text-center text-xs font-bold text-indigo-700 hover:bg-slate-100">View All Payments →</a>
+                            <a href="{% url 'web-invoice-list' %}?month={{ rent_notification.month_param }}{% if rent_notification.draft_count %}&status=draft{% endif %}" class="block px-4 py-4 hover:bg-slate-50">
+                                {% if rent_notification.invoice_count %}
+                                <p class="text-sm font-bold text-ink">{{ rent_notification.month_label }} invoices: {{ rent_notification.draft_count }} draft, {{ rent_notification.sent_count }} sent, {{ rent_notification.paid_count }} paid</p>
+                                {% if rent_notification.draft_count %}
+                                <p class="mt-1 text-xs text-slate-500">Review and continue sending this month's draft invoices.</p>
+                                {% else %}
+                                <p class="mt-1 text-xs text-slate-500">There are no draft invoices waiting to be sent.</p>
+                                {% endif %}
+                                {% else %}
+                                <p class="text-sm font-bold text-ink">A new month is here. Generate {{ rent_notification.month_label }} invoices.</p>
+                                <p class="mt-1 text-xs text-slate-500">Click to prepare this month's rent drafts for eligible customers.</p>
+                                {% endif %}
+                            </a>
                         </div>
                     </div>
                     {% endif %}

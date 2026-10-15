@@ -5,5 +5,6 @@ media/
 .env
 db.sqlite3
 staticfiles/
+/backups/
 # Local AI development documentation
 /docs/

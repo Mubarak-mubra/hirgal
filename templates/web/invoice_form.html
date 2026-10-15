@@ -27,6 +27,13 @@
         </div>
       </div>
 
+      <div class="mb-4 sm:w-1/2">
+        <label class="block text-sm font-medium text-slate-700">{{ form.billing_period.label }}</label>
+        {{ form.billing_period }}
+        <p class="mt-1 text-xs text-slate-500">Choose the rent month. The system creates one draft for each active agreement; open that draft to review and send it.</p>
+        {% if form.billing_period.errors %}<p class="text-red-500 text-sm">{{ form.billing_period.errors.0 }}</p>{% endif %}
+      </div>
+
       <div class="grid gap-4 sm:grid-cols-2">
         <div class="mb-4">
           <label class="block text-sm font-medium text-slate-700">{{ form.invoice_number.label }}</label>
