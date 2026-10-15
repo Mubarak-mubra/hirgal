@@ -223,6 +223,59 @@ class AgreementsByTenantView(LoginRequiredMixin, View):
         return JsonResponse({"agreements": result})
 
 
+class InvoicesByTenantView(LoginRequiredMixin, View):
+    login_url = "/login/"
+
+    def get(self, request):
+        tenant_id = request.GET.get("tenant_id", "")
+        if not tenant_id.isdecimal():
+            return JsonResponse({"invoices": []})
+
+        agreement_id = request.GET.get("agreement_id", "")
+        if agreement_id and not agreement_id.isdecimal():
+            return JsonResponse({"invoices": []})
+
+        selected_invoice_id = request.GET.get("invoice_id", "")
+        if not selected_invoice_id.isdecimal():
+            selected_invoice_id = ""
+
+        owner = request.user.get_data_owner()
+        invoices = Invoice.objects.filter(
+            owner=owner,
+            tenant_id=tenant_id,
+        ).filter(
+            Q(status__in=["draft", "sent"]) | Q(pk=selected_invoice_id or None)
+        )
+        if agreement_id:
+            invoices = invoices.filter(
+                Q(rental_agreement__isnull=True)
+                | Q(rental_agreement_id=agreement_id)
+                | Q(pk=selected_invoice_id or None)
+            )
+        else:
+            invoices = invoices.filter(
+                Q(rental_agreement__isnull=True) | Q(pk=selected_invoice_id or None)
+            )
+
+        result = []
+        invoices = invoices.prefetch_related("lines", "payments").order_by("-date", "-pk")
+        for invoice in invoices:
+            total = invoice.get_total_amount()
+            paid = sum(payment.amount for payment in invoice.payments.all())
+            balance = total - paid
+            is_current_invoice = selected_invoice_id and str(invoice.pk) == selected_invoice_id
+            if total <= 0 or (balance <= 0 and not is_current_invoice):
+                continue
+
+            label = (
+                f"{invoice.invoice_number} — total ${total:.2f} — "
+                f"balance ${balance:.2f} — due {invoice.due_date}"
+            )
+            result.append({"id": invoice.pk, "label": label})
+
+        return JsonResponse({"invoices": result})
+
+
 class CheckTenantPaidView(LoginRequiredMixin, View):
     login_url = "/login/"
 
@@ -1312,16 +1365,17 @@ class InvoiceCreateView(LoginRequiredMixin, View):
         form = InvoiceForm(request.POST, user=request.user.get_data_owner())
         formset = InvoiceLineFormSet(request.POST, user=request.user.get_data_owner())
         if form.is_valid() and formset.is_valid():
-            invoice = form.save(commit=False)
-            invoice.owner = request.user.get_data_owner()
-            invoice.property = invoice.rental_agreement.property if invoice.rental_agreement else None
-            # Save invoice first (so formset has an instance), then lines, then re-post
-            invoice.save()
-            formset.instance = invoice
-            formset.save()
-            # Ensure journal entry is created now that lines exist
-            from accounting.services import post_invoice
-            post_invoice(invoice)
+            with transaction.atomic():
+                invoice = form.save(commit=False)
+                invoice.owner = request.user.get_data_owner()
+                invoice.property = invoice.rental_agreement.property if invoice.rental_agreement else None
+                # Save invoice first (so formset has an instance), then lines, then re-post
+                invoice.save()
+                formset.instance = invoice
+                formset.save()
+                # Ensure journal entry is created now that lines exist
+                from accounting.services import post_invoice
+                post_invoice(invoice)
             return redirect("web-invoice-detail", invoice.pk)
         return render(request, "web/invoice_form.html", {"form": form, "formset": formset})
 
@@ -1340,13 +1394,14 @@ class InvoiceUpdateView(LoginRequiredMixin, View):
         form = InvoiceForm(request.POST, instance=invoice, user=request.user.get_data_owner())
         formset = InvoiceLineFormSet(request.POST, instance=invoice, user=request.user.get_data_owner())
         if form.is_valid() and formset.is_valid():
-            invoice = form.save(commit=False)
-            invoice.property = invoice.rental_agreement.property if invoice.rental_agreement else None
-            invoice.save()
-            formset.save()
-            # Re-post journal entry with updated lines
-            from accounting.services import post_invoice
-            post_invoice(invoice)
+            with transaction.atomic():
+                invoice = form.save(commit=False)
+                invoice.property = invoice.rental_agreement.property if invoice.rental_agreement else None
+                invoice.save()
+                formset.save()
+                # Re-post journal entry with updated lines
+                from accounting.services import post_invoice
+                post_invoice(invoice)
             return redirect("web-invoice-detail", pk)
         return render(request, "web/invoice_form.html", {"form": form, "formset": formset, "editing": True})
 

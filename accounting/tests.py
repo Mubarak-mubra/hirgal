@@ -65,6 +65,18 @@ class DoubleEntryAccountingTests(TestCase):
         self.assertEqual(debit_line.debit, Decimal("500.00"))
         self.assertEqual(credit_line.credit, Decimal("500.00"))
 
+    def test_cash_payment_uses_cash_on_hand_when_no_destination_is_selected(self):
+        payment = Payment.objects.create(
+            rental_agreement=self.agreement,
+            amount=Decimal("125.00"),
+            payment_date=timezone.now().date(),
+            payment_method="cash",
+        )
+
+        debit_line = payment.journal_entry.lines.get(debit__gt=0)
+        self.assertEqual(debit_line.account, get_default_cash_account(self.user))
+        self.assertEqual(debit_line.debit, Decimal("125.00"))
+
     def test_payment_update_is_idempotent(self):
         payment = Payment.objects.create(
             rental_agreement=self.agreement,

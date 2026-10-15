@@ -1,5 +1,8 @@
+from decimal import Decimal
+
 from django import forms
 from django.contrib.auth import get_user_model
+from django.db.models import Q, Sum
 
 from accounting.models import Account, Invoice, InvoiceLine, JournalEntry, JournalEntryLine
 from finance.models import BankAccount, GeneralExpense, MaintenanceRepair, Payment
@@ -294,9 +297,21 @@ class PaymentForm(forms.ModelForm):
             )
             self.fields["bank_account"].queryset = BankAccount.objects.filter(owner=user)
             self.fields["destination_account"].queryset = Account.objects.filter(owner=user, category="asset")
-            self.fields["invoice"].queryset = Invoice.objects.filter(
-                owner=user, status__in=["sent", "draft"]
-            ).order_by("-date")
+            invoices = Invoice.objects.filter(owner=user)
+            if self.instance.invoice_id:
+                self.fields["invoice"].queryset = invoices.filter(
+                    Q(status__in=["sent", "draft"]) | Q(pk=self.instance.invoice_id)
+                ).order_by("-date")
+            else:
+                self.fields["invoice"].queryset = invoices.filter(
+                    status__in=["sent", "draft"]
+                ).order_by("-date")
+            self.fields["invoice"].label_from_instance = lambda invoice: (
+                f"{invoice.invoice_number} — {invoice.tenant.full_name}"
+            )
+
+        if self.instance.pk and self.instance.rental_agreement_id:
+            self.fields["tenant"].initial = self.instance.rental_agreement.tenant_id
 
         # Auto-generate reference number if creating new payment
         if not self.instance.pk:
@@ -304,6 +319,30 @@ class PaymentForm(forms.ModelForm):
 
         _style_fields(self)
         self.fields["notes"].widget.attrs["rows"] = 3
+
+    def clean(self):
+        cleaned_data = super().clean()
+        tenant = cleaned_data.get("tenant")
+        agreement = cleaned_data.get("rental_agreement")
+        invoice = cleaned_data.get("invoice")
+
+        if tenant and agreement and tenant.pk != agreement.tenant_id:
+            self.add_error("rental_agreement", "Choose an agreement for the selected customer.")
+
+        if invoice and invoice.get_total_amount() <= 0:
+            self.add_error(
+                "invoice",
+                "The selected invoice has no billable total; a payment cannot "
+                "be recorded against it.",
+            )
+
+        if invoice and agreement:
+            if invoice.tenant_id != agreement.tenant_id:
+                self.add_error("invoice", "Choose an invoice for the selected customer.")
+            elif invoice.rental_agreement_id and invoice.rental_agreement_id != agreement.pk:
+                self.add_error("invoice", "This invoice belongs to a different rental agreement.")
+
+        return cleaned_data
 
     def _generate_reference(self, user):
         """Generate a unique reference like PAY-2026-0001"""
@@ -572,7 +611,29 @@ class JournalEntryLineFormSet(UserFormSetMixin, forms.BaseInlineFormSet):
 
 
 class InvoiceLineFormSetClass(UserFormSetMixin, forms.BaseInlineFormSet):
-    pass
+    def clean(self):
+        """Batch edits and deletions must keep the invoice total at or above
+        the amount already collected when payments exist. Per-line clean()
+        only validates surviving edits, not what the set looks like after
+        deletions are applied."""
+        super().clean()
+        invoice = self.instance
+        if not invoice or not invoice.pk or not invoice.payments.exists():
+            return
+        total_paid = invoice.payments.aggregate(total=Sum("amount"))["total"] or Decimal("0")
+        surviving_total = Decimal("0")
+        for form in self.forms:
+            data = getattr(form, "cleaned_data", None)
+            if not data or data.get("DELETE"):
+                continue
+            amount = data.get("amount")
+            if isinstance(amount, Decimal):
+                surviving_total += amount
+        if surviving_total <= 0 or surviving_total < total_paid:
+            raise forms.ValidationError(
+                "This invoice has payments: the remaining invoice total must "
+                "stay at or above the amount already collected."
+            )
 
 
 JournalEntryLineFormSet = forms.inlineformset_factory(

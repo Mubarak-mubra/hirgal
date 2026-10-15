@@ -2,7 +2,7 @@ from django.urls import path
 
 from .views import (
     AccountCreateView, AccountDeleteView, AccountListView, AccountUpdateView,
-    AgreementsByTenantView, BankAccountCreateView, BankAccountDeleteView, BankAccountDetailView,
+    AgreementsByTenantView, InvoicesByTenantView, BankAccountCreateView, BankAccountDeleteView, BankAccountDetailView,
     BankAccountListView, BankAccountUpdateView,
     CheckTenantPaidView, ChatbotView, ChatSessionDeleteView,
     DashboardView, GeneralExpenseCreateView, GeneralExpenseDeleteView,
@@ -44,6 +44,7 @@ urlpatterns = [
     path("profile/", ProfileView.as_view(), name="web-profile"),
     path("api/units-by-property/", UnitsByPropertyView.as_view(), name="web-units-by-property"),
     path("api/agreements-by-tenant/", AgreementsByTenantView.as_view(), name="web-agreements-by-tenant"),
+    path("api/invoices-by-tenant/", InvoicesByTenantView.as_view(), name="web-invoices-by-tenant"),
     path("api/check-tenant-paid/", CheckTenantPaidView.as_view(), name="web-check-tenant-paid"),
     path("", DashboardView.as_view(), name="home"),
     path("dashboard/", DashboardView.as_view(), name="dashboard"),

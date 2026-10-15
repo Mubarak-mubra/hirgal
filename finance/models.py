@@ -1,4 +1,7 @@
-from django.db import models
+from decimal import Decimal
+from django.core.exceptions import ValidationError
+from django.db import models, transaction
+from django.db.models import Sum
 from django.conf import settings
 from properties.models import Property, Unit
 from rentals.models import RentalAgreement, Tenant
@@ -37,6 +40,65 @@ class Payment(models.Model):
     reference_number = models.CharField(max_length=100, blank=True)
     notes = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    def clean(self):
+        super().clean()
+        errors = {}
+        if self.amount is not None and self.amount <= 0:
+            errors["amount"] = "Payment amount must be greater than zero."
+
+        if self.rental_agreement_id:
+            owner_id = self.rental_agreement.tenant.owner_id
+            if self.bank_account_id and self.bank_account.owner_id != owner_id:
+                errors["bank_account"] = "Bank account belongs to a different owner."
+            if self.bank_account_id and self.bank_account.linked_account_id:
+                linked_account = self.bank_account.linked_account
+                if linked_account.owner_id != owner_id or linked_account.category != "asset":
+                    errors["bank_account"] = "Bank account must link to an asset account owned by this user."
+            if self.destination_account_id:
+                if self.destination_account.owner_id != owner_id:
+                    errors["destination_account"] = "Destination account belongs to a different owner."
+                elif self.destination_account.category != "asset":
+                    errors["destination_account"] = "Destination account must be an asset account."
+
+            if self.invoice_id:
+                invoice = self.invoice
+                if invoice.owner_id != owner_id:
+                    errors["invoice"] = "Invoice belongs to a different owner."
+                elif invoice.tenant_id != self.rental_agreement.tenant_id:
+                    errors["invoice"] = "Invoice belongs to a different customer."
+                elif invoice.rental_agreement_id and invoice.rental_agreement_id != self.rental_agreement_id:
+                    errors["invoice"] = "Invoice belongs to a different rental agreement."
+                elif invoice.status == "cancelled":
+                    errors["invoice"] = "A cancelled invoice cannot receive payments."
+                elif self.amount is not None:
+                    invoice_total = invoice.get_total_amount()
+                    if invoice_total <= 0:
+                        errors["invoice"] = "A payment cannot be linked to an invoice with no billable total."
+                    else:
+                        other_payments = invoice.payments.all()
+                        if self.pk:
+                            other_payments = other_payments.exclude(pk=self.pk)
+                        already_paid = other_payments.aggregate(total=Sum("amount"))["total"] or Decimal("0")
+                        if already_paid + self.amount > invoice_total:
+                            errors["amount"] = (
+                                "Payment exceeds the invoice's remaining balance. "
+                                "Reduce the amount or choose a different invoice."
+                            )
+
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        # Serialize payments against the invoice so concurrent entries cannot
+        # both consume the same remaining balance. The surrounding transaction
+        # also rolls back the source row if its accounting signal fails.
+        with transaction.atomic():
+            if self.invoice_id:
+                invoice_model = self._meta.get_field("invoice").remote_field.model
+                self.invoice = invoice_model.objects.select_for_update().get(pk=self.invoice_id)
+            self.clean()
+            super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.rental_agreement.tenant.full_name} - {self.amount}"

@@ -1,4 +1,4 @@
-from django.db import models
+from django.db import models, transaction
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from properties.models import Property
@@ -131,12 +131,13 @@ class Invoice(models.Model):
         return sum(line.amount for line in self.lines.all())
 
     def save(self, *args, **kwargs):
-        # save() never runs full_clean(); enforce the cancellation invariant at
-        # this boundary so direct ORM writes cannot void posted accounting while
-        # payment JEs still credit Accounts Receivable against it.
-        if self.status == "cancelled" and self.pk and self.payments.exists():
-            raise ValidationError({"status": "Cannot cancel an invoice that has payments."})
-        super().save(*args, **kwargs)
+        # save() never runs full_clean(); enforce invoice ownership, agreement,
+        # cancellation, and paid-status invariants for direct ORM writes too.
+        # The atomic block also prevents a failing post_save accounting signal
+        # from persisting a partial invoice update.
+        self.clean()
+        with transaction.atomic():
+            super().save(*args, **kwargs)
 
     def clean(self):
         """Enforce invoice invariants shared by forms, admin, and services."""
@@ -155,6 +156,11 @@ class Invoice(models.Model):
             errors["property"] = "Property does not match the rental agreement."
         if self.status == "cancelled" and self.pk and self.payments.exists():
             errors["status"] = "Cannot cancel an invoice that has payments."
+        if self.status == "paid":
+            total_amount = self.get_total_amount()
+            total_paid = self.payments.aggregate(total=models.Sum("amount"))["total"] or 0
+            if total_amount <= 0 or total_paid < total_amount:
+                errors["status"] = "An invoice can be marked paid only when payments cover its total."
         if errors:
             raise ValidationError(errors)
 
@@ -170,8 +176,11 @@ class InvoiceLine(models.Model):
     def save(self, *args, **kwargs):
         # save() never runs full_clean(); validate here so invalid lines can
         # never reach the ledger through the post_save -> post_invoice path.
+        # The atomic block keeps a raising post_save signal from persisting a
+        # partial write when this runs outside an outer transaction.
         self.full_clean()
-        super().save(*args, **kwargs)
+        with transaction.atomic():
+            super().save(*args, **kwargs)
 
     def clean(self):
         """A line must post valid revenue: positive amount, revenue account, owner's account."""
@@ -184,6 +193,21 @@ class InvoiceLine(models.Model):
                 errors["account"] = "Invoice lines must use a revenue account."
             if self.invoice_id and self.account.owner_id != self.invoice.owner_id:
                 errors["account"] = "Account belongs to a different owner."
+        # Payments may already be collected: editing this line must not push
+        # the invoice total below what has actually been received.
+        if self.invoice_id and self.amount is not None and "amount" not in errors:
+            invoice = self.invoice
+            if invoice.payments.exists():
+                total_paid = invoice.payments.aggregate(total=models.Sum("amount"))["total"] or 0
+                other_lines = invoice.lines.all()
+                if self.pk:
+                    other_lines = other_lines.exclude(pk=self.pk)
+                other_total = other_lines.aggregate(total=models.Sum("amount"))["total"] or 0
+                if other_total + self.amount < total_paid:
+                    errors["amount"] = (
+                        "Invoice has payments: the total cannot drop below "
+                        "the amount already collected."
+                    )
         if errors:
             raise ValidationError(errors)
 

@@ -1,5 +1,6 @@
 import datetime
 from decimal import Decimal
+from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Sum
 from .models import Account, AccountCategory, JournalEntry, JournalEntryLine, Invoice
@@ -160,6 +161,8 @@ def resolve_destination_account(user, payment):
         return payment.destination_account
     if payment.bank_account and payment.bank_account.linked_account:
         return payment.bank_account.linked_account
+    if payment.payment_method == "cash":
+        return get_default_cash_account(user)
     return get_default_bank_account(user)
 
 
@@ -290,14 +293,38 @@ def post_payment(payment):
             payment.destination_account = debit_account
         payment.save(update_fields=["journal_entry", "destination_account"])
 
-    # Check if linked invoice is fully paid
+    # Keep invoice status derived from the payments actually recorded.
     if payment.invoice:
-        total_paid = payment.invoice.payments.aggregate(total=Sum("amount"))["total"] or Decimal("0")
-        if total_paid >= payment.invoice.get_total_amount():
-            payment.invoice.status = "paid"
-            payment.invoice.save(update_fields=["status"])
+        sync_invoice_payment_status(payment.invoice)
 
     return entry
+
+
+def sync_invoice_payment_status(invoice):
+    """Mark an invoice paid exactly while its recorded payments cover its total."""
+    if not invoice.pk:
+        return invoice.status
+    # Related instances can be cached before a Payment or InvoiceLine save;
+    # derive the transition from the persisted status, not that stale cache.
+    invoice.refresh_from_db(fields=["status"])
+    if invoice.status == "cancelled":
+        return invoice.status
+
+    total_amount = invoice.get_total_amount()
+    total_paid = invoice.payments.aggregate(total=Sum("amount"))["total"] or Decimal("0")
+    if total_amount > 0 and total_paid >= total_amount:
+        new_status = "paid"
+    elif invoice.status == "paid":
+        # A paid invoice has been issued; restore it to the collectible state
+        # if a payment is edited, moved, or deleted.
+        new_status = "sent"
+    else:
+        return invoice.status
+
+    if invoice.status != new_status:
+        invoice.status = new_status
+        invoice.save(update_fields=["status"])
+    return new_status
 
 
 @transaction.atomic
@@ -429,17 +456,28 @@ def post_invoice(invoice):
 
     # A cancelled invoice must never leave posted AR/revenue accounting behind,
     # and posted accounting must never be voided while payment JEs still credit
-    # AR against it.
+    # AR against it. Bulk operations (QuerySet.update(), raw queries) can reach
+    # this state; refuse loudly instead of leaving contradictory accounting.
     if invoice.status == "cancelled":
-        if not invoice.payments.exists():
-            cancel_journal_entry_for_object(invoice)
+        if invoice.payments.exists():
+            raise ValidationError(
+                f"Invoice {invoice.invoice_number} is cancelled but has payments; "
+                "refusing to leave inconsistent accounting."
+            )
+        cancel_journal_entry_for_object(invoice)
         return None
 
     # An invoice without value posts nothing; void any previously posted JE so
-    # the ledger never keeps a stale entry after lines are removed.
+    # the ledger never keeps a stale entry after lines are removed. Payments
+    # against such an invoice are contradictory: rejecting keeps the entries
+    # and balances consistent for the accountant to inspect.
     if total_amount <= 0:
-        if not invoice.payments.exists():
-            cancel_journal_entry_for_object(invoice)
+        if invoice.payments.exists():
+            raise ValidationError(
+                f"Invoice {invoice.invoice_number} has payments but no billable "
+                "total; refusing to leave inconsistent accounting."
+            )
+        cancel_journal_entry_for_object(invoice)
         return None
 
     ar_account = get_ar_account(user)

@@ -17,6 +17,13 @@
       <label class="block text-sm font-medium text-slate-700 mb-1">2. Agreement</label>
       {{ form.rental_agreement }}
       <p class="text-xs text-slate-400 mt-1" id="agreement_hint">Select a customer first</p>
+      {% if form.rental_agreement.errors %}<p class="mt-1 text-sm text-red-600">{{ form.rental_agreement.errors.0 }}</p>{% endif %}
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-slate-700 mb-1">3. Invoice (optional)</label>
+      {{ form.invoice }}
+      <p class="mt-1 text-xs text-slate-400" id="invoice_hint">Link this payment to an invoice to reduce its balance. Leave blank for a rent payment without an invoice.</p>
+      {% if form.invoice.errors %}<p class="mt-1 text-sm text-red-600">{{ form.invoice.errors.0 }}</p>{% endif %}
     </div>
     <div>
       <label class="block text-sm font-medium text-slate-700 mb-1">Amount</label>
@@ -77,28 +84,31 @@
 document.addEventListener('DOMContentLoaded', function() {
     const tenantSelect = document.getElementById('id_tenant_select');
     const agreementSelect = document.getElementById('id_rental_agreement');
+    const invoiceSelect = document.getElementById('id_invoice');
     const hint = document.getElementById('agreement_hint');
+    const invoiceHint = document.getElementById('invoice_hint');
+    const invoicesUrl = "{% url 'web-invoices-by-tenant' %}";
     const form = document.getElementById('payment-form');
     const modal = document.getElementById('duplicate-modal');
     let isDuplicate = false;
     let previousTenantValue = tenantSelect ? tenantSelect.value : '';
 
-    if (!tenantSelect || !agreementSelect) return;
+    if (!tenantSelect || !agreementSelect || !invoiceSelect) return;
 
-    function loadAgreements(tenantId) {
+    function loadAgreements(tenantId, selectedAgreementId = '') {
+        agreementSelect.innerHTML = '<option value="">--- Select agreement ---</option>';
         if (!tenantId) {
-            agreementSelect.innerHTML = '';
             hint.textContent = 'Select a customer first';
-            return;
+            return Promise.resolve([]);
         }
         hint.textContent = 'Loading...';
-        fetch(`/api/agreements-by-tenant/?tenant_id=${tenantId}`)
+        return fetch(`/api/agreements-by-tenant/?tenant_id=${tenantId}`)
             .then(r => r.json())
             .then(data => {
-                agreementSelect.innerHTML = '';
+                agreementSelect.innerHTML = '<option value="">--- Select agreement ---</option>';
                 if (data.agreements.length === 0) {
                     hint.textContent = 'No active agreements for this customer';
-                    return;
+                    return data.agreements;
                 }
                 hint.textContent = '';
                 data.agreements.forEach(a => {
@@ -107,8 +117,59 @@ document.addEventListener('DOMContentLoaded', function() {
                     opt.textContent = a.label;
                     agreementSelect.appendChild(opt);
                 });
+
+                if (selectedAgreementId && data.agreements.some(a => String(a.id) === String(selectedAgreementId))) {
+                    agreementSelect.value = selectedAgreementId;
+                } else if (data.agreements.length === 1) {
+                    agreementSelect.value = data.agreements[0].id;
+                }
+                return data.agreements;
             })
-            .catch(() => { hint.textContent = 'Error loading agreements'; });
+            .catch(() => {
+                hint.textContent = 'Error loading agreements';
+                return [];
+            });
+    }
+
+    function loadInvoices(tenantId, agreementId, selectedInvoiceId = '') {
+        invoiceSelect.innerHTML = '<option value="">No invoice</option>';
+        if (!tenantId) {
+            invoiceHint.textContent = 'Choose a customer first';
+            return Promise.resolve([]);
+        }
+
+        invoiceHint.textContent = 'Loading invoices...';
+        const params = new URLSearchParams({tenant_id: tenantId});
+        if (agreementId) params.set('agreement_id', agreementId);
+        if (selectedInvoiceId) params.set('invoice_id', selectedInvoiceId);
+
+        return fetch(`${invoicesUrl}?${params.toString()}`)
+            .then(r => r.json())
+            .then(data => {
+                invoiceSelect.innerHTML = '<option value="">No invoice</option>';
+                data.invoices.forEach(invoice => {
+                    const option = document.createElement('option');
+                    option.value = invoice.id;
+                    option.textContent = invoice.label;
+                    invoiceSelect.appendChild(option);
+                });
+
+                if (selectedInvoiceId && data.invoices.some(invoice => String(invoice.id) === String(selectedInvoiceId))) {
+                    invoiceSelect.value = selectedInvoiceId;
+                }
+                if (data.invoices.length) {
+                    invoiceHint.textContent = 'Link this payment to reduce the selected invoice balance.';
+                } else if (!agreementId) {
+                    invoiceHint.textContent = 'Choose an agreement to see invoices linked to it.';
+                } else {
+                    invoiceHint.textContent = 'No unpaid invoices for this customer and agreement.';
+                }
+                return data.invoices;
+            })
+            .catch(() => {
+                invoiceHint.textContent = 'Could not load invoices.';
+                return [];
+            });
     }
 
     function checkDuplicatePayment(tenantId) {
@@ -131,20 +192,30 @@ document.addEventListener('DOMContentLoaded', function() {
         const selectedValue = this.value;
         isDuplicate = false;
 
-        checkDuplicatePayment(selectedValue).then(paid => {
-            if (paid) {
-                // Don't load agreements yet — wait for user decision
-                return;
-            }
-            previousTenantValue = selectedValue;
-            loadAgreements(selectedValue);
+        loadAgreements(selectedValue).then(() => {
+            loadInvoices(selectedValue, agreementSelect.value);
         });
+        checkDuplicatePayment(selectedValue).then(paid => {
+            if (!paid) previousTenantValue = selectedValue;
+        });
+    });
+
+    agreementSelect.addEventListener('change', function() {
+        loadInvoices(tenantSelect.value, agreementSelect.value);
     });
 
     if (tenantSelect.value) {
         previousTenantValue = tenantSelect.value;
-        loadAgreements(tenantSelect.value);
+        const initialAgreementId = agreementSelect.value;
+        const initialInvoiceId = invoiceSelect.value;
+        loadAgreements(tenantSelect.value, initialAgreementId).then(() => {
+            loadInvoices(tenantSelect.value, agreementSelect.value, initialInvoiceId);
+        });
         checkDuplicatePayment(tenantSelect.value);
+    } else {
+        loadAgreements('');
+        loadInvoices('', '');
+        invoiceHint.textContent = 'Choose a customer first';
     }
 
     form.addEventListener('submit', function(e) {
@@ -159,7 +230,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // Expose reset function for modal cancel
     window.resetTenantSelection = function() {
         tenantSelect.value = previousTenantValue;
-        loadAgreements(previousTenantValue);
+        loadAgreements(previousTenantValue).then(() => {
+            loadInvoices(previousTenantValue, agreementSelect.value);
+        });
     };
 });
 

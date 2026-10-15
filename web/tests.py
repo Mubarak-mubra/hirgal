@@ -4,13 +4,14 @@ from decimal import Decimal
 from unittest.mock import patch
 
 from django.core.exceptions import ValidationError
+from django.db import transaction
 from django.test import TestCase
 from django.urls import reverse
 
 from accounts.models import User
 from accounting.models import Account, Invoice, InvoiceLine, JournalEntry, JournalEntryLine
 from accounting.services import (
-    DEFAULT_COA, get_rental_income_account, link_bank_account_to_ledger,
+    DEFAULT_COA, get_default_cash_account, get_rental_income_account, link_bank_account_to_ledger,
     post_invoice, seed_default_chart_of_accounts,
 )
 from finance.models import BankAccount, Payment, GeneralExpense, MaintenanceRepair
@@ -18,7 +19,7 @@ from properties.models import Property, PropertyAsset, PropertyType, Room, Unit
 from rentals.models import RentalAgreement, Tenant
 
 from .chatbot import explore_financial_summary
-from .forms import InvoiceForm, InvoiceLineFormSet
+from .forms import InvoiceForm, InvoiceLineFormSet, PaymentForm
 
 
 class CheckTenantPaidViewOwnershipTests(TestCase):
@@ -555,6 +556,20 @@ class PaymentSourceLinkOwnershipTests(TestCase):
         self.invoice_b = Invoice.objects.create(
             owner=self.owner_b, tenant=self.tenant_b, invoice_number="INV-2026-9001",
             date=date.today(), due_date=date.today(),
+        )
+        # A payable invoice needs a billable total; payments against a
+        # zero-total invoice are rejected as inconsistent accounting.
+        seed_default_chart_of_accounts(self.owner_a)
+        seed_default_chart_of_accounts(self.owner_b)
+        InvoiceLine.objects.create(
+            invoice=self.invoice_a,
+            account=Account.objects.get(owner=self.owner_a, code="4010"),
+            description="Monthly Rent", amount=Decimal("500.00"),
+        )
+        InvoiceLine.objects.create(
+            invoice=self.invoice_b,
+            account=Account.objects.get(owner=self.owner_b, code="4010"),
+            description="Monthly Rent", amount=Decimal("700.00"),
         )
         self.ar_payment_a = Payment.objects.create(
             rental_agreement=self.agreement_a, amount=Decimal("100.00"),
@@ -3323,19 +3338,132 @@ class InvoiceOrmBypassGuardTests(TestCase):
         self.assertEqual(self.posted_balance(self.exp_a), Decimal("0.00"))
         self.assertEqual(self.posted_balance(self.ar_a), Decimal("1000.00"))
 
-    def test_post_invoice_never_voids_entries_for_paid_invoices(self):
+    def test_post_invoice_rejects_cancelled_invoice_with_payments(self):
         invoice = self.make_invoice()
         self.make_payment(invoice, Decimal("400.00"))
-        # Bulk update bypasses save() and signals entirely; the posting service
-        # itself must still refuse to void accounting behind live payments.
+        # QuerySet.update() bypasses save(), clean(), and every signal; the
+        # posting service itself must refuse this contradictory state instead
+        # of silently leaving a posted invoice JE behind a cancelled invoice.
         Invoice.objects.filter(pk=invoice.pk).update(status="cancelled")
         invoice.refresh_from_db()
 
-        post_invoice(invoice)
+        with self.assertRaises(ValidationError):
+            post_invoice(invoice)
+
+        # Rejection must leave both journal entries untouched and posted.
         invoice.refresh_from_db()
+        self.assertEqual(invoice.journal_entry.status, "posted")
+        payment = invoice.payments.get()
+        self.assertEqual(payment.journal_entry.status, "posted")
+        self.assertEqual(self.posted_balance(self.ar_a), Decimal("600.00"))
+        self.assertEqual(self.posted_balance(self.cash_a), Decimal("400.00"))
+        self.assertEqual(self.posted_balance(self.rev_a), Decimal("-1000.00"))
+
+    def test_post_invoice_rejects_zero_total_invoice_with_payments(self):
+        invoice = self.make_invoice()
+        self.make_payment(invoice, Decimal("400.00"))
+        # Bypass every model and signal guard: remove the line without
+        # validation so the invoice total collapses to zero while cash is held.
+        InvoiceLine.objects.filter(invoice=invoice)._raw_delete("default")
+        invoice.refresh_from_db()
+        self.assertEqual(invoice.get_total_amount(), Decimal("0.00"))
+
+        with self.assertRaises(ValidationError):
+            post_invoice(invoice)
+
+        invoice.refresh_from_db()
+        self.assertEqual(invoice.journal_entry.status, "posted")
+        self.assertEqual(invoice.payments.get().journal_entry.status, "posted")
+        self.assertEqual(self.posted_balance(self.ar_a), Decimal("600.00"))
+        self.assertEqual(self.posted_balance(self.cash_a), Decimal("400.00"))
+        self.assertEqual(self.posted_balance(self.rev_a), Decimal("-1000.00"))
+
+    def test_line_edit_cannot_reduce_total_below_collected_payments(self):
+        invoice = self.make_invoice(amount=Decimal("1000.00"))
+        self.make_payment(invoice, Decimal("400.00"))
+        line = invoice.lines.get()
+
+        line.amount = Decimal("300.00")  # below the 400.00 already collected
+        with self.assertRaises(ValidationError):
+            line.save()
+        line.refresh_from_db()
+        self.assertEqual(line.amount, Decimal("1000.00"))
+        self.assertEqual(invoice.journal_entry.status, "posted")
+        self.assertEqual(self.posted_balance(self.ar_a), Decimal("600.00"))
+        self.assertEqual(self.posted_balance(self.rev_a), Decimal("-1000.00"))
+
+        # Legitimate edits that keep the total at or above collected cash still work.
+        line.amount = Decimal("700.00")
+        line.save()
+        self.assertEqual(self.posted_balance(self.ar_a), Decimal("300.00"))
+        self.assertEqual(self.posted_balance(self.rev_a), Decimal("-700.00"))
+
+    def test_line_deletion_cannot_zero_invoice_with_payments(self):
+        invoice = self.make_invoice()
+        self.make_payment(invoice, Decimal("400.00"))
+        line = invoice.lines.get()
+
+        with self.assertRaises(ValidationError):
+            with transaction.atomic():
+                line.delete()
+
+        self.assertTrue(InvoiceLine.objects.filter(pk=line.pk).exists())
+        invoice.refresh_from_db()
+        self.assertEqual(invoice.get_total_amount(), Decimal("1000.00"))
         self.assertEqual(invoice.journal_entry.status, "posted")
         self.assertEqual(self.posted_balance(self.ar_a), Decimal("600.00"))
         self.assertEqual(self.posted_balance(self.cash_a), Decimal("400.00"))
+
+    def test_update_view_rejects_line_deletion_that_would_zero_paid_invoice(self):
+        invoice = self.make_invoice()
+        self.make_payment(invoice, Decimal("400.00"))
+        line = invoice.lines.get()
+        prefix = InvoiceLineFormSet().prefix
+        self.client.login(username="ormguard_owner_a", password=self.password)
+        payload = {
+            "tenant": invoice.tenant_id,
+            "rental_agreement": "",
+            "invoice_number": invoice.invoice_number,
+            "date": "2026-06-01",
+            "due_date": "2026-06-30",
+            "status": "draft",
+            "notes": "",
+            f"{prefix}-TOTAL_FORMS": "1",
+            f"{prefix}-INITIAL_FORMS": "1",
+            f"{prefix}-MIN_NUM_FORMS": "0",
+            f"{prefix}-MAX_NUM_FORMS": "1000",
+            f"{prefix}-0-id": str(line.pk),
+            f"{prefix}-0-account": str(line.account_id),
+            f"{prefix}-0-description": line.description,
+            f"{prefix}-0-amount": str(line.amount),
+            f"{prefix}-0-DELETE": "on",
+        }
+
+        response = self.client.post(reverse("web-invoice-edit", args=[invoice.pk]), payload)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context["formset"].non_form_errors())
+        self.assertTrue(InvoiceLine.objects.filter(pk=line.pk).exists())
+        invoice.refresh_from_db()
+        self.assertEqual(invoice.get_total_amount(), Decimal("1000.00"))
+        self.assertEqual(invoice.journal_entry.status, "posted")
+        self.assertEqual(self.posted_balance(self.ar_a), Decimal("600.00"))
+        self.assertEqual(self.posted_balance(self.rev_a), Decimal("-1000.00"))
+
+    def test_payment_form_rejects_zero_total_invoice(self):
+        zero_invoice = self.make_invoice(amount=None)
+        self.assertEqual(zero_invoice.get_total_amount(), Decimal("0.00"))
+
+        form = PaymentForm(data={
+            "rental_agreement": str(self.agreement_a.pk),
+            "amount": "100.00",
+            "payment_date": "2026-06-15",
+            "payment_method": "cash",
+            "invoice": str(zero_invoice.pk),
+        }, user=self.owner_a)
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("invoice", form.errors)
 
     def test_direct_valid_line_edit_still_reposts_ledger(self):
         invoice = self.make_invoice(amount=Decimal("1000.00"))
@@ -3344,3 +3472,130 @@ class InvoiceOrmBypassGuardTests(TestCase):
         line.save()
         self.assertEqual(self.posted_balance(self.ar_a), Decimal("500.00"))
         self.assertEqual(self.posted_balance(self.rev_a), Decimal("-500.00"))
+
+    def test_payment_cannot_exceed_invoice_balance_through_form_or_model(self):
+        invoice = self.make_invoice()
+        self.make_payment(invoice, Decimal("800.00"))
+
+        form = PaymentForm(data={
+            "tenant": str(self.tenant_a.pk),
+            "rental_agreement": str(self.agreement_a.pk),
+            "amount": "201.00",
+            "payment_date": "2026-06-15",
+            "payment_method": "cash",
+            "invoice": str(invoice.pk),
+        }, user=self.owner_a)
+        self.assertFalse(form.is_valid())
+        self.assertIn("amount", form.errors)
+
+        with self.assertRaises(ValidationError):
+            Payment.objects.create(
+                rental_agreement=self.agreement_a,
+                invoice=invoice,
+                amount=Decimal("201.00"),
+                payment_date=date(2026, 6, 15),
+            )
+
+    def test_reducing_full_payment_reopens_invoice_and_updates_ledger(self):
+        invoice = self.make_invoice()
+        payment = self.make_payment(invoice, Decimal("1000.00"))
+        invoice.refresh_from_db()
+        self.assertEqual(invoice.status, "paid")
+
+        payment.amount = Decimal("700.00")
+        payment.save()
+
+        invoice.refresh_from_db()
+        self.assertEqual(invoice.status, "sent")
+        self.assertEqual(self.posted_balance(self.ar_a), Decimal("300.00"))
+        self.assertEqual(self.posted_balance(self.cash_a), Decimal("700.00"))
+
+    def test_increasing_paid_invoice_total_reopens_it_and_updates_receivable(self):
+        invoice = self.make_invoice()
+        self.make_payment(invoice, Decimal("1000.00"))
+        line = invoice.lines.get()
+
+        line.amount = Decimal("1200.00")
+        line.save()
+
+        invoice.refresh_from_db()
+        self.assertEqual(invoice.status, "sent")
+        self.assertEqual(self.posted_balance(self.ar_a), Decimal("200.00"))
+        self.assertEqual(self.posted_balance(self.rev_a), Decimal("-1200.00"))
+
+    def test_deleting_full_payment_reopens_invoice_and_restores_receivable(self):
+        invoice = self.make_invoice()
+        payment = self.make_payment(invoice, Decimal("1000.00"))
+        payment.delete()
+
+        invoice.refresh_from_db()
+        self.assertEqual(invoice.status, "sent")
+        self.assertEqual(self.posted_balance(self.ar_a), Decimal("1000.00"))
+        self.assertEqual(self.posted_balance(self.cash_a), Decimal("0.00"))
+
+    def test_moving_payment_reopens_old_invoice_and_settles_new_invoice(self):
+        old_invoice = self.make_invoice()
+        new_invoice = self.make_invoice()
+        payment = self.make_payment(old_invoice, Decimal("1000.00"))
+
+        payment.invoice = new_invoice
+        payment.save()
+
+        old_invoice.refresh_from_db()
+        new_invoice.refresh_from_db()
+        self.assertEqual(old_invoice.status, "sent")
+        self.assertEqual(new_invoice.status, "paid")
+        self.assertEqual(self.posted_balance(self.ar_a), Decimal("1000.00"))
+
+    def test_invoice_cannot_be_marked_paid_without_full_payment(self):
+        invoice = self.make_invoice()
+        invoice.status = "paid"
+
+        with self.assertRaises(ValidationError):
+            invoice.save()
+
+        invoice.refresh_from_db()
+        self.assertEqual(invoice.status, "draft")
+
+    def test_invoice_lookup_returns_only_open_invoice_balances(self):
+        open_invoice = self.make_invoice()
+        paid_invoice = self.make_invoice()
+        self.make_payment(paid_invoice, Decimal("1000.00"))
+        self.client.login(username="ormguard_owner_a", password=self.password)
+
+        response = self.client.get(reverse("web-invoices-by-tenant"), {
+            "tenant_id": self.tenant_a.pk,
+            "agreement_id": self.agreement_a.pk,
+        })
+
+        self.assertEqual(response.status_code, 200)
+        rows = response.json()["invoices"]
+        self.assertEqual([row["id"] for row in rows], [open_invoice.pk])
+        self.assertIn("balance $1000.00", rows[0]["label"])
+
+    def test_payment_create_view_links_invoice_and_posts_only_the_remaining_receivable(self):
+        invoice = self.make_invoice()
+        self.client.login(username="ormguard_owner_a", password=self.password)
+
+        response = self.client.post(reverse("web-payment-create"), {
+            "tenant": str(self.tenant_a.pk),
+            "rental_agreement": str(self.agreement_a.pk),
+            "invoice": str(invoice.pk),
+            "amount": "1000.00",
+            "payment_date": "2026-06-15",
+            "payment_method": "cash",
+            "bank_account": "",
+            "destination_account": "",
+            "reference_number": "PAY-INVOICE-LINK-1",
+            "notes": "",
+        })
+
+        self.assertEqual(response.status_code, 302)
+        payment = Payment.objects.get(invoice=invoice)
+        invoice.refresh_from_db()
+        self.assertEqual(invoice.status, "paid")
+        self.assertEqual(payment.journal_entry.status, "posted")
+        self.assertEqual(self.posted_balance(self.ar_a), Decimal("0.00"))
+        self.assertEqual(self.posted_balance(self.rev_a), Decimal("-1000.00"))
+        cash_on_hand = get_default_cash_account(self.owner_a)
+        self.assertEqual(self.posted_balance(cash_on_hand), Decimal("1000.00"))
