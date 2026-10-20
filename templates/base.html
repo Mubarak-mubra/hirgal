@@ -450,6 +450,7 @@
             .main-content { margin-left: 0; }
         }
     </style>
+    {% block extra_css %}{% endblock %}
 </head>
 <body>
     <div class="app-layout">
@@ -562,5 +563,6 @@
         if (menu && !menu.contains(e.target)) menu.classList.add('hidden');
     });
     </script>
+    {% block extra_js %}{% endblock %}
 </body>
 </html>

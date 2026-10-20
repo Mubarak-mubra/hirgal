@@ -62,7 +62,10 @@ class UserProfileForm(forms.ModelForm):
 class PropertyForm(forms.ModelForm):
     class Meta:
         model = Property
-        fields = ("name", "property_type", "location", "electricity_account_no", "water_account_no", "description")
+        fields = (
+            "name", "property_type", "location", "electricity_account_no", "water_account_no",
+            "description", "cover_image", "is_published",
+        )
         labels = {
             "name": "Property Name",
             "property_type": "Property Type",
@@ -70,6 +73,16 @@ class PropertyForm(forms.ModelForm):
             "description": "Description",
             "electricity_account_no": "Electricity Account No.",
             "water_account_no": "Water Account No.",
+            "cover_image": "Cover Image",
+            "is_published": "Publish to Explore",
+        }
+        help_texts = {
+            "cover_image": "A clear photo shown on Explore and the property page. Required to publish.",
+            "is_published": "Let anyone on the internet find this property on the /explore page.",
+        }
+        widgets = {
+            "cover_image": forms.ClearableFileInput(attrs={"class": FORM_INPUT}),
+            "is_published": forms.CheckboxInput(attrs={"class": "h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"}),
         }
 
     def __init__(self, *args, user=None, **kwargs):
@@ -81,7 +94,20 @@ class PropertyForm(forms.ModelForm):
             self.fields["property_type"].queryset = PropertyType.objects.none()
         self.fields["property_type"].required = True
         _style_fields(self)
+        # Keep the file input / checkbox styling set above (styles are for text inputs).
+        self.fields["cover_image"].widget.attrs["class"] = FORM_INPUT
+        self.fields["is_published"].widget.attrs["class"] = "h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
         self.fields["description"].widget.attrs["rows"] = 4
+
+    def _post_clean(self):
+        """A property may only be live on Explore if it has a cover image.
+
+        Runs after ModelForm rebuilds ``self.instance`` from the submitted data,
+        so it also catches "keep published but clear the photo" edits.
+        """
+        super()._post_clean()
+        if self.instance.is_published and not self.instance.cover_image:
+            self.add_error("cover_image", "Add a cover image before publishing this property to Explore.")
 
 
 class PropertyTypeForm(forms.ModelForm):

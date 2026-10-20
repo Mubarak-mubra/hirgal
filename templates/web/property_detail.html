@@ -3,6 +3,14 @@
 {% block content %}
 <a class="text-sm font-semibold text-indigo-700" href="{% url 'web-properties' %}">← Properties</a>
 
+{% if messages %}
+<div class="mt-4 space-y-2">
+    {% for message in messages %}
+    <p class="rounded-xl px-4 py-3 text-sm font-semibold {% if message.tags == 'error' %}bg-rose-50 text-rose-700{% else %}bg-green-50 text-green-700{% endif %}">{{ message }}</p>
+    {% endfor %}
+</div>
+{% endif %}
+
 <section class="mb-7 mt-4 flex flex-wrap items-end justify-between gap-5">
     <div>
         <h1 class="text-3xl font-bold text-ink">{{ property.name }}</h1>
@@ -19,6 +27,50 @@
         {% else %}
             <a class="rounded-xl bg-ink px-4 py-3 text-sm font-bold text-white shadow-lg shadow-indigo-900/20 hover:bg-indigo-900" href="{% url 'web-unit-create' property.pk %}">+ Add Unit</a>
         {% endif %}
+    </div>
+</section>
+
+<!-- Cover image + Explore publishing -->
+<section class="mb-6 grid gap-4 md:grid-cols-2">
+    <div class="rounded-2xl border bg-white p-3 shadow-sm">
+        {% if property.cover_image %}
+        <img src="{{ property.cover_image.url }}" alt="{{ property.name }}" class="h-56 w-full rounded-xl object-cover">
+        {% else %}
+        <div class="flex h-56 w-full flex-col items-center justify-center gap-1 rounded-xl bg-slate-100 text-center">
+            <p class="text-sm font-semibold text-slate-400">No cover image yet</p>
+            <p class="text-xs text-slate-400">Add one to publish this property.</p>
+        </div>
+        {% endif %}
+    </div>
+    <div class="flex flex-col justify-between rounded-2xl border bg-white p-5 shadow-sm">
+        <div>
+            <div class="flex items-center justify-between gap-3">
+                <p class="text-sm font-semibold text-slate-500">Explore page</p>
+                {% if property.is_published %}
+                <span class="inline-flex items-center gap-1.5 rounded-full bg-green-100 px-3 py-1 text-xs font-bold text-green-700"><span class="h-1.5 w-1.5 rounded-full bg-green-500"></span>Live on Explore</span>
+                {% else %}
+                <span class="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-500">Hidden</span>
+                {% endif %}
+            </div>
+            <p class="mt-2 text-sm text-slate-600">
+                {% if property.is_published %}
+                Anyone on the internet can find this property on the <a class="font-semibold text-indigo-600 hover:underline" href="{% url 'web-explore' %}" target="_blank" rel="noopener">Explore page ↗</a>.
+                {% else %}
+                Publish it so anyone browsing the internet can discover it and contact Hirgal Kiro.
+                {% endif %}
+            </p>
+            {% if not property.cover_image %}
+            <p class="mt-3 rounded-xl bg-amber-50 p-3 text-xs font-semibold text-amber-700">A cover image is required before publishing — properties without a photo can't go live.</p>
+            {% endif %}
+        </div>
+        <div class="mt-4 flex flex-wrap items-center gap-3">
+            <form method="post" action="{% url 'web-property-publish' property.pk %}">{% csrf_token %}
+                <button type="submit" class="rounded-xl px-4 py-2.5 text-sm font-bold transition {% if property.is_published %}bg-slate-200 text-slate-700 hover:bg-slate-300{% elif property.cover_image %}bg-green-600 text-white hover:bg-green-700{% else %}cursor-not-allowed bg-slate-100 text-slate-400{% endif %}" {% if not property.is_published and not property.cover_image %}disabled{% endif %}>
+                    {% if property.is_published %}Unpublish{% else %}Publish to Explore{% endif %}
+                </button>
+            </form>
+            <a href="{% url 'web-property-edit' property.pk %}" class="rounded-xl border px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50">{% if property.cover_image %}Edit photo &amp; details{% else %}Add cover image{% endif %}</a>
+        </div>
     </div>
 </section>
 

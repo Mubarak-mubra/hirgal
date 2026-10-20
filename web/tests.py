@@ -1,13 +1,15 @@
 import json
+import tempfile
 from datetime import date
 from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 from django.core.exceptions import ValidationError
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import transaction
 from django.db.models import Sum
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from accounts.models import User
@@ -21,7 +23,7 @@ from properties.models import Property, PropertyAsset, PropertyType, Room, Unit
 from rentals.models import RentalAgreement, Tenant
 
 from .chatbot import ask_ai, explore_financial_summary
-from .forms import InvoiceForm, InvoiceLineFormSet, JournalEntryLineFormSet, PaymentForm
+from .forms import InvoiceForm, InvoiceLineFormSet, JournalEntryLineFormSet, PaymentForm, PropertyForm
 
 
 class CheckTenantPaidViewOwnershipTests(TestCase):
@@ -3750,3 +3752,158 @@ class ChatbotSdkIntegrationTests(TestCase):
         self.assertEqual(second_contents[-1].parts[0].function_response.id, "call-1")
         self.assertEqual(second_contents[-1].parts[0].function_response.response, {"result": "[]"})
         client.close.assert_called_once()
+
+
+@override_settings(MEDIA_ROOT=tempfile.mkdtemp(prefix="hirgal_explore_media_"))
+class ExplorePublicationTests(TestCase):
+    """The public /explore page only shows properties their owners published,
+    and a property can never be published without a cover image."""
+
+    password = "ExplorePass123!"
+    GIF = (
+        b"GIF89a\x01\x00\x01\x00\x80\x00\x00\x00\x00\x00\xff\xff\xff!\xf9\x04"
+        b"\x01\x00\x00\x00\x00,\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x02D\x01\x00;"
+    )
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create_user(
+            "explore_owner", "+252617000191", cls.password, full_name="Explore Owner", is_approved=True,
+        )
+        cls.other_owner = User.objects.create_user(
+            "explore_other", "+252617000192", cls.password, full_name="Other Owner", is_approved=True,
+        )
+        cls.ptype = PropertyType.objects.create(owner=cls.owner, name="Villa")
+        cls.published = Property.objects.create(
+            owner=cls.owner, name="Published Villa", location="Mogadishu", property_type=cls.ptype,
+            cover_image=SimpleUploadedFile("published.gif", cls.GIF, "image/gif"), is_published=True,
+        )
+        # Published flag on, but no photo — must stay invisible to visitors.
+        cls.imageless_published = Property.objects.create(
+            owner=cls.owner, name="Imageless House", location="Baidoa", is_published=True,
+        )
+        # Has a photo, but owner never published it.
+        cls.unpublished = Property.objects.create(
+            owner=cls.owner, name="Hidden House", location="Hargeisa",
+            cover_image=SimpleUploadedFile("hidden.gif", cls.GIF, "image/gif"), is_published=False,
+        )
+        # Published with no photo and not live yet — cannot go live.
+        cls.no_image_hidden = Property.objects.create(
+            owner=cls.owner, name="No Photo House", location="Mogadishu", is_published=False,
+        )
+        # Another owner's listing still shows: Explore is public across owners.
+        cls.other_published = Property.objects.create(
+            owner=cls.other_owner, name="Other Villa", location="Kismayo",
+            cover_image=SimpleUploadedFile("other.gif", cls.GIF, "image/gif"), is_published=True,
+        )
+
+    @staticmethod
+    def _upload(name="cover.gif"):
+        return SimpleUploadedFile(name, ExplorePublicationTests.GIF, "image/gif")
+
+    @staticmethod
+    def _listed(response):
+        return [prop.name for prop in response.context["properties"]]
+
+    # ── /explore visibility ──────────────────────────────────────────────────
+
+    def test_explore_is_public_and_lists_only_published_with_image(self):
+        response = self.client.get(reverse("web-explore"))  # anonymous, no login
+        self.assertEqual(response.status_code, 200)
+        names = self._listed(response)
+        self.assertIn("Published Villa", names)
+        self.assertIn("Other Villa", names)
+        self.assertNotIn("Imageless House", names)  # published but photo-less
+        self.assertNotIn("Hidden House", names)      # owner never published
+        self.assertContains(response, "Published Villa")
+        self.assertNotContains(response, "Hidden House")
+
+    def test_explore_search_filters_by_name_or_location(self):
+        response = self.client.get(reverse("web-explore"), {"q": "Kismayo"})
+        self.assertEqual(self._listed(response), ["Other Villa"])
+        response = self.client.get(reverse("web-explore"), {"q": "nothing-matches-this"})
+        self.assertEqual(self._listed(response), [])
+
+    def test_explore_lists_cheapest_rent_when_spaces_have_one(self):
+        unit = Unit.objects.create(property=self.published, unit_number="1A", monthly_rent=Decimal("250.00"))
+        Room.objects.create(unit=unit, room_name="Bed 1", monthly_rent=Decimal("90.00"))
+        response = self.client.get(reverse("web-explore"))
+        prop = next(p for p in response.context["properties"] if p.pk == self.published.pk)
+        self.assertEqual(prop.min_rent, Decimal("90.00"))
+
+    # ── Publishing always needs an image ─────────────────────────────────────
+
+    def test_form_rejects_publishing_without_image(self):
+        form = PropertyForm(
+            {"name": "No Photo", "property_type": self.ptype.pk, "location": "Mogadishu", "is_published": "on"},
+            user=self.owner,
+        )
+        self.assertFalse(form.is_valid())
+        self.assertIn("cover_image", form.errors)
+        self.assertIn("cover image", " ".join(form.errors["cover_image"]))
+
+    def test_form_accepts_publishing_with_newly_uploaded_image(self):
+        form = PropertyForm(
+            {
+                "name": "With Photo", "property_type": self.ptype.pk, "location": "Mogadishu",
+                "is_published": "on",
+            },
+            files={"cover_image": self._upload()}, user=self.owner,
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_form_accepts_publish_when_image_already_on_record(self):
+        form = PropertyForm(
+            {"name": self.unpublished.name, "property_type": self.ptype.pk, "location": "Hargeisa", "is_published": "on"},
+            instance=self.unpublished, user=self.owner,
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_form_saves_unpublished_property_without_image(self):
+        form = PropertyForm(
+            {"name": "Draft Listing", "property_type": self.ptype.pk, "location": "Mogadishu"},
+            user=self.owner,
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_create_view_uploads_cover_and_publishes(self):
+        self.client.force_login(self.owner)
+        response = self.client.post(
+            reverse("web-property-create"),
+            {
+                "name": "Fresh Listing", "property_type": self.ptype.pk, "location": "Mogadishu",
+                "description": "Two bedrooms", "cover_image": self._upload("fresh.gif"), "is_published": "on",
+            },
+        )
+        prop = Property.objects.get(name="Fresh Listing")
+        self.assertRedirects(response, reverse("web-property-detail", args=[prop.pk]))
+        self.assertTrue(prop.is_published)
+        self.assertTrue(prop.cover_image.name)
+        # And it is now visible to the public.
+        self.assertIn("Fresh Listing", self._listed(self.client.get(reverse("web-explore"))))
+
+    def test_publish_toggle_refuses_property_without_image(self):
+        self.client.force_login(self.owner)
+        response = self.client.post(
+            reverse("web-property-publish", args=[self.no_image_hidden.pk]), follow=True,
+        )
+        self.no_image_hidden.refresh_from_db()
+        self.assertFalse(self.no_image_hidden.is_published)
+        self.assertContains(response, "Add a cover image before publishing")
+
+    def test_publish_toggle_publishes_then_unpublishes(self):
+        self.client.force_login(self.owner)
+        self.client.post(reverse("web-property-publish", args=[self.unpublished.pk]))
+        self.unpublished.refresh_from_db()
+        self.assertTrue(self.unpublished.is_published)
+
+        self.client.post(reverse("web-property-publish", args=[self.unpublished.pk]))
+        self.unpublished.refresh_from_db()
+        self.assertFalse(self.unpublished.is_published)
+
+    def test_publish_toggle_requires_owner(self):
+        self.client.force_login(self.other_owner)
+        response = self.client.post(reverse("web-property-publish", args=[self.unpublished.pk]))
+        self.assertEqual(response.status_code, 404)
+        self.unpublished.refresh_from_db()
+        self.assertFalse(self.unpublished.is_published)

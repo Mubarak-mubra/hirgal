@@ -47,11 +47,20 @@ class Property(models.Model):
     water_account_no = models.CharField("Water account no.", max_length=50, blank=True)
     cover_image = models.ImageField(upload_to="property_covers/", null=True, blank=True)
     description = models.TextField(blank=True)
+    is_published = models.BooleanField(
+        "Published to Explore",
+        default=False,
+        help_text="Show this property on the public /explore page. Publishing requires a cover image.",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return self.name
+
+    @property
+    def has_cover_image(self):
+        return bool(self.cover_image)
 
     @property
     def has_units(self):

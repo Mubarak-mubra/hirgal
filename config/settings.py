@@ -112,3 +112,10 @@ STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = BASE_DIR / "staticfiles"
 MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"
+
+
+# Public Explore page — how visitors contact Hirgal Kiro
+# (update these to your real company details)
+HIRGAL_CONTACT_PHONE = "+252 61 000 0000"
+HIRGAL_CONTACT_EMAIL = "info@hirgal.com"
+HIRGAL_CONTACT_ADDRESS = "Mogadishu, Somalia"

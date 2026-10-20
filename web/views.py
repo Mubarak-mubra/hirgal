@@ -8,9 +8,10 @@ from django.views import View
 from django.views.generic import DetailView, TemplateView, ListView
 
 from django.db import transaction
-from django.db.models import Count, ProtectedError, Q, Sum
+from django.db.models import Count, Min, ProtectedError, Q, Sum
 from datetime import date
 from django.utils import timezone
+from django.conf import settings
 from accounting.models import Account, Invoice, InvoiceLine, JournalEntry, JournalEntryLine
 from accounting.services import (
     generate_monthly_rent_invoices, link_bank_account_to_ledger, post_expense, post_payment, post_repair,
@@ -58,6 +59,14 @@ class DashboardView(LoginRequiredMixin, TemplateView):
 
         context["payment_count"] = all_payments.count()
         context["total_revenue"] = sum(p.amount for p in all_payments)
+
+        # This-month revenue (the revenue KPI's default view; the card flips
+        # to the all-time total_revenue above).
+        month_payments = all_payments.filter(
+            payment_date__gte=first_day_of_month, payment_date__lte=today
+        )
+        context["revenue_this_month"] = month_payments.aggregate(t=Sum("amount"))["t"] or 0
+        context["payment_count_this_month"] = month_payments.count()
         context["expense_total"] = sum(e.amount for e in all_expenses)
         context["repair_total"] = sum(r.repair_cost for r in all_repairs)
         # Net income: posted revenue minus posted expenses (accounting source
@@ -385,7 +394,7 @@ class PropertyListView(HomeView):
         return context
 
     def post(self, request):
-        form = PropertyForm(request.POST, user=request.user.get_data_owner())
+        form = PropertyForm(request.POST, request.FILES, user=request.user.get_data_owner())
         if form.is_valid():
             property_instance = form.save(commit=False)
             property_instance.owner = request.user.get_data_owner()
@@ -403,7 +412,7 @@ class PropertyCreateView(HomeView):
         return context
 
     def post(self, request):
-        form = PropertyForm(request.POST, user=request.user.get_data_owner())
+        form = PropertyForm(request.POST, request.FILES, user=request.user.get_data_owner())
         if form.is_valid():
             property_instance = form.save(commit=False)
             property_instance.owner = request.user.get_data_owner()
@@ -471,7 +480,7 @@ class PropertyUpdateView(LoginRequiredMixin, View):
 
     def post(self, request, pk):
         property_instance = get_object_or_404(Property, pk=pk, owner=request.user.get_data_owner())
-        form = PropertyForm(request.POST, instance=property_instance, user=request.user.get_data_owner())
+        form = PropertyForm(request.POST, request.FILES, instance=property_instance, user=request.user.get_data_owner())
         if form.is_valid():
             form.save()
             return redirect("web-property-detail", pk)
@@ -489,6 +498,63 @@ class PropertyDeleteView(LoginRequiredMixin, View):
         property_instance = get_object_or_404(Property, pk=pk, owner=request.user.get_data_owner())
         property_instance.delete()
         return redirect("web-properties")
+
+
+class PropertyPublishToggleView(LoginRequiredMixin, View):
+    """Publish / unpublish a property on the public Explore page.
+
+    Publishing is refused when the property has no cover image.
+    """
+    login_url = "/login/"
+
+    def post(self, request, pk):
+        property_instance = get_object_or_404(Property, pk=pk, owner=request.user.get_data_owner())
+        if property_instance.is_published:
+            property_instance.is_published = False
+            property_instance.save(update_fields=["is_published", "updated_at"])
+            messages.success(request, 'Hidden from Explore: "%s".' % property_instance.name)
+        elif not property_instance.cover_image:
+            messages.error(request, "Add a cover image before publishing this property to Explore.")
+        else:
+            property_instance.is_published = True
+            property_instance.save(update_fields=["is_published", "updated_at"])
+            messages.success(request, 'Now live on Explore: "%s".' % property_instance.name)
+        return redirect("web-property-detail", pk)
+
+
+class ExploreView(TemplateView):
+    """Public, no-login page where anyone on the internet can browse the
+    properties owners chose to publish and contact Hirgal Kiro."""
+    template_name = "web/explore.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        query = (self.request.GET.get("q") or "").strip()
+        properties = (
+            Property.objects.filter(is_published=True, cover_image__isnull=False)
+            .exclude(cover_image="")  # imageless rows store '' not NULL
+            .select_related("property_type")
+            .annotate(
+                unit_rent=Min("units__monthly_rent", filter=Q(units__monthly_rent__gt=0)),
+                room_rent=Min("units__rooms__monthly_rent", filter=Q(units__rooms__monthly_rent__gt=0)),
+            )
+            .order_by("-updated_at")
+        )
+        if query:
+            properties = properties.filter(
+                Q(name__icontains=query) | Q(location__icontains=query) | Q(description__icontains=query)
+            )
+        for prop in properties:
+            rents = [rent for rent in (prop.unit_rent, prop.room_rent) if rent]
+            prop.min_rent = min(rents) if rents else None
+        context["properties"] = properties
+        context["query"] = query
+        context["contact"] = {
+            "phone": getattr(settings, "HIRGAL_CONTACT_PHONE", ""),
+            "email": getattr(settings, "HIRGAL_CONTACT_EMAIL", ""),
+            "address": getattr(settings, "HIRGAL_CONTACT_ADDRESS", ""),
+        }
+        return context
 
 
 # ── Property Types ────────────────────────────────────────────────────────────

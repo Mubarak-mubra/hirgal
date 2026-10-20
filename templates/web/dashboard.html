@@ -10,10 +10,33 @@
 
 {# ── Top Financial Stats ───────────────────────────────────────────────────── #}
 <section class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-8">
-    <div class="rounded-2xl bg-ink p-5 text-white">
-        <p class="text-indigo-200 text-sm">Total Revenue</p>
-        <strong class="mt-2 block text-3xl">${{ total_revenue|floatformat:0 }}</strong>
-        <p class="mt-1 text-xs text-indigo-300">From {{ payment_count }} payment{{ payment_count|pluralize }}</p>
+    {# Revenue KPI — front: this month, back (click to flip): all-time #}
+    <div id="revenueCard" class="flip-card h-full rounded-2xl" role="button" tabindex="0"
+         aria-pressed="false" title="Click to flip: this month ↔ all-time revenue"
+         onclick="toggleRevenueFlip()"
+         onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleRevenueFlip();}">
+        <div class="flip-card-inner h-full rounded-2xl">
+            {# Front — Revenue this month #}
+            <div class="flip-card-front rounded-2xl bg-ink p-5 text-white">
+                <div class="flex items-start justify-between gap-2">
+                    <p class="text-indigo-200 text-sm">Revenue — This Month</p>
+                    <span class="flip-hint" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-3.5 w-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" /></svg></span>
+                </div>
+                <strong class="mt-2 block text-3xl">${{ revenue_this_month|floatformat:0 }}</strong>
+                <p class="mt-1 text-xs text-indigo-300">{{ payment_count_this_month }} payment{{ payment_count_this_month|pluralize }} · {% now "F Y" %}</p>
+                <p class="mt-3 text-[10px] font-bold uppercase tracking-widest text-indigo-400">Click to see all-time</p>
+            </div>
+            {# Back — All-time revenue #}
+            <div class="flip-card-back rounded-2xl bg-gradient-to-br from-indigo-700 to-ink p-5 text-white">
+                <div class="flex items-start justify-between gap-2">
+                    <p class="text-indigo-200 text-sm">Total Revenue — All-Time</p>
+                    <span class="flip-hint" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-3.5 w-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" /></svg></span>
+                </div>
+                <strong class="mt-2 block text-3xl">${{ total_revenue|floatformat:0 }}</strong>
+                <p class="mt-1 text-xs text-indigo-300">From {{ payment_count }} payment{{ payment_count|pluralize }} since start</p>
+                <p class="mt-3 text-[10px] font-bold uppercase tracking-widest text-indigo-400">Click to see this month</p>
+            </div>
+        </div>
     </div>
     <div class="rounded-2xl border bg-white p-5">
         <p class="text-slate-500 text-sm">Total Expenses</p>
@@ -285,4 +308,67 @@
     </section>
 </div>
 
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ── Revenue KPI flip card ── */
+    .flip-card {
+        perspective: 1000px;
+        cursor: pointer;
+    }
+    .flip-card:focus-visible {
+        outline: 3px solid #6366f1;
+        outline-offset: 2px;
+    }
+    .flip-card-inner {
+        position: relative;
+        transition: transform 0.6s cubic-bezier(0.4, 0.2, 0.2, 1);
+        transform-style: preserve-3d;
+    }
+    .flip-card.flipped .flip-card-inner {
+        transform: rotateY(180deg);
+    }
+    .flip-card-front {
+        position: relative;
+        backface-visibility: hidden;
+        -webkit-backface-visibility: hidden;
+    }
+    .flip-card-back {
+        position: absolute;
+        inset: 0;
+        transform: rotateY(180deg);
+        backface-visibility: hidden;
+        -webkit-backface-visibility: hidden;
+    }
+    .flip-hint {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 20px;
+        height: 20px;
+        flex-shrink: 0;
+        border-radius: 9999px;
+        background: rgba(255, 255, 255, 0.12);
+        color: #c7d2fe;
+        transition: transform 0.6s;
+    }
+    .flip-card.flipped .flip-hint {
+        transform: rotate(360deg);
+    }
+    @media (prefers-reduced-motion: reduce) {
+        .flip-card-inner, .flip-hint { transition: none; }
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function toggleRevenueFlip() {
+        var card = document.getElementById('revenueCard');
+        if (!card) return;
+        var flipped = card.classList.toggle('flipped');
+        card.setAttribute('aria-pressed', flipped ? 'true' : 'false');
+    }
+</script>
 {% endblock %}
