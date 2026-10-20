@@ -1,7 +1,30 @@
-{% extends "base.html" %}
+{% extends "web/public_base.html" %}
 {% load static %}
-{% block title %}Explore Properties - Hirgal Kiro{% endblock %}
-{% block content %}
+{% block title %}Properties for Rent in Mogadishu — Hirgal Kiro{% endblock %}
+{% block meta_description %}Browse homes, apartments and shops for rent in Mogadishu, Somalia. Compare rents and locations, then contact Hirgal Kiro to book a viewing.{% endblock %}
+{% block canonical %}{{ request.build_absolute_uri }}{% endblock %}
+
+{% block extra_head %}
+{# Structured data: helps search engines understand these are rental listings #}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "RealEstateAgent",
+  "name": "Hirgal Kiro",
+  "description": "Rent and property management in Mogadishu, Somalia.",
+  "address": {
+    "@type": "PostalAddress",
+    "addressLocality": "{% if contact.address %}{{ contact.address }}{% else %}Mogadishu{% endif %}",
+    "addressCountry": "SO"
+  },
+  {% if contact.phone %}"telephone": "{{ contact.phone }}",
+  {% endif %}{% if contact.email %}"email": "{{ contact.email }}",
+  {% endif %}"areaServed": "Mogadishu, Somalia"
+}
+</script>
+{% endblock %}
+
+{% block page_content %}
 
 {# ── Hero ─────────────────────────────────────────────────────────────────── #}
 <section class="rounded-3xl bg-ink p-7 text-white md:p-10">

@@ -1,0 +1,29 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Hirgal Kiro — Properties for Rent in Mogadishu{% endblock %}</title>
+    <meta name="description" content="{% block meta_description %}Browse homes, apartments and shops for rent in Mogadishu, Somalia. Find your next rental with Hirgal Kiro and contact us to book a viewing.{% endblock %}">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="{% block canonical %}{% endblock %}">
+
+    {# Open Graph — how the page looks when shared on social / WhatsApp #}
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Hirgal Kiro">
+    <meta property="og:title" content="{% block og_title %}Hirgal Kiro — Properties for Rent in Mogadishu{% endblock %}">
+    <meta property="og:description" content="{% block og_description %}Browse homes, apartments and shops for rent in Mogadishu. Contact Hirgal Kiro to book a viewing.{% endblock %}">
+    <meta property="og:image" content="{% block og_image %}{% static 'logoHirgal.png' %}{% endblock %}">
+    <meta name="twitter:card" content="summary">
+
+    <link rel="icon" type="image/png" href="{% static 'logoHirgal.png' %}">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>tailwind.config = { theme: { extend: { colors: { ink: '#10194f' } } } }</script>
+    {% block extra_head %}{% endblock %}
+</head>
+<body class="bg-slate-50 text-slate-900">
+    {% block page_content %}{% endblock %}
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

@@ -1,7 +1,8 @@
 from django.contrib import messages
 from django.contrib.auth import get_user_model, login, logout
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.http import Http404, JsonResponse
+from django.http import Http404, HttpResponse, JsonResponse
+from django.utils.html import escape
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views import View
@@ -555,6 +556,55 @@ class ExploreView(TemplateView):
             "address": getattr(settings, "HIRGAL_CONTACT_ADDRESS", ""),
         }
         return context
+
+
+class RobotsTxtView(View):
+    """Public crawler guide. Everything private (the management app) stays
+    disallowed; the Explore listing page is the only indexable surface."""
+
+    def get(self, request):
+        sitemap_url = request.build_absolute_uri(reverse("web-sitemap"))
+        content = (
+            "User-agent: *\n"
+            "Disallow: /admin/\n"
+            "Disallow: /profile/\n"
+            "Disallow: /dashboard/\n"
+            "\n"
+            f"Sitemap: {sitemap_url}\n"
+        )
+        return HttpResponse(content, content_type="text/plain")
+
+
+class SitemapXmlView(View):
+    """Sitemap of public pages. Only published Explore content is listed —
+    no authenticated page is ever exposed to crawlers."""
+
+    def get(self, request):
+        base_uri = request.build_absolute_uri("/").rstrip("/")
+        explore_uri = request.build_absolute_uri(reverse("web-explore"))
+        last_modified = (
+            Property.objects.filter(is_published=True)
+            .order_by("-updated_at")
+            .values_list("updated_at", flat=True)
+            .first()
+        )
+        modified = (
+            last_modified.strftime("%Y-%m-%d")
+            if last_modified
+            else timezone.localdate().strftime("%Y-%m-%d")
+        )
+        lines = [
+            '<?xml version="1.0" encoding="UTF-8"?>',
+            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+            "  <url>",
+            f"    <loc>{escape(explore_uri)}</loc>",
+            f"    <lastmod>{modified}</lastmod>",
+            "    <changefreq>weekly</changefreq>",
+            "    <priority>1.0</priority>",
+            "  </url>",
+            "</urlset>",
+        ]
+        return HttpResponse("\n".join(lines), content_type="application/xml")
 
 
 # ── Property Types ────────────────────────────────────────────────────────────
@@ -1556,11 +1606,15 @@ class InvoiceDetailView(LoginRequiredMixin, DetailView):
 
 
 class InvoiceSendView(LoginRequiredMixin, View):
-    """Mark a draft invoice as sent and open WhatsApp with the invoice message."""
+    """Mark a draft invoice as sent and open WhatsApp with the invoice message.
+
+    POST-only: marking an invoice sent posts its receivable to the ledger, so
+    it must never happen as a side effect of a GET (link scanners, prefetch).
+    """
 
     login_url = "/login/"
 
-    def get(self, request, pk):
+    def post(self, request, pk):
         import re as _re
         from urllib.parse import urlencode
 

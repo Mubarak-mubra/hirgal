@@ -20,7 +20,7 @@ from .views import (
     PropertyTypeCreateView,
     PropertyTypeDeleteView, PropertyTypeListView, PropertyTypeUpdateView,
     PropertyUpdateView,
-    ExploreView,
+    ExploreView, RobotsTxtView, SitemapXmlView,
     RegisterView, RentalAgreementCreateView, RentalAgreementDeleteView,
     RentalAgreementListView, RentalAgreementUpdateView,
     RoomCreateView, RoomDeleteView, RoomUpdateView, TenantCreateView,
@@ -53,6 +53,9 @@ urlpatterns = [
 
     # Properties
     path("explore/", ExploreView.as_view(), name="web-explore"),
+    # Public crawler files for the Explore page
+    path("robots.txt", RobotsTxtView.as_view(), name="web-robots"),
+    path("sitemap.xml", SitemapXmlView.as_view(), name="web-sitemap"),
     path("guryaha/", PropertyListView.as_view(), name="web-properties"),
     path("guryaha/new/", PropertyCreateView.as_view(), name="web-property-create"),
     path("guryaha/<int:pk>/", PropertyDetailView.as_view(), name="web-property-detail"),

@@ -3907,3 +3907,171 @@ class ExplorePublicationTests(TestCase):
         self.assertEqual(response.status_code, 404)
         self.unpublished.refresh_from_db()
         self.assertFalse(self.unpublished.is_published)
+
+
+class PublicExploreChromeTests(TestCase):
+    """The Explore page is a public marketing page. It must look the same to a
+    search engine, a prospective tenant, and a logged-in owner — never the
+    management sidebar."""
+
+    password = "ExplorePass123!"
+
+    def setUp(self):
+        self.owner = User.objects.create_user(
+            "chrome_owner", "+252617000291", self.password, full_name="Chrome Owner", is_approved=True,
+        )
+
+    def test_explore_renders_without_app_chrome_for_anonymous(self):
+        response = self.client.get(reverse("web-explore"))
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "web/public_base.html")
+        self.assertTemplateNotUsed(response, "base.html")
+        self.assertNotContains(response, 'class="sidebar"')
+        self.assertNotContains(response, "sidebar-overlay")
+
+    def test_explore_renders_without_app_chrome_for_logged_in_owner(self):
+        self.client.force_login(self.owner)
+        response = self.client.get(reverse("web-explore"))
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "web/public_base.html")
+        self.assertTemplateNotUsed(response, "base.html")
+        self.assertNotContains(response, 'class="sidebar"')
+        self.assertNotContains(response, "sidebar-overlay")
+
+    def test_explore_is_indexable_and_declares_canonical(self):
+        response = self.client.get(reverse("web-explore"))
+        self.assertContains(response, 'name="robots" content="index, follow"')
+        self.assertContains(response, "rel=\"canonical\"")
+        self.assertContains(response, "application/ld+json")
+
+
+class PublicCrawlerFilesTests(TestCase):
+    """robots.txt and sitemap.xml must be reachable without login and must point
+    crawlers at the public Explore page only."""
+
+    def test_robots_txt_is_public_and_references_sitemap(self):
+        response = self.client.get(reverse("web-robots"))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "text/plain")
+        self.assertIn("User-agent: *", response.content.decode())
+        self.assertIn(reverse("web-sitemap"), response.content.decode())
+        self.assertIn("Disallow: /admin/", response.content.decode())
+
+    def test_robots_txt_does_not_disallow_explore(self):
+        response = self.client.get(reverse("web-robots"))
+        lines = response.content.decode().splitlines()
+        disallowed = [line.split(": ", 1)[1] for line in lines if line.startswith("Disallow:")]
+        self.assertNotIn(reverse("web-explore"), disallowed)
+
+    def test_sitemap_is_public_lists_explore_and_no_private_pages(self):
+        response = self.client.get(reverse("web-sitemap"))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "application/xml")
+        body = response.content.decode()
+        self.assertIn(reverse("web-explore"), body)
+        self.assertIn("<lastmod>", body)
+        for private in ("/dashboard/", "/admin/", reverse("web-properties")):
+            self.assertNotIn(private, body)
+
+
+class InvoiceSendIsPostOnlyTests(TestCase):
+    """Sending an invoice marks it issued and posts its receivable to the
+    ledger, so it must never happen as a side effect of a GET (link scanners,
+    prefetch, crawlers)."""
+
+    password = "SendPass123!"
+
+    def setUp(self):
+        self.owner = User.objects.create_user(
+            "send_owner", "+252617000391", self.password, full_name="Send Owner", is_approved=True,
+        )
+        seed_default_chart_of_accounts(self.owner)
+        self.prop = Property.objects.create(owner=self.owner, name="Send Villa", location="Mogadishu")
+        self.tenant = Tenant.objects.create(owner=self.owner, full_name="Send Customer")
+        self.agreement = RentalAgreement.objects.create(
+            tenant=self.tenant, property=self.prop, start_date=date(2026, 1, 1),
+            monthly_rent=Decimal("500.00"), status="active",
+        )
+        self.invoice = Invoice.objects.create(
+            owner=self.owner, tenant=self.tenant, rental_agreement=self.agreement,
+            property=self.prop, invoice_number="SEND-001",
+            date=date(2026, 6, 1), due_date=date(2026, 6, 7), status="draft",
+        )
+        self.income = Account.objects.get(owner=self.owner, code="4010")
+        InvoiceLine.objects.create(
+            invoice=self.invoice, account=self.income, description="Monthly Rent",
+            amount=Decimal("500.00"),
+        )
+        self.ar = Account.objects.get(owner=self.owner, code="1200")
+        self.client.force_login(self.owner)
+
+    def test_get_does_not_send_or_post(self):
+        response = self.client.get(reverse("web-invoice-send", args=[self.invoice.pk]))
+        self.assertEqual(response.status_code, 405)
+        self.invoice.refresh_from_db()
+        self.assertEqual(self.invoice.status, "draft")
+        self.assertIsNone(self.invoice.journal_entry_id)
+
+    def test_post_sends_and_posts_receivable(self):
+        response = self.client.post(reverse("web-invoice-send", args=[self.invoice.pk]))
+        self.assertEqual(response.status_code, 302)
+        self.invoice.refresh_from_db()
+        self.assertEqual(self.invoice.status, "sent")
+        self.assertIsNotNone(self.invoice.journal_entry_id)
+        posted = sum(
+            line.debit - line.credit
+            for line in JournalEntryLine.objects.filter(
+                account=self.ar, journal_entry__status="posted"
+            )
+        )
+        self.assertEqual(posted, Decimal("500.00"))
+
+
+class JournalEntryLineModelGuardTests(TestCase):
+    """The web formset validates journal lines, but the Django admin and direct
+    ORM writes bypass forms. The model must reject a line that would corrupt
+    balances: a negative amount, or a debit and credit on the same line."""
+
+    password = "LineGuardPass123!"
+
+    def setUp(self):
+        self.owner = User.objects.create_user(
+            "line_owner", "+252617000491", self.password, full_name="Line Owner", is_approved=True,
+        )
+        self.cash = get_default_cash_account(self.owner)
+        self.income = get_rental_income_account(self.owner)
+        self.entry = JournalEntry.objects.create(
+            owner=self.owner, date=date(2026, 6, 1), reference="GUARD-1",
+            description="Guard entry", status="posted",
+        )
+
+    def _line(self, **overrides):
+        data = {
+            "journal_entry": self.entry,
+            "account": self.cash,
+            "description": "Guard line",
+            "debit": Decimal("0"),
+            "credit": Decimal("0"),
+        }
+        data.update(overrides)
+        return JournalEntryLine.objects.create(**data)
+
+    def test_negative_debit_is_rejected(self):
+        with self.assertRaises(ValidationError):
+            self._line(debit=Decimal("-100.00"))
+        self.assertFalse(JournalEntryLine.objects.filter(debit__lt=0).exists())
+
+    def test_negative_credit_is_rejected(self):
+        with self.assertRaises(ValidationError):
+            self._line(credit=Decimal("-100.00"))
+        self.assertFalse(JournalEntryLine.objects.filter(credit__lt=0).exists())
+
+    def test_line_with_both_debit_and_credit_is_rejected(self):
+        with self.assertRaises(ValidationError):
+            self._line(debit=Decimal("100.00"), credit=Decimal("100.00"), account=self.income)
+
+    def test_valid_single_sided_line_is_saved(self):
+        line = self._line(debit=Decimal("250.00"))
+        self.assertIsNotNone(line.pk)
+        line.refresh_from_db()
+        self.assertEqual(line.debit, Decimal("250.00"))

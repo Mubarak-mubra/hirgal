@@ -103,6 +103,30 @@ class JournalEntryLine(models.Model):
     # Optional link to property for Property-level Profit & Loss reporting
     property = models.ForeignKey(Property, on_delete=models.SET_NULL, null=True, blank=True, related_name='journal_lines')
 
+    def clean(self):
+        """A line is either a debit or a credit, never negative and never both.
+
+        The journal-entry formset already enforces this for browser input, but
+        the Django admin and direct ORM writes bypass forms entirely. Validating
+        here keeps every path from writing a line that would corrupt balances.
+        """
+        super().clean()
+        errors = {}
+        if self.debit is not None and self.debit < 0:
+            errors["debit"] = "Debit must be zero or greater."
+        if self.credit is not None and self.credit < 0:
+            errors["credit"] = "Credit must be zero or greater."
+        if not errors and self.debit and self.credit:
+            errors["credit"] = "A journal line cannot have both a debit and a credit."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        # save() never runs full_clean(); validate here so the admin and any
+        # direct ORM write are held to the same rules as the web forms.
+        self.full_clean()
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return f"{self.account.name}: Dr {self.debit} | Cr {self.credit}"
 
