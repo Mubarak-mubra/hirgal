@@ -1,3 +1,4 @@
+import re
 from decimal import Decimal
 
 from django import forms
@@ -7,7 +8,9 @@ from django.utils import timezone
 
 from accounting.models import Account, Invoice, InvoiceLine, JournalEntry, JournalEntryLine
 from finance.models import BankAccount, GeneralExpense, MaintenanceRepair, Payment
-from properties.models import Property, PropertyAsset, PropertyType, Room, Unit, ensure_default_property_types
+from properties.models import (
+    ExploreSettings, Property, PropertyAsset, PropertyType, Room, Unit, ensure_default_property_types,
+)
 from rentals.models import RentalAgreement, Tenant
 
 User = get_user_model()
@@ -108,6 +111,26 @@ class PropertyForm(forms.ModelForm):
         super()._post_clean()
         if self.instance.is_published and not self.instance.cover_image:
             self.add_error("cover_image", "Add a cover image before publishing this property to Explore.")
+
+
+class ExploreSettingsForm(forms.ModelForm):
+    class Meta:
+        model = ExploreSettings
+        fields = ("whatsapp_number", "contact_phone", "contact_email", "contact_address")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        _style_fields(self)
+        self.fields["whatsapp_number"].widget.attrs["placeholder"] = "+252 61 234 5678"
+        self.fields["contact_phone"].widget.attrs["placeholder"] = "+252 61 234 5678"
+        self.fields["contact_email"].widget.attrs["placeholder"] = "info@hirgal.com"
+        self.fields["contact_address"].widget.attrs["placeholder"] = "Mogadishu, Somalia"
+
+    def clean_whatsapp_number(self):
+        number = (self.cleaned_data.get("whatsapp_number") or "").strip()
+        if number and len(re.sub(r"\D", "", number)) < 7:
+            raise forms.ValidationError("Enter a valid WhatsApp number with its country code.")
+        return number
 
 
 class PropertyTypeForm(forms.ModelForm):

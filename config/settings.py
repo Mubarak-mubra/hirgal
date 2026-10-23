@@ -114,13 +114,13 @@ MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
 
-# Public Explore page — how visitors contact Hirgal Kiro
-# (update these to your real company details)
+# Fallback contact details for the public Explore page. Values saved on the
+# in-app Explore Settings page take precedence over these defaults.
 HIRGAL_CONTACT_PHONE = "+252 61 000 0000"
 HIRGAL_CONTACT_EMAIL = "info@hirgal.com"
 HIRGAL_CONTACT_ADDRESS = "Mogadishu, Somalia"
 
-# WhatsApp number used by the Explore "Contact us" buttons. Use the full
-# international number, with or without spaces. Falls back to
+# Fallback WhatsApp number used by the Explore "Contact us" buttons. Use the
+# full international number, with or without spaces. Falls back to
 # HIRGAL_CONTACT_PHONE when left empty.
 HIRGAL_WHATSAPP_NUMBER = ""

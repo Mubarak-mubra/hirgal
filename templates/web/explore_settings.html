@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Explore Settings - Hirgal Kiro{% endblock %}
+{% block content %}
+<section class="mx-auto max-w-3xl">
+  <a class="text-sm font-semibold text-indigo-700" href="{% url 'web-properties' %}">← Properties</a>
+
+  <div class="mb-6 mt-5">
+    <p class="text-xs font-bold tracking-widest text-indigo-700">PUBLIC EXPLORE</p>
+    <h1 class="mt-2 text-3xl font-bold text-ink">Explore Settings</h1>
+    <p class="mt-2 max-w-2xl text-slate-500">
+      These contact details are used on the public Explore page and by the “Contact us on WhatsApp” buttons.
+    </p>
+  </div>
+
+  {% if messages %}
+  <div class="mb-5 space-y-2">
+    {% for message in messages %}
+    <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">{{ message }}</div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <form method="post" class="rounded-2xl border bg-white p-6 shadow-xl shadow-slate-200/60 md:p-8">
+    {% csrf_token %}
+    {% for error in form.non_field_errors %}
+    <p class="mb-4 rounded-xl bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">{{ error }}</p>
+    {% endfor %}
+
+    <div class="mb-5">
+      <label class="block text-sm font-semibold text-slate-700" for="{{ form.whatsapp_number.id_for_label }}">{{ form.whatsapp_number.label }}</label>
+      {{ form.whatsapp_number }}
+      {% if form.whatsapp_number.help_text %}<p class="mt-1 text-xs text-slate-500">{{ form.whatsapp_number.help_text }}</p>{% endif %}
+      {% for error in form.whatsapp_number.errors %}<p class="mt-1 text-sm text-rose-600">{{ error }}</p>{% endfor %}
+    </div>
+
+    <div class="mb-5">
+      <label class="block text-sm font-semibold text-slate-700" for="{{ form.contact_phone.id_for_label }}">{{ form.contact_phone.label }}</label>
+      {{ form.contact_phone }}
+      {% if form.contact_phone.help_text %}<p class="mt-1 text-xs text-slate-500">{{ form.contact_phone.help_text }}</p>{% endif %}
+      {% for error in form.contact_phone.errors %}<p class="mt-1 text-sm text-rose-600">{{ error }}</p>{% endfor %}
+    </div>
+
+    <div class="mb-5">
+      <label class="block text-sm font-semibold text-slate-700" for="{{ form.contact_email.id_for_label }}">{{ form.contact_email.label }}</label>
+      {{ form.contact_email }}
+      {% if form.contact_email.help_text %}<p class="mt-1 text-xs text-slate-500">{{ form.contact_email.help_text }}</p>{% endif %}
+      {% for error in form.contact_email.errors %}<p class="mt-1 text-sm text-rose-600">{{ error }}</p>{% endfor %}
+    </div>
+
+    <div class="mb-5">
+      <label class="block text-sm font-semibold text-slate-700" for="{{ form.contact_address.id_for_label }}">{{ form.contact_address.label }}</label>
+      {{ form.contact_address }}
+      {% if form.contact_address.help_text %}<p class="mt-1 text-xs text-slate-500">{{ form.contact_address.help_text }}</p>{% endif %}
+      {% for error in form.contact_address.errors %}<p class="mt-1 text-sm text-rose-600">{{ error }}</p>{% endfor %}
+    </div>
+
+    <div class="mt-4 flex flex-wrap items-center justify-between gap-3 border-t pt-5">
+      <a href="{% url 'web-explore' %}" target="_blank" rel="noopener" class="text-sm font-semibold text-indigo-600 hover:underline">Open Explore ↗</a>
+      <button class="rounded-xl bg-ink px-6 py-3 font-bold text-white shadow-lg shadow-indigo-900/20 transition hover:bg-indigo-900" type="submit">Save settings</button>
+    </div>
+  </form>
+</section>
+{% endblock %}

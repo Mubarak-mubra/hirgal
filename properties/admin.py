@@ -1,7 +1,18 @@
 from django.contrib import admin
 
 # Register your models here.
-from .models import Property, PropertyAsset, PropertyType, Room, Unit
+from .models import ExploreSettings, Property, PropertyAsset, PropertyType, Room, Unit
+
+
+@admin.register(ExploreSettings)
+class ExploreSettingsAdmin(admin.ModelAdmin):
+    list_display = ("whatsapp_number", "contact_phone", "contact_email", "contact_address", "updated_at")
+
+    def has_add_permission(self, request):
+        return not ExploreSettings.objects.exists()
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(PropertyType)

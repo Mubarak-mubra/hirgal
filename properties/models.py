@@ -145,3 +145,43 @@ class PropertyAsset(models.Model):
 
     def __str__(self):
         return f"{self.property.name} - {self.name}"
+
+
+class ExploreSettings(models.Model):
+    """Contact details shown on the public Explore page.
+
+    This is a singleton: the public Explore page is shared by every owner,
+    so there is exactly one set of company contact details.
+    """
+
+    whatsapp_number = models.CharField(
+        "WhatsApp number",
+        max_length=30,
+        blank=True,
+        help_text="Number opened by the Contact us buttons. Include the country code, e.g. +252 61 234 5678.",
+    )
+    contact_phone = models.CharField(
+        "Contact phone",
+        max_length=30,
+        blank=True,
+        help_text="Used as the WhatsApp fallback when no WhatsApp number is set.",
+    )
+    contact_email = models.EmailField("Contact email", blank=True)
+    contact_address = models.CharField("Office address", max_length=255, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Explore settings"
+        verbose_name_plural = "Explore settings"
+
+    def __str__(self):
+        return "Explore settings"
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def load(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj

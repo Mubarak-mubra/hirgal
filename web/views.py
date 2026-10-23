@@ -22,7 +22,7 @@ from accounting.services import (
     seed_default_chart_of_accounts,
 )
 from finance.models import BankAccount, GeneralExpense, MaintenanceRepair, Payment
-from properties.models import Property, PropertyAsset, PropertyType, Room, Unit, ensure_default_property_types
+from properties.models import ExploreSettings, Property, PropertyAsset, PropertyType, Room, Unit, ensure_default_property_types
 from rentals.models import RentalAgreement, Tenant
 
 from .forms import (
@@ -30,7 +30,7 @@ from .forms import (
     JournalEntryForm, JournalEntryLineFormSet, MaintenanceRepairForm,
     MonthlyRentInvoiceGenerationForm, PaymentForm, PropertyAssetForm, PropertyForm, PropertyTypeForm, RegistrationForm,
     RentalAgreementForm, RoomForm, TenantForm, UnitForm, UserProfileForm,
-    VillaDetailsForm,
+    VillaDetailsForm, ExploreSettingsForm,
 )
 
 
@@ -560,12 +560,20 @@ class ExploreView(TemplateView):
             properties = properties.filter(
                 Q(name__icontains=query) | Q(location__icontains=query) | Q(description__icontains=query)
             )
+        contact_settings = ExploreSettings.objects.filter(pk=1).first()
         contact = {
-            "phone": getattr(settings, "HIRGAL_CONTACT_PHONE", ""),
-            "email": getattr(settings, "HIRGAL_CONTACT_EMAIL", ""),
-            "address": getattr(settings, "HIRGAL_CONTACT_ADDRESS", ""),
+            "phone": (contact_settings.contact_phone if contact_settings else "")
+            or getattr(settings, "HIRGAL_CONTACT_PHONE", ""),
+            "email": (contact_settings.contact_email if contact_settings else "")
+            or getattr(settings, "HIRGAL_CONTACT_EMAIL", ""),
+            "address": (contact_settings.contact_address if contact_settings else "")
+            or getattr(settings, "HIRGAL_CONTACT_ADDRESS", ""),
         }
-        whatsapp_number = getattr(settings, "HIRGAL_WHATSAPP_NUMBER", "") or contact["phone"]
+        whatsapp_number = (
+            (contact_settings.whatsapp_number if contact_settings else "")
+            or getattr(settings, "HIRGAL_WHATSAPP_NUMBER", "")
+            or contact["phone"]
+        )
         for prop in properties:
             rents = [rent for rent in (prop.unit_rent, prop.room_rent) if rent]
             prop.min_rent = min(rents) if rents else None
@@ -703,6 +711,25 @@ class PropertyTypeDeleteView(LoginRequiredMixin, View):
             return render(request, "web/confirm_delete.html", {"object": property_type, "cancel_url": "web-property-type-list", "error": error})
         property_type.delete()
         return redirect("web-property-type-list")
+
+
+class ExploreSettingsView(HomeView):
+    """Company contact details used by the public Explore page."""
+
+    template_name = "web/explore_settings.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["form"] = ExploreSettingsForm(instance=ExploreSettings.load())
+        return context
+
+    def post(self, request):
+        form = ExploreSettingsForm(request.POST, instance=ExploreSettings.load())
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Explore settings saved. The public page now uses these details.")
+            return redirect("web-explore-settings")
+        return render(request, self.template_name, {"form": form})
 
 
 # ── Assets ────────────────────────────────────────────────────────────────────

@@ -20,7 +20,7 @@ from accounting.services import (
     post_invoice, seed_default_chart_of_accounts,
 )
 from finance.models import BankAccount, Payment, GeneralExpense, MaintenanceRepair
-from properties.models import Property, PropertyAsset, PropertyType, Room, Unit
+from properties.models import ExploreSettings, Property, PropertyAsset, PropertyType, Room, Unit
 from rentals.models import RentalAgreement, Tenant
 
 from .chatbot import ask_ai, explore_financial_summary
@@ -3856,6 +3856,27 @@ class ExplorePublicationTests(TestCase):
         prop = next(p for p in response.context["properties"] if p.pk == self.published.pk)
         self.assertTrue(prop.whatsapp_url.startswith("https://wa.me/252610000000?"))
 
+    def test_saved_explore_settings_override_defaults(self):
+        ExploreSettings.objects.create(
+            pk=1,
+            whatsapp_number="+252 61 555 7788",
+            contact_phone="+252 61 111 2233",
+            contact_email="hello@example.com",
+            contact_address="Taleex, Mogadishu",
+        )
+        response = self.client.get(reverse("web-explore"))
+        prop = next(p for p in response.context["properties"] if p.pk == self.published.pk)
+
+        self.assertTrue(prop.whatsapp_url.startswith("https://wa.me/252615557788?"))
+        self.assertContains(response, "hello@example.com")
+        self.assertContains(response, "Taleex, Mogadishu")
+
+    def test_contact_phone_is_used_when_whatsapp_number_is_blank(self):
+        ExploreSettings.objects.create(pk=1, contact_phone="+252 61 111 2233")
+        response = self.client.get(reverse("web-explore"))
+        prop = next(p for p in response.context["properties"] if p.pk == self.published.pk)
+        self.assertTrue(prop.whatsapp_url.startswith("https://wa.me/252611112233?"))
+
     def test_description_can_be_expanded_from_the_card(self):
         response = self.client.get(reverse("web-explore"))
         self.assertContains(response, "data-description-toggle")
@@ -3945,6 +3966,74 @@ class ExplorePublicationTests(TestCase):
         self.assertEqual(response.status_code, 404)
         self.unpublished.refresh_from_db()
         self.assertFalse(self.unpublished.is_published)
+
+
+class ExploreSettingsPageTests(TestCase):
+    """The in-app Explore settings page controls the public contact details."""
+
+    password = "ExplorePass123!"
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="explore_settings_user",
+            phone_number="+252617000391",
+            password=self.password,
+            full_name="Settings User",
+            is_approved=True,
+        )
+
+    def test_settings_page_requires_login(self):
+        response = self.client.get(reverse("web-explore-settings"))
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/login/", response.url)
+
+    def test_settings_page_renders_form_and_sidebar_link(self):
+        self.client.force_login(self.user)
+        response = self.client.get(reverse("web-explore-settings"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Explore Settings")
+        self.assertContains(response, 'name="whatsapp_number"')
+        self.assertContains(response, 'name="contact_phone"')
+        self.assertContains(response, 'name="contact_email"')
+        self.assertContains(response, 'name="contact_address"')
+        self.assertContains(response, reverse("web-explore-settings"))
+        self.assertContains(response, "Explore Page ↗")
+
+    def test_settings_page_saves_contact_details(self):
+        self.client.force_login(self.user)
+        response = self.client.post(
+            reverse("web-explore-settings"),
+            {
+                "whatsapp_number": "+252 61 555 7788",
+                "contact_phone": "+252 61 111 2233",
+                "contact_email": "hello@example.com",
+                "contact_address": "Taleex, Mogadishu",
+            },
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Explore settings saved")
+
+        settings_obj = ExploreSettings.load()
+        self.assertEqual(settings_obj.whatsapp_number, "+252 61 555 7788")
+        self.assertEqual(settings_obj.contact_phone, "+252 61 111 2233")
+        self.assertEqual(settings_obj.contact_email, "hello@example.com")
+        self.assertEqual(settings_obj.contact_address, "Taleex, Mogadishu")
+
+    def test_settings_page_rejects_invalid_whatsapp_number(self):
+        self.client.force_login(self.user)
+        response = self.client.post(
+            reverse("web-explore-settings"),
+            {
+                "whatsapp_number": "123",
+                "contact_phone": "",
+                "contact_email": "",
+                "contact_address": "",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Enter a valid WhatsApp number")
+        self.assertEqual(ExploreSettings.load().whatsapp_number, "")
 
 
 class PublicExploreChromeTests(TestCase):
