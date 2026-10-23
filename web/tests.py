@@ -4,6 +4,7 @@ from datetime import date
 from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
+from urllib.parse import parse_qs, urlparse
 
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -3776,6 +3777,10 @@ class ExplorePublicationTests(TestCase):
         cls.ptype = PropertyType.objects.create(owner=cls.owner, name="Villa")
         cls.published = Property.objects.create(
             owner=cls.owner, name="Published Villa", location="Mogadishu", property_type=cls.ptype,
+            description=(
+                "A bright three-bedroom villa near the beach with a private garden, "
+                "covered parking and a large living room."
+            ),
             cover_image=SimpleUploadedFile("published.gif", cls.GIF, "image/gif"), is_published=True,
         )
         # Published flag on, but no photo — must stay invisible to visitors.
@@ -3830,6 +3835,39 @@ class ExplorePublicationTests(TestCase):
         response = self.client.get(reverse("web-explore"))
         prop = next(p for p in response.context["properties"] if p.pk == self.published.pk)
         self.assertEqual(prop.min_rent, Decimal("90.00"))
+
+    @override_settings(HIRGAL_WHATSAPP_NUMBER="+252 61 234 5678")
+    def test_contact_button_links_each_listing_to_whatsapp(self):
+        response = self.client.get(reverse("web-explore"))
+        prop = next(p for p in response.context["properties"] if p.pk == self.published.pk)
+
+        parsed = urlparse(prop.whatsapp_url)
+        self.assertEqual(parsed.scheme, "https")
+        self.assertEqual(parsed.netloc, "wa.me")
+        self.assertEqual(parsed.path, "/252612345678")
+        message = parse_qs(parsed.query)["text"][0]
+        self.assertIn("Published Villa", message)
+        self.assertIn("Mogadishu", message)
+        self.assertContains(response, "https://wa.me/252612345678?text=")
+        self.assertContains(response, "Contact us on WhatsApp")
+
+    def test_contact_button_falls_back_to_contact_phone(self):
+        response = self.client.get(reverse("web-explore"))
+        prop = next(p for p in response.context["properties"] if p.pk == self.published.pk)
+        self.assertTrue(prop.whatsapp_url.startswith("https://wa.me/252610000000?"))
+
+    def test_description_can_be_expanded_from_the_card(self):
+        response = self.client.get(reverse("web-explore"))
+        self.assertContains(response, "data-description-toggle")
+        self.assertContains(response, "data-description-text")
+        self.assertContains(response, "line-clamp-3")
+        self.assertContains(response, "Read more")
+        self.assertContains(response, self.published.description)
+
+    def test_explore_has_no_bottom_contact_card(self):
+        response = self.client.get(reverse("web-explore"))
+        self.assertNotContains(response, 'id="contact"')
+        self.assertNotContains(response, "Talk to Hirgal Kiro")
 
     # ── Publishing always needs an image ─────────────────────────────────────
 
@@ -3937,6 +3975,21 @@ class PublicExploreChromeTests(TestCase):
         self.assertTemplateNotUsed(response, "base.html")
         self.assertNotContains(response, 'class="sidebar"')
         self.assertNotContains(response, "sidebar-overlay")
+        # A logged-in owner gets the same public marketing page as a visitor.
+        self.assertNotContains(response, "Go to my properties")
+
+    def test_explore_never_shows_login_or_dashboard_buttons(self):
+        for logged_in in (False, True):
+            with self.subTest(logged_in=logged_in):
+                if logged_in:
+                    self.client.force_login(self.owner)
+                else:
+                    self.client.logout()
+                response = self.client.get(reverse("web-explore"))
+                self.assertNotContains(response, reverse("web-login"))
+                self.assertNotContains(response, reverse("dashboard"))
+                self.assertNotContains(response, "Sign in")
+                self.assertNotContains(response, "Dashboard →")
 
     def test_explore_is_indexable_and_declares_canonical(self):
         response = self.client.get(reverse("web-explore"))

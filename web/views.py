@@ -1,3 +1,6 @@
+import re
+from urllib.parse import urlencode
+
 from django.contrib import messages
 from django.contrib.auth import get_user_model, login, logout
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -29,6 +32,18 @@ from .forms import (
     RentalAgreementForm, RoomForm, TenantForm, UnitForm, UserProfileForm,
     VillaDetailsForm,
 )
+
+
+def _whatsapp_url(number, message):
+    """Build a wa.me link from a human-formatted phone number."""
+    digits = re.sub(r"\D", "", number or "")
+    if digits.startswith("00"):
+        digits = digits[2:]
+    elif digits.startswith("0"):
+        # Local Somali numbers are written as 06..., but wa.me needs 2526...
+        digits = "252" + digits[1:]
+    base = f"https://wa.me/{digits}" if digits else "https://wa.me/"
+    return f"{base}?{urlencode({'text': message})}"
 
 
 class HomeView(LoginRequiredMixin, TemplateView):
@@ -545,16 +560,24 @@ class ExploreView(TemplateView):
             properties = properties.filter(
                 Q(name__icontains=query) | Q(location__icontains=query) | Q(description__icontains=query)
             )
-        for prop in properties:
-            rents = [rent for rent in (prop.unit_rent, prop.room_rent) if rent]
-            prop.min_rent = min(rents) if rents else None
-        context["properties"] = properties
-        context["query"] = query
-        context["contact"] = {
+        contact = {
             "phone": getattr(settings, "HIRGAL_CONTACT_PHONE", ""),
             "email": getattr(settings, "HIRGAL_CONTACT_EMAIL", ""),
             "address": getattr(settings, "HIRGAL_CONTACT_ADDRESS", ""),
         }
+        whatsapp_number = getattr(settings, "HIRGAL_WHATSAPP_NUMBER", "") or contact["phone"]
+        for prop in properties:
+            rents = [rent for rent in (prop.unit_rent, prop.room_rent) if rent]
+            prop.min_rent = min(rents) if rents else None
+            location = f" ({prop.location})" if prop.location else ""
+            prop.whatsapp_url = _whatsapp_url(
+                whatsapp_number,
+                f"Hello Hirgal Kiro, I'm interested in {prop.name}{location} "
+                "listed on Explore. Could you help me arrange a viewing?",
+            )
+        context["properties"] = properties
+        context["query"] = query
+        context["contact"] = contact
         return context
 
 
@@ -1615,17 +1638,11 @@ class InvoiceSendView(LoginRequiredMixin, View):
     login_url = "/login/"
 
     def post(self, request, pk):
-        import re as _re
-        from urllib.parse import urlencode
-
         invoice = get_object_or_404(Invoice, pk=pk, owner=request.user.get_data_owner())
         if invoice.status == "draft":
             invoice.status = "sent"
             invoice.save(update_fields=["status"])
 
-        phone = _re.sub(r"\D", "", invoice.tenant.phone_number or "")
-        if phone.startswith("0"):
-            phone = "252" + phone[1:]
         rent_month_line = (
             f"Rent month: {(invoice.billing_period or invoice.due_date.replace(day=1)).strftime('%B %Y')}\n"
             if invoice.billing_period or invoice.rental_agreement_id else ""
@@ -1639,11 +1656,7 @@ class InvoiceSendView(LoginRequiredMixin, View):
             f"Due: {invoice.due_date}\n\n"
             f"Thank you."
         )
-        if phone:
-            url = f"https://wa.me/{phone}?{urlencode({'text': message})}"
-        else:
-            url = f"https://wa.me/?{urlencode({'text': message})}"
-        return redirect(url)
+        return redirect(_whatsapp_url(invoice.tenant.phone_number, message))
 
 
 class InvoiceCreateView(LoginRequiredMixin, View):

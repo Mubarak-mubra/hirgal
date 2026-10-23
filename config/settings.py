@@ -119,3 +119,8 @@ MEDIA_ROOT = BASE_DIR / "media"
 HIRGAL_CONTACT_PHONE = "+252 61 000 0000"
 HIRGAL_CONTACT_EMAIL = "info@hirgal.com"
 HIRGAL_CONTACT_ADDRESS = "Mogadishu, Somalia"
+
+# WhatsApp number used by the Explore "Contact us" buttons. Use the full
+# international number, with or without spaces. Falls back to
+# HIRGAL_CONTACT_PHONE when left empty.
+HIRGAL_WHATSAPP_NUMBER = ""
