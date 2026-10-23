@@ -46,14 +46,18 @@
         <div>
             <div class="flex items-center justify-between gap-3">
                 <p class="text-sm font-semibold text-slate-500">Explore page</p>
-                {% if property.is_published %}
+                {% if property.is_published and is_fully_occupied %}
+                <span class="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-700"><span class="h-1.5 w-1.5 rounded-full bg-amber-500"></span>Fully rented · hidden</span>
+                {% elif property.is_published %}
                 <span class="inline-flex items-center gap-1.5 rounded-full bg-green-100 px-3 py-1 text-xs font-bold text-green-700"><span class="h-1.5 w-1.5 rounded-full bg-green-500"></span>Live on Explore</span>
                 {% else %}
                 <span class="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-500">Hidden</span>
                 {% endif %}
             </div>
             <p class="mt-2 text-sm text-slate-600">
-                {% if property.is_published %}
+                {% if property.is_published and is_fully_occupied %}
+                This property is fully rented, so it is automatically hidden from the <a class="font-semibold text-indigo-600 hover:underline" href="{% url 'web-explore' %}" target="_blank" rel="noopener">Explore page ↗</a>. It will appear again automatically when a space becomes free.
+                {% elif property.is_published %}
                 Anyone on the internet can find this property on the <a class="font-semibold text-indigo-600 hover:underline" href="{% url 'web-explore' %}" target="_blank" rel="noopener">Explore page ↗</a>.
                 {% else %}
                 Publish it so anyone browsing the internet can discover it and contact Hirgal Kiro.
@@ -98,6 +102,9 @@
             <div class="h-3 rounded-full {% if occupancy_color == 'green' %}bg-green-500{% elif occupancy_color == 'amber' %}bg-amber-500{% else %}bg-red-500{% endif %}" style="width: {{ occupancy_rate }}%"></div>
         </div>
         <p class="mt-2 text-sm text-slate-600"><strong>{{ occupancy_rate }}%</strong> — {{ rented_spaces }} of {{ total_spaces }} space{{ total_spaces|pluralize }} rented</p>
+        {% if is_fully_occupied %}
+        <p class="mt-2 text-xs font-semibold text-amber-700">Fully rented — automatically hidden from Explore until a space becomes free.</p>
+        {% endif %}
     </div>
     <div class="rounded-2xl border bg-white p-5 shadow-sm">
         <p class="text-sm text-slate-500 mb-3">Utility Account Numbers</p>

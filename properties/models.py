@@ -68,6 +68,90 @@ class Property(models.Model):
             return self.property_type.has_units
         return self.units.exists()
 
+    # ── Occupancy ────────────────────────────────────────────────────────────
+
+    def active_rental_agreements(self):
+        """Active agreements using this property, directly or via a unit/room.
+
+        An agreement may store ``property``, ``unit``, ``room`` or a
+        combination of them, so ``rental_agreements`` alone would miss
+        unit-only and room-only agreements.
+        """
+        from rentals.models import RentalAgreement
+
+        return (
+            RentalAgreement.objects.filter(status="active")
+            .filter(
+                models.Q(property=self)
+                | models.Q(unit__property=self)
+                | models.Q(room__unit__property=self)
+            )
+            .select_related("tenant", "property", "unit", "room")
+        )
+
+    @staticmethod
+    def _occupied_unit_ids(units, agreements):
+        """Return the ids of units fully covered by active agreements."""
+        unit_ids = {unit.pk for unit in units}
+        if any(
+            agreement.unit_id is None and agreement.room_id is None
+            for agreement in agreements
+        ):
+            # A whole-property agreement covers every unit.
+            return unit_ids
+
+        occupied_unit_ids = set()
+        rented_room_ids = {a.room_id for a in agreements if a.room_id}
+        for agreement in agreements:
+            if agreement.room_id is None and agreement.unit_id in unit_ids:
+                occupied_unit_ids.add(agreement.unit_id)
+        for unit in units:
+            if unit.pk in occupied_unit_ids:
+                continue
+            room_ids = {room.pk for room in unit.rooms.all()}
+            if room_ids and room_ids <= rented_room_ids:
+                occupied_unit_ids.add(unit.pk)
+        return occupied_unit_ids
+
+    def get_occupancy(self, agreements=None):
+        """Return how much of this property is currently rented.
+
+        A property with units counts one unit as one rentable space. A unit
+        rented room by room only counts as occupied once every room in it is
+        rented. A property without units is one single rentable space.
+        """
+        if agreements is None:
+            agreements = self.active_rental_agreements()
+        agreements = list(agreements)
+
+        units = list(self.units.prefetch_related("rooms")) if self.has_units else []
+        if units:
+            total_spaces = len(units)
+            rented_spaces = len(self._occupied_unit_ids(units, agreements))
+        else:
+            total_spaces = 1
+            rented_spaces = 1 if agreements else 0
+
+        return {
+            "total_spaces": total_spaces,
+            "rented_spaces": rented_spaces,
+            "occupancy_rate": round(rented_spaces / total_spaces * 100, 1),
+            "is_fully_occupied": rented_spaces >= total_spaces,
+        }
+
+    def available_units(self):
+        """Units that can still be offered in a new rental agreement."""
+        if not self.has_units:
+            return []
+        units = list(self.units.prefetch_related("rooms"))
+        agreements = list(self.active_rental_agreements())
+        occupied = self._occupied_unit_ids(units, agreements)
+        return [unit for unit in units if unit.pk not in occupied]
+
+    @property
+    def is_fully_occupied(self):
+        return self.get_occupancy()["is_fully_occupied"]
+
 
 class Unit(models.Model):
     UNIT_TYPES = [("house", "House"), ("apartment", "Apartment"), ("room", "Room"), ("shop", "Shop"), ("office", "Office"), ("other", "Other")]

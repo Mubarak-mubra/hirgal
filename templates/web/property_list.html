@@ -58,7 +58,9 @@
                     {% endfor %}
                 </td>
                 <td class="px-4 py-3">
-                    {% if property.is_published %}
+                    {% if property.is_published and property.occupancy.is_fully_occupied %}
+                    <span class="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-700" title="Fully rented — automatically hidden from Explore"><span class="h-1.5 w-1.5 rounded-full bg-amber-500"></span>Fully rented</span>
+                    {% elif property.is_published %}
                     <span class="inline-flex items-center gap-1.5 rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-semibold text-green-700"><span class="h-1.5 w-1.5 rounded-full bg-green-500"></span>Live</span>
                     {% elif property.cover_image %}
                     <span class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-500">Hidden</span>

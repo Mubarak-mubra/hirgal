@@ -132,8 +132,12 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         context["recent_repairs"] = all_repairs.select_related("property").order_by("-reported_date")[:5]
 
         # Occupancy
-        total_units = sum(p.total_rentable_spaces for p in Property.objects.filter(owner=user))
-        rented_units = RentalAgreement.objects.filter(tenant__owner=user, status="active").count()
+        total_units = 0
+        rented_units = 0
+        for prop in Property.objects.filter(owner=user):
+            occupancy = prop.get_occupancy()
+            total_units += occupancy["total_spaces"]
+            rented_units += occupancy["rented_spaces"]
         context["occupancy_rate"] = round((rented_units / total_units * 100) if total_units > 0 else 0, 1)
         context["total_units"] = total_units
         context["rented_units"] = rented_units
@@ -211,20 +215,15 @@ class UnitsByPropertyView(LoginRequiredMixin, View):
         if not property_instance or not property_instance.has_units:
             return JsonResponse({"units": []})
 
-        # Get all units for this property
-        all_units = Unit.objects.filter(property_id=property_id)
-
-        # Get unit IDs that have active agreements
-        rented_unit_ids = RentalAgreement.objects.filter(
-            property_id=property_id,
-            status="active",
-            unit__isnull=False
-        ).values_list("unit_id", flat=True)
-
-        # Filter out rented units
-        available_units = all_units.exclude(id__in=rented_unit_ids).values("id", "unit_number")
-
-        return JsonResponse({"units": list(available_units)})
+        # Get only units that are still free. Occupancy-aware so a unit rented
+        # through a unit-only agreement (property=None) is not offered again.
+        available_units = property_instance.available_units()
+        return JsonResponse({
+            "units": [
+                {"id": unit.pk, "unit_number": unit.unit_number}
+                for unit in available_units
+            ]
+        })
 
 
 class AgreementsByTenantView(LoginRequiredMixin, View):
@@ -403,9 +402,11 @@ class PropertyListView(HomeView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         properties = Property.objects.filter(owner=self.request.user.get_data_owner()).prefetch_related("assets")
-        # Prefetch active agreements for each property
+        # Fetch active agreements and occupancy once per property for the list.
         for prop in properties:
-            prop.active_agreements = prop.rental_agreements.filter(status="active").select_related("tenant", "unit")
+            agreements = list(prop.active_rental_agreements())
+            prop.active_agreements = agreements
+            prop.occupancy = prop.get_occupancy(agreements)
         context["properties"] = properties
         return context
 
@@ -450,7 +451,7 @@ class PropertyDetailView(LoginRequiredMixin, DetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        agreements = self.object.rental_agreements.filter(status="active")
+        agreements = self.object.active_rental_agreements()
         context["active_agreements"] = agreements
         context["expected_rent"] = sum(item.agreed_monthly_rent for item in agreements)
         context["monthly_expenses"] = sum(item.amount for item in self.object.general_expenses.all())
@@ -461,16 +462,12 @@ class PropertyDetailView(LoginRequiredMixin, DetailView):
             single_unit = self.object.units.first()
             context["space_badge"] = "%d rooms" % single_unit.rooms.count() if single_unit else "Whole property"
 
-        total_spaces = self.object.total_rentable_spaces or 1
-        rented_spaces = min(sum(item.rented_space_count for item in agreements), total_spaces)
-        occupancy_rate = round(rented_spaces / total_spaces * 100, 1)
-        context["total_spaces"] = total_spaces
-        context["rented_spaces"] = rented_spaces
-        context["occupancy_rate"] = occupancy_rate
-        if occupancy_rate >= 100:
+        occupancy = self.object.get_occupancy(agreements)
+        context.update(occupancy)
+        if occupancy["is_fully_occupied"]:
             context["occupancy_label"] = "Fully Rented"
             context["occupancy_color"] = "green"
-        elif occupancy_rate > 0:
+        elif occupancy["occupancy_rate"] > 0:
             context["occupancy_label"] = "Partially Rented"
             context["occupancy_color"] = "amber"
         else:
@@ -531,6 +528,14 @@ class PropertyPublishToggleView(LoginRequiredMixin, View):
             messages.success(request, 'Hidden from Explore: "%s".' % property_instance.name)
         elif not property_instance.cover_image:
             messages.error(request, "Add a cover image before publishing this property to Explore.")
+        elif property_instance.is_fully_occupied:
+            property_instance.is_published = True
+            property_instance.save(update_fields=["is_published", "updated_at"])
+            messages.success(
+                request,
+                'Saved as published. "%s" will appear on Explore again when a space becomes free.'
+                % property_instance.name,
+            )
         else:
             property_instance.is_published = True
             property_instance.save(update_fields=["is_published", "updated_at"])
@@ -574,7 +579,13 @@ class ExploreView(TemplateView):
             or getattr(settings, "HIRGAL_WHATSAPP_NUMBER", "")
             or contact["phone"]
         )
+        listed_properties = []
         for prop in properties:
+            occupancy = prop.get_occupancy()
+            if occupancy["is_fully_occupied"]:
+                # A fully rented property has nothing left to advertise.
+                continue
+            prop.occupancy = occupancy
             rents = [rent for rent in (prop.unit_rent, prop.room_rent) if rent]
             prop.min_rent = min(rents) if rents else None
             location = f" ({prop.location})" if prop.location else ""
@@ -583,7 +594,8 @@ class ExploreView(TemplateView):
                 f"Hello Hirgal Kiro, I'm interested in {prop.name}{location} "
                 "listed on Explore. Could you help me arrange a viewing?",
             )
-        context["properties"] = properties
+            listed_properties.append(prop)
+        context["properties"] = listed_properties
         context["query"] = query
         context["contact"] = contact
         return context

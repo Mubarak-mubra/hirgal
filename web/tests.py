@@ -24,7 +24,10 @@ from properties.models import ExploreSettings, Property, PropertyAsset, Property
 from rentals.models import RentalAgreement, Tenant
 
 from .chatbot import ask_ai, explore_financial_summary
-from .forms import InvoiceForm, InvoiceLineFormSet, JournalEntryLineFormSet, PaymentForm, PropertyForm
+from .forms import (
+    InvoiceForm, InvoiceLineFormSet, JournalEntryLineFormSet, PaymentForm, PropertyForm,
+    RentalAgreementForm,
+)
 
 
 class CheckTenantPaidViewOwnershipTests(TestCase):
@@ -3966,6 +3969,144 @@ class ExplorePublicationTests(TestCase):
         self.assertEqual(response.status_code, 404)
         self.unpublished.refresh_from_db()
         self.assertFalse(self.unpublished.is_published)
+
+
+class ExploreOccupancyTests(TestCase):
+    """Fully rented properties leave Explore and return when a space frees up."""
+
+    password = "ExplorePass123!"
+    GIF = ExplorePublicationTests.GIF
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create_user(
+            "occupancy_owner", "+252617000193", cls.password,
+            full_name="Occupancy Owner", is_approved=True,
+        )
+        cls.house_type = PropertyType.objects.create(owner=cls.owner, name="House", has_units=False)
+        cls.apartment_type = PropertyType.objects.create(
+            owner=cls.owner, name="Apartment block", has_units=True,
+        )
+        cls.house = Property.objects.create(
+            owner=cls.owner, name="Occupancy House", location="Mogadishu",
+            property_type=cls.house_type,
+            cover_image=SimpleUploadedFile("occupancy-house.gif", cls.GIF, "image/gif"),
+            is_published=True,
+        )
+        cls.apartment = Property.objects.create(
+            owner=cls.owner, name="Occupancy Apartments", location="Mogadishu",
+            property_type=cls.apartment_type,
+            cover_image=SimpleUploadedFile("occupancy-apartments.gif", cls.GIF, "image/gif"),
+            is_published=True,
+        )
+        cls.unit_one = Unit.objects.create(property=cls.apartment, unit_number="1A")
+        cls.unit_two = Unit.objects.create(property=cls.apartment, unit_number="1B")
+        cls.tenant = Tenant.objects.create(owner=cls.owner, full_name="Occupancy Renter")
+
+    def _agreement(self, *, property=None, unit=None, room=None, status="active"):
+        return RentalAgreement.objects.create(
+            tenant=self.tenant,
+            property=property,
+            unit=unit,
+            room=room,
+            start_date=date(2026, 1, 1),
+            monthly_rent=Decimal("400.00"),
+            status=status,
+        )
+
+    def _listed(self, response):
+        return [prop.name for prop in response.context["properties"]]
+
+    def test_whole_property_rental_hides_house_from_explore(self):
+        self._agreement(property=self.house)
+        response = self.client.get(reverse("web-explore"))
+        self.assertNotIn("Occupancy House", self._listed(response))
+        # The owner's publishing preference is kept, so it can return later.
+        self.house.refresh_from_db()
+        self.assertTrue(self.house.is_published)
+
+    def test_ended_or_cancelled_agreements_do_not_hide_the_house(self):
+        self._agreement(property=self.house, status="ended")
+        self._agreement(property=self.house, status="cancelled")
+        response = self.client.get(reverse("web-explore"))
+        self.assertIn("Occupancy House", self._listed(response))
+
+    def test_house_returns_to_explore_when_agreement_ends(self):
+        agreement = self._agreement(property=self.house)
+        self.assertNotIn(
+            "Occupancy House", self._listed(self.client.get(reverse("web-explore"))),
+        )
+        agreement.status = "ended"
+        agreement.save(update_fields=["status"])
+        self.assertIn(
+            "Occupancy House", self._listed(self.client.get(reverse("web-explore"))),
+        )
+
+    def test_partially_rented_apartment_stays_on_explore(self):
+        self._agreement(property=self.apartment, unit=self.unit_one)
+        response = self.client.get(reverse("web-explore"))
+        self.assertIn("Occupancy Apartments", self._listed(response))
+
+    def test_fully_rented_apartment_is_hidden_with_unit_only_agreements(self):
+        self._agreement(property=self.apartment, unit=self.unit_one)
+        # Unit-only agreements have property=None but still rent the property.
+        self._agreement(unit=self.unit_two)
+        response = self.client.get(reverse("web-explore"))
+        self.assertNotIn("Occupancy Apartments", self._listed(response))
+
+    def test_apartment_stays_visible_until_every_room_is_rented(self):
+        room_one = Room.objects.create(
+            unit=self.unit_one, room_name="Bed 1", monthly_rent=Decimal("120.00"),
+        )
+        Room.objects.create(
+            unit=self.unit_two, room_name="Bed 1", monthly_rent=Decimal("120.00"),
+        )
+        self._agreement(room=room_one)
+        response = self.client.get(reverse("web-explore"))
+        self.assertIn("Occupancy Apartments", self._listed(response))
+
+    def test_apartment_is_hidden_when_every_room_is_rented(self):
+        room_one = Room.objects.create(
+            unit=self.unit_one, room_name="Bed 1", monthly_rent=Decimal("120.00"),
+        )
+        room_two = Room.objects.create(
+            unit=self.unit_two, room_name="Bed 1", monthly_rent=Decimal("120.00"),
+        )
+        self._agreement(room=room_one)
+        self._agreement(room=room_two)
+        response = self.client.get(reverse("web-explore"))
+        self.assertNotIn("Occupancy Apartments", self._listed(response))
+
+    def test_property_detail_explains_the_explore_hiding(self):
+        self._agreement(property=self.house)
+        self.client.force_login(self.owner)
+        response = self.client.get(reverse("web-property-detail", args=[self.house.pk]))
+        self.assertContains(response, "Fully Rented")
+        self.assertContains(response, "Fully rented · hidden")
+        self.assertContains(response, "automatically hidden from Explore")
+
+    def test_property_list_marks_fully_rented_published_properties(self):
+        self._agreement(property=self.house)
+        self.client.force_login(self.owner)
+        response = self.client.get(reverse("web-properties"))
+        self.assertContains(response, "Fully rented")
+
+    def test_agreement_form_excludes_fully_rented_properties(self):
+        self._agreement(property=self.house)
+        form = RentalAgreementForm(user=self.owner)
+        self.assertNotIn(self.house, form.fields["property"].queryset)
+        self.assertIn(self.apartment, form.fields["property"].queryset)
+
+    def test_units_endpoint_hides_units_rented_through_unit_only_agreements(self):
+        self._agreement(unit=self.unit_one)
+        self.client.force_login(self.owner)
+        response = self.client.get(
+            reverse("web-units-by-property"), {"property_id": self.apartment.pk},
+        )
+        self.assertEqual(
+            [unit["id"] for unit in response.json()["units"]],
+            [self.unit_two.pk],
+        )
 
 
 class ExploreSettingsPageTests(TestCase):

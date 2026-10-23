@@ -47,12 +47,23 @@ class RentalsWebTests(TestCase):
         self.assertEqual(response.status_code, 200)
 
     def test_units_by_property_endpoint_lists_available_units(self):
+        # End the current whole-property agreement so the unit is available.
+        self.agreement.status = "ended"
+        self.agreement.save(update_fields=["status"])
         response = self.client.get(
             reverse("web-units-by-property"), {"property_id": self.property.pk}
         )
         self.assertEqual(response.status_code, 200)
         units = response.json()["units"]
         self.assertEqual([unit["id"] for unit in units], [self.unit.pk])
+
+    def test_units_by_property_endpoint_hides_occupied_units(self):
+        # The active whole-property agreement covers the only unit.
+        response = self.client.get(
+            reverse("web-units-by-property"), {"property_id": self.property.pk}
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["units"], [])
 
     def test_anonymous_rentals_pages_redirect_to_login(self):
         self.client.logout()

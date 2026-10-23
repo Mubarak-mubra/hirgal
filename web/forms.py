@@ -259,21 +259,20 @@ class RentalAgreementForm(forms.ModelForm):
     def __init__(self, *args, user=None, tenant_id=None, **kwargs):
         super().__init__(*args, **kwargs)
         if user:
-            from django.db.models import Q
-            active_agreements = RentalAgreement.objects.filter(status="active")
-
-            final_property_ids = []
-            for prop in Property.objects.filter(owner=user):
-                active_for_prop = active_agreements.filter(property=prop)
-                if prop.has_units:
-                    # Unit-based property: available if any unit is still free
-                    rented_unit_ids = active_for_prop.values_list("unit_id", flat=True)
-                    if prop.units.exclude(id__in=rented_unit_ids).exists():
-                        final_property_ids.append(prop.pk)
-                else:
-                    # Complete-unit (whole property) rental: available if no active agreement
-                    if not active_for_prop.exists():
-                        final_property_ids.append(prop.pk)
+            final_property_ids = [
+                prop.pk
+                for prop in Property.objects.filter(owner=user)
+                if not prop.is_fully_occupied
+            ]
+            # Keep the current selection editable even if it just became full.
+            if self.instance.pk:
+                current_property_id = self.instance.property_id
+                if not current_property_id and self.instance.unit_id:
+                    current_property_id = self.instance.unit.property_id
+                if not current_property_id and self.instance.room_id:
+                    current_property_id = self.instance.room.unit.property_id
+                if current_property_id and current_property_id not in final_property_ids:
+                    final_property_ids.append(current_property_id)
 
             self.fields["tenant"].queryset = Tenant.objects.filter(owner=user)
             self.fields["property"].queryset = Property.objects.filter(id__in=final_property_ids)
